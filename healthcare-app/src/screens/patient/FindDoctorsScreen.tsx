@@ -59,7 +59,7 @@ const FindDoctorsScreen = ({ navigation }: any) => {
                   <Star size={14} color="#FACC15" fill="#FACC15" />
                   <Text style={styles.ratingText}>{item.rating} ({item.reviews} reviews)</Text>
                 </View>
-                <TouchableOpacity style={styles.bookBtn}>
+                <TouchableOpacity style={styles.bookBtn} onPress={() => navigation.navigate('BookAppointment')}>
                   <Text style={styles.bookBtnText}>Book</Text>
                 </TouchableOpacity>
               </View>

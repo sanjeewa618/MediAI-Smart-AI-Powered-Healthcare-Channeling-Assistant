@@ -1,5 +1,5 @@
 export const COLORS = {
-  primary: '#724CF9', // Lighter, more modern violet-blue
+  primary: '#633bf2', // Lighter, more modern violet-blue
   primaryDark: '#5E3BEE',
   primaryLight: '#F3F0FF',
   secondary: '#FF6584',
@@ -13,7 +13,7 @@ export const COLORS = {
   success: '#4CAF50',
   error: '#F44336',
   warning: '#FF9800',
-  gradientPrimary: ['#724CF9', '#A58BFF'] as const,
+  gradientPrimary: ['#6139f1', '#A58BFF'] as const,
   shadow: '#724CF915',
 };
 
