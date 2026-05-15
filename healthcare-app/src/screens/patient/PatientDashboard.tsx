@@ -75,6 +75,7 @@ const PatientDashboard = () => {
             horizontal 
             showsHorizontalScrollIndicator={false} 
             contentContainerStyle={styles.categoriesContainer}
+            
           >
             <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('FindDoctors')}>
               <View style={styles.categoryIconWrap}>
