@@ -13,11 +13,13 @@ import RoleSelectionScreen from '../screens/auth/RoleSelectionScreen';
 import PatientDashboard from '../screens/patient/PatientDashboard';
 import DoctorDashboard from '../screens/doctor/DoctorDashboard';
 import LabDashboard from '../screens/lab/LabDashboard';
+import DoctorAvailability from '../screens/doctor/DoctorAvailability';
 
 // Patient Sub-screens
 import FindDoctorsScreen from '../screens/patient/FindDoctorsScreen';
 import AIHealthAssistantScreen from '../screens/patient/AIHealthAssistantScreen';
 import PatientAppointmentsScreen from '../screens/patient/PatientAppointmentsScreen';
+import BookAppointmentScreen from '../screens/patient/BookAppointmentScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -37,10 +39,12 @@ const AppNavigator = () => {
       <Stack.Screen name="RoleSelection" component={RoleSelectionScreen} />
       <Stack.Screen name="PatientDashboard" component={PatientDashboard} />
       <Stack.Screen name="DoctorDashboard" component={DoctorDashboard} />
+      <Stack.Screen name="DoctorAvailability" component={DoctorAvailability} />
       <Stack.Screen name="LabDashboard" component={LabDashboard} />
       <Stack.Screen name="FindDoctors" component={FindDoctorsScreen} />
       <Stack.Screen name="AIHealthAssistant" component={AIHealthAssistantScreen} />
       <Stack.Screen name="PatientAppointments" component={PatientAppointmentsScreen} />
+      <Stack.Screen name="BookAppointment" component={BookAppointmentScreen} />
     </Stack.Navigator>
   );
 };

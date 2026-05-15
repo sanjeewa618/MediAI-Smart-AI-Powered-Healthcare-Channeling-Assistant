@@ -1,7 +1,7 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, Dimensions } from 'react-native';
+import React, { useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, Dimensions, Animated, PanResponder } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
-import { Search, Calendar, User, FileText, Activity, MoreHorizontal, Home, Heart, Shield, MessageCircle, FilePenLine, FlaskConical, ChevronRight, Baby, Droplets, Sun, Sparkles } from 'lucide-react-native';
+import { Search, Calendar, User, FileText, Activity, MoreHorizontal, Home, Heart, Shield, MessageCircle, FilePenLine, FlaskConical, ChevronRight, Baby, Droplets, Sun, Sparkles, Plus } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -13,6 +13,32 @@ type PatientDashboardProp = StackNavigationProp<RootStackParamList, 'PatientDash
 
 const PatientDashboard = () => {
   const navigation = useNavigation<PatientDashboardProp>();
+
+  const pan = useRef(new Animated.ValueXY()).current;
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (e, gestureState) => {
+        // Trigger only if dragging moves more than a few pixels to allow normal onPress
+        return Math.abs(gestureState.dx) > 2 || Math.abs(gestureState.dy) > 2;
+      },
+      onPanResponderGrant: () => {
+        pan.setOffset({
+          x: (pan.x as any)._value,
+          y: (pan.y as any)._value
+        });
+      },
+      onPanResponderMove: Animated.event(
+        [
+          null,
+          { dx: pan.x, dy: pan.y }
+        ],
+        { useNativeDriver: false }
+      ),
+      onPanResponderRelease: () => {
+        pan.flattenOffset();
+      }
+    })
+  ).current;
 
   return (
     <View style={styles.container}>
@@ -60,9 +86,16 @@ const PatientDashboard = () => {
               </TouchableOpacity>
             </View>
             <Image 
-              source={require('../../../assets/robot-card.png')} 
+              source={require('../../../assets/bot-image.png')} 
               style={styles.aiCardImage} 
               resizeMode="contain"
+            />
+            {/* Gradient overlay to blend the left side of the image into the background */}
+            <LinearGradient
+              colors={['#6139f1', 'transparent']}
+              start={{ x: 0.04, y: 0 }}
+              end={{ x: 0.5, y: 0 }}
+              style={styles.aiCardImageOverlay}
             />
           </LinearGradient>
         </LinearGradient>
@@ -77,35 +110,35 @@ const PatientDashboard = () => {
             contentContainerStyle={styles.categoriesContainer}
             
           >
-            <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('FindDoctors')}>
+            <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('DoctorAvailability')}>
               <View style={styles.categoryIconWrap}>
                 <Heart size={28} color="#4B5563" />
               </View>
               <Text style={styles.categoryText}>Cardiology</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('FindDoctors')}>
+            <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('DoctorAvailability')}>
               <View style={styles.categoryIconWrap}>
                 <Baby size={28} color="#4B5563" />
               </View>
               <Text style={styles.categoryText}>Paediatrics</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('FindDoctors')}>
+            <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('DoctorAvailability')}>
               <View style={styles.categoryIconWrap}>
                 <Droplets size={28} color="#4B5563" />
               </View>
               <Text style={styles.categoryText}>Urology</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('FindDoctors')}>
+            <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('DoctorAvailability')}>
               <View style={styles.categoryIconWrap}>
                 <Sun size={28} color="#4B5563" />
               </View>
               <Text style={styles.categoryText}>Oncology</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('FindDoctors')}>
+            <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('DoctorAvailability')}>
               <View style={styles.categoryIconWrap}>
                 <Sparkles size={28} color="#4B5563" />
               </View>
@@ -177,7 +210,7 @@ const PatientDashboard = () => {
           {/* Quick Actions */}
           <Text style={[styles.sectionTitle, { marginTop: 24, marginBottom: 16 }]}>Quick Actions</Text>
           <View style={styles.quickActionsRow}>
-            <TouchableOpacity style={styles.quickActionItem} onPress={() => navigation.navigate('FindDoctors')}>
+            <TouchableOpacity style={styles.quickActionItem} onPress={() => navigation.navigate('DoctorAvailability')}>
               <View style={styles.quickActionIconWrap}>
                 <User size={24} color={COLORS.primary} />
               </View>
@@ -223,15 +256,31 @@ const PatientDashboard = () => {
           <Heart size={24} color="#9CA3AF" />
           <Text style={styles.navText}>AI Health</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
+        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('DoctorAvailability')}>
           <FileText size={24} color="#9CA3AF" />
-          <Text style={styles.navText}>Records</Text>
+          <Text style={styles.navText}>Availability</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.navItem}>
           <User size={24} color="#9CA3AF" />
           <Text style={styles.navText}>Profile</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Floating Action Button */}
+      <Animated.View
+        style={[
+          styles.fabWrapper,
+          { transform: [{ translateX: pan.x }, { translateY: pan.y }] }
+        ]}
+        {...panResponder.panHandlers}
+      >
+        <TouchableOpacity 
+          style={[styles.fab, SHADOWS.medium]} 
+          onPress={() => navigation.navigate('DoctorAvailability')}
+        >
+          <Plus size={28} color="#FFFFFF" />
+        </TouchableOpacity>
+      </Animated.View>
     </View>
   );
 };
@@ -299,7 +348,9 @@ const styles = StyleSheet.create({
     position: 'relative',
     height: 140,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)'
+    borderColor: 'rgba(255,255,255,0.1)',
+    overflow: 'hidden',
+    marginTop: 10
   },
   aiCardContent: { 
     flex: 1, 
@@ -331,12 +382,21 @@ const styles = StyleSheet.create({
     fontSize: 12 
   },
   aiCardImage: { 
-    width: 130, 
-    height: 130, 
+    width: 150, 
+    height: 150, 
     position: 'absolute', 
     right: -10, 
     bottom: -5,
-    zIndex: 1
+    zIndex: 1,
+    opacity: 0.85
+  },
+  aiCardImageOverlay: {
+    position: 'absolute',
+    right: -10,
+    bottom: -5,
+    width: 150,
+    height: 150,
+    zIndex: 2,
   },
   whiteCurveContainer: {
     backgroundColor: '#F9FAFB',
@@ -541,7 +601,25 @@ const styles = StyleSheet.create({
     fontSize: 10, 
     marginTop: 6, 
     fontWeight: '600', 
-    color: '#9CA3AF' 
+    color: '#9CA3AF'   },
+  fabWrapper: {
+    position: 'absolute',
+    bottom: 100, // Just above the bottom nav
+    right: 20,
+    zIndex: 1000,
+  },
+  fab: {
+    backgroundColor: COLORS.primary,
+    width: 60,
+    height: 60,
+    borderRadius: 20, // slightly rounded for a square-ish look
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 8,
   }
 });
 
