@@ -48,10 +48,12 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6', // Lighter background as seen in forms
-    borderRadius: 16,
+    backgroundColor: '#F8F8FB', // Mapped to the light grey/blue in image fields
+    borderRadius: 12,
     paddingHorizontal: 16,
-    height: 56,
+    height: 52,
+    borderWidth: 1,
+    borderColor: '#F0F0F5',
   },
   icon: {
     marginRight: 12,

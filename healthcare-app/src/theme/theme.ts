@@ -1,19 +1,20 @@
 export const COLORS = {
-  primary: '#6B4EFF', // Deep Purple from image
-  primaryDark: '#4A32C2',
-  primaryLight: '#F0EEFF',
+  primary: '#724CF9', // Lighter, more modern violet-blue
+  primaryDark: '#5E3BEE',
+  primaryLight: '#F3F0FF',
   secondary: '#FF6584',
   white: '#FFFFFF',
-  background: '#F8F9FE',
+  background: '#FDFDFF',
   textHeader: '#1A1A3E',
   textMain: '#52527A',
   textSecondary: '#9A9AB0',
   border: '#E8E8F3',
+  inputBg: '#F8F8FB',
   success: '#4CAF50',
   error: '#F44336',
   warning: '#FF9800',
-  gradientPrimary: ['#6B4EFF', '#9D85FF'] as const,
-  shadow: '#6B4EFF20',
+  gradientPrimary: ['#724CF9', '#A58BFF'] as const,
+  shadow: '#724CF915',
 };
 
 export const SIZES = {

@@ -5,20 +5,18 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/types';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import { CustomButton } from '../../components/CustomButton';
-import { ArrowLeft, UserRound, Stethoscope, FlaskConical } from 'lucide-react-native';
+import { ArrowLeft, UserRound, Stethoscope, BriefcaseMedical, ShieldCheck } from 'lucide-react-native';
 
 type RoleNav = StackNavigationProp<RootStackParamList, 'RoleSelection'>;
 
-type RoleKey = 'patient' | 'doctor' | 'lab';
+type RoleKey = 'patient' | 'doctor' | 'nurse' | 'admin';
 
 const RoleSelectionScreen = () => {
   const navigation = useNavigation<RoleNav>();
   const [role, setRole] = React.useState<RoleKey>('patient');
 
   const onContinue = () => {
-    if (role === 'patient') navigation.replace('PatientDashboard');
-    if (role === 'doctor') navigation.replace('DoctorDashboard');
-    if (role === 'lab') navigation.replace('LabDashboard');
+    navigation.navigate('SignIn', { role });
   };
 
   return (
@@ -48,11 +46,18 @@ const RoleSelectionScreen = () => {
           icon={<Stethoscope size={22} color={role === 'doctor' ? '#FFFFFF' : COLORS.primary} />}
         />
         <RoleCard
-          active={role === 'lab'}
-          title="Laboratory"
-          subtitle="Track tests and reports"
-          onPress={() => setRole('lab')}
-          icon={<FlaskConical size={22} color={role === 'lab' ? '#FFFFFF' : COLORS.primary} />}
+          active={role === 'nurse'}
+          title="Nurse"
+          subtitle="Access patient health records"
+          onPress={() => setRole('nurse')}
+          icon={<BriefcaseMedical size={22} color={role === 'nurse' ? '#FFFFFF' : COLORS.primary} />}
+        />
+        <RoleCard
+          active={role === 'admin'}
+          title="Hospital Admin"
+          subtitle="Control and monitor operations"
+          onPress={() => setRole('admin')}
+          icon={<ShieldCheck size={22} color={role === 'admin' ? '#FFFFFF' : COLORS.primary} />}
         />
       </View>
 

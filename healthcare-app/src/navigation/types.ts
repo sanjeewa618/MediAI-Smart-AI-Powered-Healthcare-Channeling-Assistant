@@ -1,8 +1,8 @@
 export type RootStackParamList = {
   Splash: undefined;
   Onboarding: undefined;
-  SignIn: undefined;
-  SignUp: undefined;
+  SignIn: { role: string };
+  SignUp: { role: string };
   ForgotPassword: undefined;
   OTPVerification: { email: string };
   CreateNewPassword: { email: string };
