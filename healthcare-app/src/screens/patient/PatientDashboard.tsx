@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, Dimensions, Animated, PanResponder, Pressable, StatusBar, Modal } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
-import { Search, Calendar, User, FileText, Activity, MoreHorizontal, Home, Heart, Shield, MessageCircle, FileEdit, FlaskConical, ChevronRight, Baby, Droplets, Sparkles, Plus, Bell, LogOut, Pill, Truck, Settings, X, LifeBuoy, Stethoscope, Dna, Brain, Bone, Eye, Smile } from 'lucide-react-native';
+import { Search, Calendar, User, FileText, Activity, MoreHorizontal, Home, Heart, Shield, MessageCircle, FileEdit, FlaskConical, ChevronRight, Baby, Droplets, Sparkles, Plus, Bell, LogOut, Pill, Truck, Settings, X, LifeBuoy, Stethoscope, Dna, Brain, Bone, Eye, Smile, CreditCard } from 'lucide-react-native';
 import BottomNavBar from '../../components/BottomNavBar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
@@ -15,6 +15,8 @@ type PatientDashboardProp = StackNavigationProp<RootStackParamList, 'PatientDash
 const PatientDashboard = () => {
   const navigation = useNavigation<PatientDashboardProp>();
   const [moreModalVisible, setMoreModalVisible] = useState(false);
+  const [menuModalVisible, setMenuModalVisible] = useState(false);
+  const [appointmentModalVisible, setAppointmentModalVisible] = useState(false);
   const [aiCardPressed, setAiCardPressed] = useState(false);
   const [aiCardHovered, setAiCardHovered] = useState(false);
   const aiCardScale = useRef(new Animated.Value(1)).current;
@@ -113,15 +115,13 @@ const PatientDashboard = () => {
         >
           {/* Header */}
           <View style={styles.header}>
-            <TouchableOpacity
-              style={styles.profileImageContainer}
-              onPress={() => navigation.navigate('PatientProfile')}
+            <TouchableOpacity 
+              style={styles.menuIconBtn}
+              onPress={() => setMenuModalVisible(true)}
             >
-              <Image
-                source={require('../../../assets/signup-image2.png')}
-                style={styles.profileImage}
-                resizeMode="cover"
-              />
+              <View style={styles.hamburgerLine} />
+              <View style={[styles.hamburgerLine, { width: 18 }]} />
+              <View style={styles.hamburgerLine} />
             </TouchableOpacity>
 
             <View style={styles.headerTextContainer}>
@@ -130,14 +130,14 @@ const PatientDashboard = () => {
             </View>
 
             <View style={styles.headerActions}>
-              <TouchableOpacity style={styles.headerActionButton}>
-                <Bell size={20} color="#FFFFFF" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.headerActionButton, styles.logoutButtonSpacing]}
-                onPress={() => navigation.navigate('SignIn', { role: 'patient' })}
+              <TouchableOpacity 
+                style={styles.headerActionButton}
+                onPress={() => setAppointmentModalVisible(true)}
               >
-                <LogOut size={20} color="#FFFFFF" />
+                <Calendar size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.headerActionButton, { marginLeft: 10 }]}>
+                <Bell size={20} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
           </View>
@@ -388,6 +388,170 @@ const PatientDashboard = () => {
         </TouchableOpacity>
       </Animated.View>
 
+      {/* Side Menu Modal */}
+      <Modal
+        animationType="none"
+        transparent={true}
+        visible={menuModalVisible}
+        onRequestClose={() => setMenuModalVisible(false)}
+      >
+        <View style={[styles.menuOverlay, { flexDirection: 'row' }]}>
+          <Animated.View style={styles.menuContent}>
+            <LinearGradient
+              colors={['#8B3DFF', '#5F0FFF']}
+              style={styles.menuHeader}
+            >
+              <TouchableOpacity 
+                style={styles.menuCloseBtn}
+                onPress={() => setMenuModalVisible(false)}
+              >
+                <X size={24} color="#FFF" />
+              </TouchableOpacity>
+              
+              <Image 
+                source={require('../../../assets/signup-image2.png')} 
+                style={styles.menuAvatar} 
+              />
+              <Text style={styles.menuUserName}>Sarah Johnson</Text>
+              <Text style={styles.menuUserEmail}>sarah.j@example.com</Text>
+              
+              <View style={styles.membershipBadge}>
+                <Sparkles size={12} color="#FFD700" fill="#FFD700" />
+                <Text style={styles.membershipText}>Premium Member</Text>
+              </View>
+            </LinearGradient>
+
+            <View style={styles.menuItemsContainer}>
+              <ScrollView style={styles.menuItemsList} showsVerticalScrollIndicator={false}>
+                <TouchableOpacity style={styles.menuItem}>
+                  <View style={[styles.menuIconBox, { backgroundColor: '#F3F0FF' }]}>
+                    <User size={20} color={COLORS.primary} />
+                  </View>
+                  <Text style={styles.menuItemText}>My Profile</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.menuItem}>
+                  <View style={[styles.menuIconBox, { backgroundColor: '#E0F2FE' }]}>
+                    <Calendar size={20} color="#0EA5E9" />
+                  </View>
+                  <Text style={styles.menuItemText}>My Appointments</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.menuItem}>
+                  <View style={[styles.menuIconBox, { backgroundColor: '#ECFDF5' }]}>
+                    <FileText size={20} color="#10B981" />
+                  </View>
+                  <Text style={styles.menuItemText}>Medical Records</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.menuItem}>
+                  <View style={[styles.menuIconBox, { backgroundColor: '#FFF7ED' }]}>
+                    <CreditCard size={20} color="#F97316" />
+                  </View>
+                  <Text style={styles.menuItemText}>Payments & Billing</Text>
+                </TouchableOpacity>
+
+                <View style={styles.menuDivider} />
+
+                <TouchableOpacity style={styles.menuItem}>
+                  <View style={[styles.menuIconBox, { backgroundColor: '#F9FAFB' }]}>
+                    <Settings size={20} color="#6B7280" />
+                  </View>
+                  <Text style={styles.menuItemText}>Settings</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.menuItem}>
+                  <View style={[styles.menuIconBox, { backgroundColor: '#F9FAFB' }]}>
+                    <LifeBuoy size={20} color="#6B7280" />
+                  </View>
+                  <Text style={styles.menuItemText}>Help & Support</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={[styles.menuItem, { marginTop: 5 }]}
+                  onPress={() => {
+                    setMenuModalVisible(false);
+                    navigation.navigate('SignIn', { role: 'patient' });
+                  }}
+                >
+                  <View style={[styles.menuIconBox, { backgroundColor: '#FEF2F2' }]}>
+                    <LogOut size={20} color="#EF4444" />
+                  </View>
+                  <Text style={[styles.menuItemText, { color: '#EF4444' }]}>Logout</Text>
+                </TouchableOpacity>
+
+                <View style={styles.menuDivider} />
+              </ScrollView>
+            </View>
+            
+            <Text style={styles.menuVersion}>Version 1.0.2 (Beta)</Text>
+          </Animated.View>
+          <Pressable 
+            style={styles.menuDismissArea} 
+            onPress={() => setMenuModalVisible(false)} 
+          />
+        </View>
+      </Modal>
+
+      {/* Appointments Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={appointmentModalVisible}
+        onRequestClose={() => setAppointmentModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: '80%' }]}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleRow}>
+                <Calendar size={24} color={COLORS.primary} />
+                <Text style={[styles.modalTitle, { marginLeft: 10 }]}>My Schedule</Text>
+              </View>
+              <TouchableOpacity onPress={() => setAppointmentModalVisible(false)}>
+                <X size={24} color={COLORS.textHeader} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.scheduleSectionTitle}>Doctor Appointments</Text>
+              <View style={styles.scheduleItem}>
+                <View style={[styles.scheduleIconWrap, { backgroundColor: '#E0F2FE' }]}>
+                  <Stethoscope size={20} color="#0EA5E9" />
+                </View>
+                <View style={styles.scheduleInfo}>
+                  <Text style={styles.scheduleName}>Dr. Emma Watson</Text>
+                  <Text style={styles.scheduleType}>Cardiologist • Room 204</Text>
+                  <Text style={styles.scheduleTime}>20 May 2024 • 10:30 AM</Text>
+                </View>
+              </View>
+
+              <Text style={[styles.scheduleSectionTitle, { marginTop: 20 }]}>Lab Tests</Text>
+              <View style={styles.scheduleItem}>
+                <View style={[styles.scheduleIconWrap, { backgroundColor: '#F3F0FF' }]}>
+                  <FlaskConical size={20} color={COLORS.primary} />
+                </View>
+                <View style={styles.scheduleInfo}>
+                  <Text style={styles.scheduleName}>Lab 01 (CBC Test)</Text>
+                  <Text style={styles.scheduleType}>2nd Floor • Hospital Visit</Text>
+                  <Text style={styles.scheduleTime}>22 May 2024 • 09:00 AM</Text>
+                </View>
+              </View>
+              
+              <View style={styles.scheduleItem}>
+                <View style={[styles.scheduleIconWrap, { backgroundColor: '#FDF2F8' }]}>
+                  <FlaskConical size={20} color="#DB2777" />
+                </View>
+                <View style={styles.scheduleInfo}>
+                  <Text style={styles.scheduleName}>Lab 05 (Urine Analysis)</Text>
+                  <Text style={styles.scheduleType}>3rd Floor • Home Collection</Text>
+                  <Text style={styles.scheduleTime}>25 May 2024 • 08:30 AM</Text>
+                </View>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       {/* More Options Modal */}
       <Modal
         animationType="slide"
@@ -540,6 +704,134 @@ const styles = StyleSheet.create({
     fontSize: 14, 
     color: 'rgba(255,255,255,0.85)', 
     marginTop: 4 
+  },
+  // Menu Icon Styles
+  menuIconBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    marginRight: 15,
+  },
+  hamburgerLine: {
+    width: 22,
+    height: 2.5,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 5,
+  },
+  // Side Menu Styles
+  menuOverlay: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  menuDismissArea: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  menuContent: {
+    width: width * 0.75,
+    height: '100%',
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 5, height: 0 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 20,
+    overflow: 'hidden',
+  },
+  menuHeader: {
+    padding: 30,
+    paddingTop: Platform.OS === 'ios' ? 60 : 50,
+    alignItems: 'center',
+    paddingBottom: 35,
+    overflow: 'hidden',
+  },
+  menuItemsContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    marginTop: -30, // Overlap the purple header
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    overflow: 'hidden',
+    paddingTop: 10,
+  },
+  menuCloseBtn: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 50 : 20,
+    right: 20,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 24,
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.3)',
+    marginBottom: 15,
+  },
+  menuUserName: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  menuUserEmail: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 4,
+  },
+  membershipBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    marginTop: 15,
+    gap: 6,
+  },
+  membershipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  menuItemsList: {
+    padding: 20,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    gap: 16,
+  },
+  menuIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuItemText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.textHeader,
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginVertical: 15,
+  },
+  menuVersion: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    marginBottom: 30,
+    fontWeight: '600',
   },
   searchContainer: { 
     flexDirection: 'row', 
@@ -926,6 +1218,55 @@ const styles = StyleSheet.create({
     color: COLORS.textMain,
     textAlign: 'center',
   },
+  // Schedule Modal Styles
+  modalTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  scheduleSectionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 16,
+    marginTop: 10,
+  },
+  scheduleItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    padding: 16,
+    borderRadius: 20,
+    marginBottom: 12,
+    gap: 16,
+  },
+  scheduleIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scheduleInfo: {
+    flex: 1,
+  },
+  scheduleName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.textHeader,
+  },
+  scheduleType: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  scheduleTime: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.primary,
+    marginTop: 6,
+  }
 });
 
 export default PatientDashboard;

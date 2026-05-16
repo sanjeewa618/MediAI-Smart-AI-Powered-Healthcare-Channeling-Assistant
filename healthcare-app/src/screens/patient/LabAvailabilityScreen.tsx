@@ -12,6 +12,7 @@ import {
   Stethoscope, Microscope, Thermometer, Brain, Bone, Eye, Smile, X, ArrowRight
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import BottomNavBar from '../../components/BottomNavBar';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/types';
@@ -518,6 +519,7 @@ const LabAvailabilityScreen = () => {
         </View>
       </Modal>
 
+      <BottomNavBar />
     </SafeAreaView>
   );
 };
@@ -589,7 +591,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   scrollContent: {
-    paddingBottom: 40,
+    paddingBottom: 100,
   },
   section: {
     marginTop: 24,

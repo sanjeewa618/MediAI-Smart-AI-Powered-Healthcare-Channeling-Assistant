@@ -6,6 +6,7 @@ import { RootStackParamList } from '../../navigation/types';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import { Stethoscope, FlaskConical, ChevronRight, Clock, ArrowLeft } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import BottomNavBar from '../../components/BottomNavBar';
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'AvailabilitySelection'>;
 
@@ -72,6 +73,7 @@ const AvailabilitySelectionScreen = () => {
           </Text>
         </View>
       </View>
+      <BottomNavBar />
     </SafeAreaView>
   );
 };

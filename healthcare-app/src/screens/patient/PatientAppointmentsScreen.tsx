@@ -102,7 +102,7 @@ const PatientAppointmentsScreen = () => {
 
         {/* Book Button */}
         <View style={styles.bookButtonContainer}>
-          <TouchableOpacity style={styles.bookButton} onPress={() => navigation.navigate('DoctorAvailability')}>
+          <TouchableOpacity style={styles.bookButton} onPress={() => navigation.navigate('DoctorAvailability', {})}>
             <View style={styles.bookButtonContent}>
               <Text style={styles.bookButtonText}>Book New Appointment</Text>
               <ArrowRight size={20} color="#FFFFFF" strokeWidth={2.5} />

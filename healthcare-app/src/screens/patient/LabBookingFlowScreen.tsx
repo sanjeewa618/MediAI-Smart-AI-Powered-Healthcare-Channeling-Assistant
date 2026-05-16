@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, 
   TextInput, SafeAreaView, Platform, StatusBar, Dimensions,
-  KeyboardAvoidingView, Alert
+  KeyboardAvoidingView, Alert, Modal
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { COLORS, SHADOWS } from '../../theme/theme';
@@ -10,7 +10,7 @@ import {
   ArrowLeft, ChevronRight, Calendar, Clock, User, 
   MapPin, Activity, CheckCircle2, Upload, CreditCard,
   Home, Building2, AlertCircle, Phone, Mail, 
-  FileText, ArrowRight, Check, Timer, FlaskConical, Shield
+  FileText, ArrowRight, Check, Timer, FlaskConical, Shield, Bell
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -46,12 +46,34 @@ const LabBookingFlowScreen = () => {
   const [collectionMethod, setCollectionMethod] = useState('Hospital'); // Hospital or Home
   const [paymentMethod, setPaymentMethod] = useState('Card');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [reminderModalVisible, setReminderModalVisible] = useState(false);
+  const [reminderOptions, setReminderOptions] = useState({
+    email: true,
+    phone: false
+  });
   const [cardDetails, setCardDetails] = useState({
     number: '',
     expiry: '',
     cvv: '',
     name: ''
   });
+
+  const handleAddToCalendar = () => {
+    Alert.alert(
+      "Added to Calendar",
+      `Lab appointment at ${lab.name} on ${selectedDate} May at ${selectedTime} has been added to your calendar.`,
+      [{ text: "OK" }]
+    );
+  };
+
+  const handleSetReminder = () => {
+    setReminderModalVisible(true);
+  };
+
+  const saveReminder = () => {
+    setReminderModalVisible(false);
+    Alert.alert("Reminder Set", "You will receive notifications via " + (reminderOptions.email ? "Email " : "") + (reminderOptions.phone ? "and SMS" : ""));
+  };
 
   const pickImage = async () => {
     // No permissions request is necessary for launching the image library
@@ -416,13 +438,10 @@ const LabBookingFlowScreen = () => {
   const renderSuccess = () => (
     <View style={styles.successContent}>
       <LinearGradient
-        colors={['#DCFCE7', '#FFF']}
+        colors={['#ECFDF5', '#FFF']}
         style={styles.successBg}
       >
-        <View style={styles.successIconWrap}>
-          <Check size={40} color="#10B981" />
-        </View>
-        <Text style={styles.successTitle}>Booking Confirmed! ✅</Text>
+        <Text style={styles.successTitle}>Booking Confirmed!</Text>
         <Text style={styles.successSub}>Your lab test has been scheduled successfully.</Text>
         
         <View style={[styles.ticketCard, SHADOWS.medium]}>
@@ -476,16 +495,54 @@ const LabBookingFlowScreen = () => {
         </TouchableOpacity>
 
         <View style={styles.extraActions}>
-          <TouchableOpacity style={styles.extraBtn}>
+          <TouchableOpacity style={styles.extraBtn} onPress={handleAddToCalendar}>
             <Calendar size={18} color={COLORS.primary} />
             <Text style={styles.extraBtnText}>Add to Calendar</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.extraBtn}>
-            <Timer size={18} color={COLORS.primary} />
+          <TouchableOpacity style={styles.extraBtn} onPress={handleSetReminder}>
+            <Bell size={18} color={COLORS.primary} />
             <Text style={styles.extraBtnText}>Set Reminder</Text>
           </TouchableOpacity>
         </View>
       </LinearGradient>
+
+      {/* Reminder Modal */}
+      <Modal
+        visible={reminderModalVisible}
+        transparent={true}
+        animationType="fade"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.reminderModalContent}>
+            <Text style={styles.reminderModalTitle}>Set Reminder</Text>
+            <Text style={styles.reminderModalSub}>Choose how you want to be notified</Text>
+            
+            <TouchableOpacity 
+              style={[styles.reminderOption, reminderOptions.email && styles.reminderOptionActive]}
+              onPress={() => setReminderOptions({...reminderOptions, email: !reminderOptions.email})}
+            >
+              <View style={[styles.radio, reminderOptions.email && styles.radioActive]} />
+              <Text style={styles.reminderOptionText}>Email Notification</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.reminderOption, reminderOptions.phone && styles.reminderOptionActive]}
+              onPress={() => setReminderOptions({...reminderOptions, phone: !reminderOptions.phone})}
+            >
+              <View style={[styles.radio, reminderOptions.phone && styles.radioActive]} />
+              <Text style={styles.reminderOptionText}>Phone (SMS) Notification</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.saveReminderBtn} onPress={saveReminder}>
+              <Text style={styles.saveReminderBtnText}>Save Reminder</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.cancelReminderBtn} onPress={() => setReminderModalVisible(false)}>
+              <Text style={styles.cancelReminderBtnText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 
@@ -1068,22 +1125,12 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     padding: 24,
-    paddingTop: 60,
-  },
-  successIconWrap: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#10B981',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-    ...SHADOWS.medium,
+    paddingTop: 100, // Increased for better centering
   },
   successTitle: {
     fontSize: 26,
     fontWeight: '900',
-    color: COLORS.textHeader,
+    color: '#10B981', // Green color vibe
     textAlign: 'center',
   },
   successSub: {
@@ -1226,8 +1273,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
     borderTopWidth: 1,
     borderTopColor: '#F3F4F6',
-    marginBottom:30,
-    
+    marginBottom: 30,
   },
   nextBtn: {
     backgroundColor: COLORS.primary,
@@ -1243,6 +1289,77 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 16,
     fontWeight: '800',
+  },
+  // Reminder Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  reminderModalContent: {
+    backgroundColor: '#FFF',
+    width: '100%',
+    borderRadius: 30,
+    padding: 24,
+    alignItems: 'center',
+  },
+  reminderModalTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: COLORS.textHeader,
+    marginBottom: 8,
+  },
+  reminderModalSub: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  reminderOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    marginBottom: 12,
+    gap: 12,
+  },
+  reminderOptionActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: '#F3F0FF',
+  },
+  reminderOptionText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.textHeader,
+  },
+  saveReminderBtn: {
+    backgroundColor: COLORS.primary,
+    width: '100%',
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  saveReminderBtnText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  cancelReminderBtn: {
+    width: '100%',
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  cancelReminderBtnText: {
+    color: COLORS.textSecondary,
+    fontSize: 14,
+    fontWeight: '600',
   }
 });
 
