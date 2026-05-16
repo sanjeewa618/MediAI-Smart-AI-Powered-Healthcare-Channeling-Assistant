@@ -341,7 +341,7 @@ const PatientDashboard = () => {
               <Text style={styles.quickActionText}>Find Doctor</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.quickActionItem}>
+            <TouchableOpacity style={styles.quickActionItem} onPress={() => navigation.navigate('AvailabilitySelection')}>
               <View style={[styles.quickActionIconWrap, { backgroundColor: '#ECFDF5' }]}>
                 <FlaskConical size={24} color="#10B981" />
               </View>

@@ -58,7 +58,7 @@ const SignInScreen = () => {
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={styles.forgotPassword} onPress={() => navigation.navigate('ForgotPassword')}>
+          <TouchableOpacity style={styles.forgotPassword} onPress={() => alert('Forgot password feature coming soon!')}>
             <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
           </TouchableOpacity>
 
@@ -67,7 +67,7 @@ const SignInScreen = () => {
             onPress={() => {
               if (role === 'patient') navigation.replace('PatientDashboard');
               else if (role === 'doctor') navigation.replace('DoctorDashboard');
-              // Add other routes as needed
+              else if (role === 'lab') navigation.replace('LabDashboard');
             }}
             style={styles.signInButton}
           />

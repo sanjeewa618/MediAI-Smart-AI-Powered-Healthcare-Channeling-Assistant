@@ -9,13 +9,10 @@ import SignInScreen from '../screens/auth/SignInScreen';
 import SignUpScreen from '../screens/auth/SignUpScreen';
 import RoleSelectionScreen from '../screens/auth/RoleSelectionScreen';
 
-// Dashboards (Placeholders for now)
+// Dashboard Screens
 import PatientDashboard from '../screens/patient/PatientDashboard';
 import DoctorDashboard from '../screens/doctor/DoctorDashboard';
 import LabDashboard from '../screens/lab/LabDashboard';
-import DoctorAvailability from '../screens/doctor/DoctorAvailability';
-
-// New Reports screen
 import ReportsScreen from '../screens/patient/ReportsScreen';
 
 // Patient Sub-screens
@@ -25,6 +22,10 @@ import PatientAppointmentsScreen from '../screens/patient/PatientAppointmentsScr
 import PatientProfileScreen from '../screens/patient/PatientProfileScreen';
 import BookAppointmentScreen from '../screens/patient/BookAppointmentScreen';
 import SpecialtyDoctorsScreen from '../screens/patient/SpecialtyDoctorsScreen';
+import AvailabilitySelectionScreen from '../screens/patient/AvailabilitySelectionScreen';
+import LabAvailabilityScreen from '../screens/patient/LabAvailabilityScreen';
+import LabBookingFlowScreen from '../screens/patient/LabBookingFlowScreen';
+import DoctorAvailability from '../screens/doctor/DoctorAvailability';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -44,7 +45,6 @@ const AppNavigator = () => {
       <Stack.Screen name="RoleSelection" component={RoleSelectionScreen} />
       <Stack.Screen name="PatientDashboard" component={PatientDashboard} />
       <Stack.Screen name="DoctorDashboard" component={DoctorDashboard} />
-      <Stack.Screen name="DoctorAvailability" component={DoctorAvailability} />
       <Stack.Screen name="LabDashboard" component={LabDashboard} />
       <Stack.Screen name="Reports" component={ReportsScreen} />
       <Stack.Screen name="FindDoctors" component={FindDoctorsScreen} />
@@ -52,7 +52,11 @@ const AppNavigator = () => {
       <Stack.Screen name="PatientAppointments" component={PatientAppointmentsScreen} />
       <Stack.Screen name="BookAppointment" component={BookAppointmentScreen} />
       <Stack.Screen name="PatientProfile" component={PatientProfileScreen} />
+      <Stack.Screen name="DoctorAvailability" component={DoctorAvailability} />
       <Stack.Screen name="SpecialtyDoctors" component={SpecialtyDoctorsScreen} />
+      <Stack.Screen name="AvailabilitySelection" component={AvailabilitySelectionScreen} />
+      <Stack.Screen name="LabAvailability" component={LabAvailabilityScreen} />
+      <Stack.Screen name="LabBookingFlow" component={LabBookingFlowScreen} />
     </Stack.Navigator>
   );
 };

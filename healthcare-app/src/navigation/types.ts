@@ -3,7 +3,7 @@ export type RootStackParamList = {
   Onboarding: undefined;
   SignIn: { role: string };
   SignUp: { role: string };
-  ForgotPassword: undefined;
+  ForgotPassword: { email?: string };
   OTPVerification: { email: string };
   CreateNewPassword: { email: string };
   RoleSelection: undefined;
@@ -14,15 +14,12 @@ export type RootStackParamList = {
   // Patient sub-screens
   BookAppointment: { doctorId?: string; doctorName?: string; specialty?: string; date?: string; time?: string };
   AIHealthAssistant: undefined;
-  MyMedicalRecords: undefined;
-  LaboratoryResults: undefined;
   FindDoctors: undefined;
   PatientAppointments: undefined;
-    PatientProfile: undefined;
+  PatientProfile: undefined;
   DoctorAvailability: { specialty?: string };
   SpecialtyDoctors: { specialty: string };
-  // Doctor/Lab screens
-  DoctorAppointments: undefined;
-  LabTests: undefined;
-  Profile: undefined;
+  AvailabilitySelection: undefined;
+  LabAvailability: undefined;
+  LabBookingFlow: { lab: any; initialDate?: string; initialTime?: string };
 };
