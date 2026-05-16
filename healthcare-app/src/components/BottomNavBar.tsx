@@ -38,9 +38,9 @@ const BottomNavBar = () => {
         <Text style={[styles.label, { color: currentRouteName === 'Reports' ? COLORS.primary : '#9CA3AF' }]}>Reports</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('Profile')}>
-        <User size={22} color="#9CA3AF" />
-        <Text style={styles.label}>Profile</Text>
+      <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('PatientProfile')}>
+        <User size={22} color={currentRouteName === 'PatientProfile' ? COLORS.primary : '#9CA3AF'} />
+        <Text style={[styles.label, { color: currentRouteName === 'PatientProfile' ? COLORS.primary : '#9CA3AF' }]}>Profile</Text>
       </TouchableOpacity>
     </View>
   );
@@ -51,10 +51,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    height: 100,
+    height: 70,
     backgroundColor: 'transparent',
     borderTopWidth: 0,
-    marginTop: 8,
+    marginTop: 2,
   },
   item: {
     alignItems: 'center',

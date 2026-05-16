@@ -1,7 +1,7 @@
-import React, { useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, Dimensions, Animated, PanResponder } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, Dimensions, Animated, PanResponder, Pressable } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
-import { Search, Calendar, User, FileText, Activity, MoreHorizontal, Home, Heart, Shield, MessageCircle, FilePenLine, FlaskConical, ChevronRight, Baby, Droplets, Sun, Sparkles, Plus } from 'lucide-react-native';
+import { Search, Calendar, User, FileText, Activity, MoreHorizontal, Home, Heart, Shield, MessageCircle, FilePenLine, FlaskConical, ChevronRight, Baby, Droplets, Sun, Sparkles, Plus, Bell, LogOut } from 'lucide-react-native';
 import BottomNavBar from '../../components/BottomNavBar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
@@ -14,6 +14,65 @@ type PatientDashboardProp = StackNavigationProp<RootStackParamList, 'PatientDash
 
 const PatientDashboard = () => {
   const navigation = useNavigation<PatientDashboardProp>();
+  const [aiCardPressed, setAiCardPressed] = useState(false);
+  const [aiCardHovered, setAiCardHovered] = useState(false);
+  const aiCardScale = useRef(new Animated.Value(1)).current;
+  const aiCardLift = useRef(new Animated.Value(0)).current;
+  const aiGlowPulse = useRef(new Animated.Value(0.75)).current;
+
+  useEffect(() => {
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(aiGlowPulse, {
+          toValue: 1,
+          duration: 1200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(aiGlowPulse, {
+          toValue: 0.65,
+          duration: 1200,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    pulseLoop.start();
+    return () => pulseLoop.stop();
+  }, [aiGlowPulse]);
+
+  const handleAiCardHoverIn = () => {
+    setAiCardHovered(true);
+    Animated.timing(aiCardLift, {
+      toValue: -4,
+      duration: 160,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleAiCardHoverOut = () => {
+    setAiCardHovered(false);
+    Animated.timing(aiCardLift, {
+      toValue: 0,
+      duration: 160,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleAiCardPressIn = () => {
+    setAiCardPressed(true);
+    Animated.spring(aiCardScale, {
+      toValue: 0.98,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleAiCardPressOut = () => {
+    setAiCardPressed(false);
+    Animated.spring(aiCardScale, {
+      toValue: 1,
+      useNativeDriver: true,
+    }).start();
+  };
 
   const pan = useRef(new Animated.ValueXY()).current;
   const panResponder = useRef(
@@ -52,16 +111,32 @@ const PatientDashboard = () => {
         >
           {/* Header */}
           <View style={styles.header}>
-            <View>
+            <TouchableOpacity
+              style={styles.profileImageContainer}
+              onPress={() => navigation.navigate('PatientProfile')}
+            >
+              <Image
+                source={require('../../../assets/signup-image2.png')}
+                style={styles.profileImage}
+                resizeMode="cover"
+              />
+            </TouchableOpacity>
+
+            <View style={styles.headerTextContainer}>
               <Text style={styles.greeting}>Hello, Sarah 👋</Text>
               <Text style={styles.subGreeting}>Take care of your health</Text>
             </View>
-            <View style={styles.avatarContainer}>
-              <Image 
-                source={require('../../../assets/robot-avatar.png')} 
-                style={styles.avatar} 
-                resizeMode="cover"
-              />
+
+            <View style={styles.headerActions}>
+              <TouchableOpacity style={styles.headerActionButton}>
+                <Bell size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.headerActionButton, styles.logoutButtonSpacing]}
+                onPress={() => navigation.navigate('SignIn', { role: 'patient' })}
+              >
+                <LogOut size={20} color="#FFFFFF" />
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -72,33 +147,49 @@ const PatientDashboard = () => {
           </View>
 
           {/* AI Health Assistant Card */}
-          <LinearGradient
-            colors={['#815CFB', '#6737EA']}
-            style={styles.aiCard}
+          <Pressable
+            onPressIn={handleAiCardPressIn}
+            onPressOut={handleAiCardPressOut}
+            onHoverIn={handleAiCardHoverIn}
+            onHoverOut={handleAiCardHoverOut}
           >
-            <View style={styles.aiCardContent}>
-              <Text style={styles.aiCardTitle}>AI Health Assistant</Text>
-              <Text style={styles.aiCardText}>Check your symptoms and get{'\n'}AI health suggestions</Text>
-              <TouchableOpacity 
-                style={styles.aiCardBtn}
-                onPress={() => navigation.navigate('AIHealthAssistant')}
+            <Animated.View
+              style={[
+                {
+                  transform: [{ scale: aiCardScale }, { translateY: aiCardLift }],
+                },
+              ]}
+            >
+              <LinearGradient
+                colors={['#FFFFFF', '#F7F2FF']}
+                style={[styles.aiCard, aiCardPressed && styles.aiCardPressed, aiCardHovered && styles.aiCardHovered]}
               >
-                <Text style={styles.aiCardBtnText}>Check Now</Text>
-              </TouchableOpacity>
-            </View>
-            <Image 
-              source={require('../../../assets/bot-image.png')} 
-              style={styles.aiCardImage} 
-              resizeMode="contain"
-            />
-            {/* Gradient overlay to blend the left side of the image into the background */}
-            <LinearGradient
-              colors={['#6139f1', 'transparent']}
-              start={{ x: 0.04, y: 0 }}
-              end={{ x: 0.5, y: 0 }}
-              style={styles.aiCardImageOverlay}
-            />
-          </LinearGradient>
+                <View style={styles.aiCardContent}>
+                  <Text style={styles.aiCardTitle}>AI Health Assistant</Text>
+                  <Text style={styles.aiCardText}>Check your symptoms and get{'\n'}AI health suggestions</Text>
+                  <TouchableOpacity 
+                    style={styles.aiCardBtn}
+                    onPress={() => navigation.navigate('AIHealthAssistant')}
+                  >
+                    <Text style={styles.aiCardBtnText}>Check Now</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.aiCardImageContainer}>
+                  <Animated.View style={[styles.aiCardGlowWrap, { opacity: aiGlowPulse }]}>
+                    <LinearGradient
+                      colors={['rgba(89, 58, 202, 0.56)', 'rgba(126, 69, 232, 0.14)']}
+                      style={styles.aiCardImageGlow}
+                    />
+                  </Animated.View>
+                  <Image 
+                    source={require('../../../assets/bot2.jpg')} 
+                    style={styles.aiCardImage} 
+                    resizeMode="contain"
+                  />
+                </View>
+              </LinearGradient>
+            </Animated.View>
+          </Pressable>
         </LinearGradient>
 
         {/* Bottom White Section */}
@@ -280,9 +371,40 @@ const styles = StyleSheet.create({
   },
   header: { 
     flexDirection: 'row', 
-    justifyContent: 'space-between', 
     alignItems: 'center', 
     marginBottom: 24 
+  },
+  profileImageContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    marginRight: 12,
+  },
+  profileImage: {
+    width: '100%',
+    height: '100%',
+  },
+  headerTextContainer: {
+    flex: 1,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerActionButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.16)',
+  },
+  logoutButtonSpacing: {
+    marginLeft: 10,
   },
   greeting: { 
     fontSize: 22, 
@@ -293,19 +415,6 @@ const styles = StyleSheet.create({
     fontSize: 14, 
     color: 'rgba(255,255,255,0.85)', 
     marginTop: 4 
-  },
-  avatarContainer: {
-    width: 45,
-    height: 45,
-    borderRadius: 22.5,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden'
-  },
-  avatar: { 
-    width: '100%', 
-    height: '100%' 
   },
   searchContainer: { 
     flexDirection: 'row', 
@@ -328,55 +437,83 @@ const styles = StyleSheet.create({
     position: 'relative',
     height: 140,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: 'rgba(114, 76, 249, 0.14)',
     overflow: 'hidden',
-    marginTop: 10
+    marginTop: 10,
+    shadowColor: '#6D28D9',
+    shadowOpacity: 0.22,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+  },
+  aiCardPressed: {
+    shadowColor: '#6D28D9',
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 12,
+  },
+  aiCardHovered: {
+    borderColor: 'rgba(114, 76, 249, 0.32)',
+    shadowColor: '#5B34DA',
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 9 },
+    elevation: 10,
   },
   aiCardContent: { 
     flex: 1, 
     zIndex: 2,
-    marginRight: 80
+    marginRight: 100
   },
   aiCardTitle: { 
-    color: '#FFFFFF', 
+    color: '#342350', 
     fontSize: 16, 
     fontWeight: '700', 
     marginBottom: 6 
   },
   aiCardText: { 
-    color: 'rgba(255, 255, 255, 0.85)', 
-    fontSize: 11, 
+    color: '#6B7280', 
+    fontSize: 12, 
     marginBottom: 14, 
     lineHeight: 16 
   },
   aiCardBtn: { 
-    backgroundColor: '#FFFFFF', 
+    backgroundColor: COLORS.primary, 
     paddingHorizontal: 16, 
     paddingVertical: 8, 
     borderRadius: 10, 
     alignSelf: 'flex-start' 
   },
   aiCardBtnText: { 
-    color: COLORS.primary, 
+    color: '#FFFFFF', 
     fontWeight: '700', 
     fontSize: 12 
   },
-  aiCardImage: { 
-    width: 150, 
-    height: 150, 
-    position: 'absolute', 
-    right: -10, 
-    bottom: -5,
-    zIndex: 1,
-    opacity: 0.85
-  },
-  aiCardImageOverlay: {
+  aiCardImageContainer: {
+    width: 140,
+    height: 140,
     position: 'absolute',
-    right: -10,
-    bottom: -5,
-    width: 150,
-    height: 150,
-    zIndex: 2,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'visible',
+  },
+  aiCardGlowWrap: {
+    position: 'absolute',
+  },
+  aiCardImageGlow: {
+    position: 'absolute',
+    width: 200,
+    height: 180,
+    borderRadius: 70,
+    opacity: 0.98,
+  },
+  aiCardImage: { 
+    width: 142, 
+    height: 170,
+    zIndex: 0,
   },
   whiteCurveContainer: {
     backgroundColor: '#F9FAFB',

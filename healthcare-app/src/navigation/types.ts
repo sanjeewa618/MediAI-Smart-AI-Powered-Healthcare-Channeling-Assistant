@@ -18,6 +18,7 @@ export type RootStackParamList = {
   LaboratoryResults: undefined;
   FindDoctors: undefined;
   PatientAppointments: undefined;
+    PatientProfile: undefined;
   DoctorAvailability: undefined;
   // Doctor/Lab screens
   DoctorAppointments: undefined;
