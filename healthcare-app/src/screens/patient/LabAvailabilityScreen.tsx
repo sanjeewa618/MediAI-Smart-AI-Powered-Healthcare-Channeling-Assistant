@@ -52,7 +52,7 @@ const mockLabs = [
     yourToken: 25,
     openTime: '07:00 AM',
     closeTime: '02:00 PM', // AM Shift
-    image: 'https://img.freepik.com/free-photo/scientist-working-with-blood-samples-lab_23-2148810769.jpg'
+    image: require('../../../assets/lab.jpg')
   },
   {
     id: '2',
@@ -71,7 +71,7 @@ const mockLabs = [
     yourToken: 17,
     openTime: '02:00 PM',
     closeTime: '09:00 PM', // PM Shift
-    image: 'https://img.freepik.com/free-photo/doctor-working-with-blood-tubes-lab_23-2148810771.jpg'
+    image: require('../../../assets/lab.jpg')
   },
   {
     id: '3',
@@ -90,7 +90,7 @@ const mockLabs = [
     yourToken: 36,
     openTime: '07:30 AM',
     closeTime: '01:30 PM', // AM Shift
-    image: 'https://img.freepik.com/free-photo/medical-specialist-analyzing-urine-sample-laboratory_23-2148810766.jpg'
+    image: require('../../../assets/lab.jpg')
   },
   {
     id: '4',
@@ -109,7 +109,7 @@ const mockLabs = [
     yourToken: 13,
     openTime: '01:30 PM',
     closeTime: '08:30 PM', // PM Shift
-    image: 'https://img.freepik.com/free-photo/biologist-woman-working-medical-research-laboratory_482257-26895.jpg'
+    image: require('../../../assets/lab.jpg')
   },
   {
     id: '5',
@@ -128,7 +128,7 @@ const mockLabs = [
     yourToken: 48,
     openTime: '07:00 AM',
     closeTime: '07:00 PM',
-    image: 'https://img.freepik.com/free-photo/doctor-hand-taking-blood-sample-from-patient_1150-18451.jpg'
+    image: require('../../../assets/lab.jpg')
   }
 ];
 
@@ -293,7 +293,7 @@ const LabAvailabilityScreen = () => {
             filteredLabs.map((lab) => (
               <View key={lab.id} style={styles.labCard}>
                 <View style={styles.labCardTop}>
-                  <Image source={{ uri: lab.image }} style={styles.labImage} />
+                  <Image source={typeof lab.image === 'number' ? lab.image : { uri: lab.image }} style={styles.labImage} />
                   <View style={styles.labMainInfo}>
                     <Text style={styles.labName}>{lab.name}</Text>
                     <Text style={styles.labDesc}>{lab.description}</Text>

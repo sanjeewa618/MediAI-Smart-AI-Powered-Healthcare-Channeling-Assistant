@@ -1,7 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, Dimensions, Animated, PanResponder, Pressable, StatusBar, Modal } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
-import { Search, Calendar, User, FileText, Activity, MoreHorizontal, Home, Heart, Shield, MessageCircle, FileEdit, FlaskConical, ChevronRight, Baby, Droplets, Sparkles, Plus, Bell, LogOut, Pill, Truck, Settings, X, LifeBuoy, Stethoscope, Dna, Brain, Bone, Eye, Smile, CreditCard } from 'lucide-react-native';
+import { Search, Calendar, User, FileText, Activity, MoreHorizontal, Home, Heart, Shield, MessageCircle, FileEdit, FlaskConical, ChevronRight, Baby, Droplets, Sparkles, Plus, Bell, LogOut, Pill, Truck, Settings, X, LifeBuoy, Stethoscope, Dna, Brain, Bone, Eye, Smile, Wallet } from 'lucide-react-native';
 import BottomNavBar from '../../components/BottomNavBar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
@@ -12,6 +12,25 @@ const { width, height } = Dimensions.get('window');
 
 type PatientDashboardProp = StackNavigationProp<RootStackParamList, 'PatientDashboard'>;
 
+// --- Countdown Timer Helpers ---
+const DOCTOR_APPT = new Date(2026, 4, 20, 10, 30, 0);  // 20 May 2026 10:30 AM
+const LAB_APPT    = new Date(2026, 4, 22,  8,  0, 0);  // 22 May 2026 08:00 AM
+
+const calcCountdown = (target: Date): string => {
+  const diff = target.getTime() - Date.now();
+  if (diff <= 0) return 'Now!';
+  const totalSec = Math.floor(diff / 1000);
+  const s   = totalSec % 60;
+  const m   = Math.floor(totalSec / 60) % 60;
+  const h   = Math.floor(totalSec / 3600) % 24;
+  const d   = Math.floor(totalSec / 86400);
+  const ss  = String(s).padStart(2, '0');
+  const mm  = String(m).padStart(2, '0');
+  const hh  = String(h).padStart(2, '0');
+  if (d > 0) return `${d}d ${hh}h ${mm}m ${ss}s`;
+  return `${hh}h ${mm}m ${ss}s`;
+};
+
 const PatientDashboard = () => {
   const navigation = useNavigation<PatientDashboardProp>();
   const [moreModalVisible, setMoreModalVisible] = useState(false);
@@ -20,8 +39,20 @@ const PatientDashboard = () => {
   const [aiCardPressed, setAiCardPressed] = useState(false);
   const [aiCardHovered, setAiCardHovered] = useState(false);
   const aiCardScale = useRef(new Animated.Value(1)).current;
-  const aiCardLift = useRef(new Animated.Value(0)).current;
+  const aiCardLift  = useRef(new Animated.Value(0)).current;
   const aiGlowPulse = useRef(new Animated.Value(0.75)).current;
+
+  // Live countdown state
+  const [doctorCountdown, setDoctorCountdown] = useState(() => calcCountdown(DOCTOR_APPT));
+  const [labCountdown,    setLabCountdown]    = useState(() => calcCountdown(LAB_APPT));
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setDoctorCountdown(calcCountdown(DOCTOR_APPT));
+      setLabCountdown(calcCountdown(LAB_APPT));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const pulseLoop = Animated.loop(
@@ -262,32 +293,56 @@ const PatientDashboard = () => {
               <Text style={styles.categoryText}>Ophthalmology</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('SpecialtyDoctors', { specialty: 'Dental' })}>
-              <View style={[styles.categoryIconWrap, { backgroundColor: '#ECFDF5' }]}>
-                <Smile size={28} color="#059669" />
-              </View>
-              <Text style={styles.categoryText}>Dental</Text>
-            </TouchableOpacity>
           </ScrollView>
 
-          {/* Upcoming Appointment */}
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Upcoming Appointment</Text>
-            <TouchableOpacity><Text style={styles.viewAll}>View All</Text></TouchableOpacity>
+          {/* Upcoming Appointments Main Section */}
+          <View style={[styles.sectionHeader, { marginTop: 5, marginBottom: 15 }]}>
+            <Text style={[styles.sectionTitle, { fontSize: 18, color: '#000000' }]}>Upcoming Appointments</Text>
           </View>
 
-          <View style={styles.appointmentCard}>
-            <Image 
-              source={require('../../../assets/dr-emma.png')} 
-              style={styles.docAvatar} 
-            />
-            <View style={styles.docInfo}>
-              <Text style={styles.docName}>Dr. Emma Watson</Text>
-              <Text style={styles.docSpecialty}>Cardiologist</Text>
-              <Text style={styles.docTime}>20 May 2024 • 10:30 AM</Text>
-            </View>
-            <TouchableOpacity style={styles.calendarIconBtn}>
-              <Calendar size={22} color={COLORS.primary} />
+          {/* Doctor Appointment Sub-Section */}
+          <View style={styles.appointmentSubSection}>
+            <Text style={styles.appointmentSubTitle}>Doctor Appointment</Text>
+            <TouchableOpacity 
+              style={[styles.mainAppointmentCard, SHADOWS.small]}
+              onPress={() => navigation.navigate('PatientAppointments')}
+            >
+              <View style={[styles.mainAppIconWrap, { backgroundColor: '#F3F0FF' }]}>
+                <Stethoscope size={28} color={COLORS.primary} />
+              </View>
+              <View style={styles.mainAppInfo}>
+                <Text style={styles.mainAppTitle}>Dr. Emma Watson</Text>
+                <Text style={styles.mainAppSub}>Cardiology  •  20 May  •  10:30 AM</Text>
+                {/* Live countdown pill */}
+                <View style={styles.countdownPill}>
+                  <Activity size={11} color={COLORS.primary} />
+                  <Text style={styles.countdownText}>{doctorCountdown}</Text>
+                </View>
+              </View>
+              <ChevronRight size={20} color="#9CA3AF" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Lab Test Appointment Sub-Section */}
+          <View style={[styles.appointmentSubSection, { marginTop: 15 }]}>
+            <Text style={styles.appointmentSubTitle}>Lab Test Appointment</Text>
+            <TouchableOpacity 
+              style={[styles.mainAppointmentCard, SHADOWS.small]}
+              onPress={() => navigation.navigate('Reports')}
+            >
+              <View style={[styles.mainAppIconWrap, { backgroundColor: '#ECFDF5' }]}>
+                <FlaskConical size={28} color="#10B981" />
+              </View>
+              <View style={styles.mainAppInfo}>
+                <Text style={styles.mainAppTitle}>Complete Blood Count</Text>
+                <Text style={styles.mainAppSub}>City Lab  •  22 May  •  08:00 AM</Text>
+                {/* Live countdown pill */}
+                <View style={[styles.countdownPill, { backgroundColor: '#ECFDF5' }]}>
+                  <Activity size={11} color="#10B981" />
+                  <Text style={[styles.countdownText, { color: '#10B981' }]}>{labCountdown}</Text>
+                </View>
+              </View>
+              <ChevronRight size={20} color="#9CA3AF" />
             </TouchableOpacity>
           </View>
 
@@ -382,7 +437,7 @@ const PatientDashboard = () => {
       >
         <TouchableOpacity 
           style={[styles.fab, SHADOWS.medium]} 
-          onPress={() => navigation.navigate('DoctorAvailability', {})}
+          onPress={() => navigation.navigate('AvailabilitySelection')}
         >
           <Plus size={28} color="#FFFFFF" />
         </TouchableOpacity>
@@ -446,7 +501,7 @@ const PatientDashboard = () => {
 
                 <TouchableOpacity style={styles.menuItem}>
                   <View style={[styles.menuIconBox, { backgroundColor: '#FFF7ED' }]}>
-                    <CreditCard size={20} color="#F97316" />
+                    <Wallet size={20} color="#F97316" />
                   </View>
                   <Text style={styles.menuItemText}>Payments & Billing</Text>
                 </TouchableOpacity>
@@ -832,6 +887,65 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 30,
     fontWeight: '600',
+  },
+  appointmentSubSection: {
+    marginBottom: 5,
+  },
+  appointmentSubTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+    marginBottom: 10,
+    marginLeft: 4,
+  },
+  mainAppointmentCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  mainAppIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mainAppInfo: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  mainAppTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.textHeader,
+    marginBottom: 4,
+  },
+  mainAppSub: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    fontWeight: '600',
+  },
+  countdownPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F3F0FF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+    marginTop: 8,
+  },
+  countdownText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: COLORS.primary,
+    fontVariant: ['tabular-nums'],
   },
   searchContainer: { 
     flexDirection: 'row', 

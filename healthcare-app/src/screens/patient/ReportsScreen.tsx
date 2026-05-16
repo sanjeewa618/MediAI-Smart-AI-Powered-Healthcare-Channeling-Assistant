@@ -4,6 +4,7 @@ import { COLORS, SHADOWS } from '../../theme/theme';
 import { FileText, Search, Filter, Bell, ArrowLeft, Download, Share2, Eye, Upload, AlertCircle, CheckCircle2, Clock } from 'lucide-react-native';
 import BottomNavBar from '../../components/BottomNavBar';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useNavigation } from '@react-navigation/native';
 
 const reportCategories = ['All', 'Lab Reports', 'Scan Reports', 'Prescriptions', 'ECG', 'Vaccination'];
 
@@ -52,6 +53,7 @@ const mockReports = [
 ];
 
 const ReportsScreen = () => {
+  const navigation = useNavigation();
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchText, setSearchText] = useState('');
   const [selectedReport, setSelectedReport] = useState<any>(null);
@@ -89,7 +91,9 @@ const ReportsScreen = () => {
           <View style={styles.headerTop}>
             <View style={styles.titleSection}>
               <View style={styles.titleRow}>
-                <ArrowLeft size={20} color="#FFFFFF" style={styles.titleArrow} />
+                <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 4, marginRight: 8 }}>
+                  <ArrowLeft size={24} color="#FFFFFF" />
+                </TouchableOpacity>
                 <Text style={styles.headerTitle}>Medical Reports</Text>
               </View>
               <Text style={styles.headerSub}>Your complete health records</Text>

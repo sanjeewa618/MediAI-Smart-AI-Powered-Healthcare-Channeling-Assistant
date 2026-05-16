@@ -8,7 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import { 
   ArrowLeft, ChevronRight, Calendar, Clock, User, 
-  MapPin, Activity, CheckCircle2, Upload, CreditCard,
+  MapPin, Activity, CheckCircle2, Upload, Wallet,
   Home, Building2, AlertCircle, Phone, Mail, 
   FileText, ArrowRight, Check, Timer, FlaskConical, Shield, Bell
 } from 'lucide-react-native';
@@ -154,7 +154,7 @@ const LabBookingFlowScreen = () => {
     <View style={styles.stepContent}>
       <Text style={styles.stepTitle}>Confirm Test Details</Text>
       <View style={[styles.card, SHADOWS.medium, { flexDirection: 'row', padding: 16, alignItems: 'center' }]}>
-        <Image source={{ uri: lab.image }} style={styles.testImageThumbnail} />
+        <Image source={typeof lab.image === 'number' ? lab.image : { uri: lab.image }} style={styles.testImageThumbnail} />
         <View style={[styles.testInfoSection, { flex: 1, padding: 0, marginLeft: 16 }]}>
           <Text style={styles.testNameLarge}>{lab.name}</Text>
           <Text style={styles.testLabSub}>{lab.floor}</Text>
@@ -353,7 +353,7 @@ const LabBookingFlowScreen = () => {
         style={[styles.payOption, paymentMethod === 'Card' && styles.payOptionActive]}
         onPress={() => setPaymentMethod('Card')}
       >
-        <CreditCard size={24} color={paymentMethod === 'Card' ? COLORS.primary : '#6B7280'} />
+        <Wallet size={24} color={paymentMethod === 'Card' ? COLORS.primary : '#6B7280'} />
         <View style={styles.payInfo}>
           <Text style={styles.payName}>Credit / Debit Card</Text>
           <Text style={styles.paySub}>Visa, Mastercard, Amex</Text>
