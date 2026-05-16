@@ -10,6 +10,7 @@ export type RootStackParamList = {
   PatientDashboard: undefined;
   DoctorDashboard: undefined;
   LabDashboard: undefined;
+  Reports: undefined;
   // Patient sub-screens
   BookAppointment: { doctorId?: string; doctorName?: string; specialty?: string; date?: string; time?: string };
   AIHealthAssistant: undefined;

@@ -6,6 +6,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/types';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import { LinearGradient } from 'expo-linear-gradient';
+import BottomNavBar from '../../components/BottomNavBar';
 
 const { width } = Dimensions.get('window');
 
@@ -202,75 +203,79 @@ const DoctorAvailability = () => {
   );
 
   return (
-    <View style={styles.container}>
-      <LinearGradient colors={['#724CF9', '#5E3BEE']} style={styles.headerGradient}>
-        <View style={styles.headerContent}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <ChevronLeft size={28} color="#FFF" />
-          </TouchableOpacity>
-          <View>
-            <Text style={styles.headerTitle}>Real-Time Availability</Text>
-            <Text style={styles.headerSub}>Find available doctors & slots</Text>
-          </View>
-        </View>
-
-        <View style={styles.searchBar}>
-          <Search size={20} color="#9CA3AF" />
-          <TextInput 
-            style={styles.searchInput}
-            placeholder="Search availability by doctor or specialty..."
-            placeholderTextColor="#9CA3AF"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </View>
-      </LinearGradient>
-
-      <View style={styles.categoriesContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesScroll}>
-          {categories.map((category, index) => (
-            <TouchableOpacity 
-              key={index}
-              style={[
-                styles.categoryChip, 
-                selectedCategory === category && styles.categoryChipActive
-              ]}
-              onPress={() => setSelectedCategory(category)}
-            >
-              <Text style={[
-                styles.categoryText,
-                selectedCategory === category && styles.categoryTextActive
-              ]}>
-                {category}
-              </Text>
+    <View style={styles.screenWrapper}>
+      <View style={styles.container}>
+        <LinearGradient colors={['#724CF9', '#5E3BEE']} style={styles.headerGradient}>
+          <View style={styles.headerContent}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+              <ChevronLeft size={28} color="#FFF" />
             </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-
-      <FlatList
-        data={filteredDoctors}
-        keyExtractor={(item) => item.id}
-        renderItem={renderDoctorCard}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        ListHeaderComponent={() => (
-          <View style={styles.benefitSection}>
-            <View style={styles.benefitCard}>
-              <CheckCircle2 size={24} color={COLORS.primary} />
-              <View style={styles.benefitTextWrap}>
-                <Text style={styles.benefitTitle}>No Overlaps</Text>
-                <Text style={styles.benefitDesc}>Conflicts are automatically blocked</Text>
-              </View>
+            <View>
+              <Text style={styles.headerTitle}>Real-Time Availability</Text>
+              <Text style={styles.headerSub}>Find available doctors & slots</Text>
             </View>
           </View>
-        )}
-      />
+
+          <View style={styles.searchBar}>
+            <Search size={20} color="#9CA3AF" />
+            <TextInput 
+              style={styles.searchInput}
+              placeholder="Search availability by doctor or specialty..."
+              placeholderTextColor="#9CA3AF"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+          </View>
+        </LinearGradient>
+
+        <View style={styles.categoriesContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesScroll}>
+            {categories.map((category, index) => (
+              <TouchableOpacity 
+                key={index}
+                style={[
+                  styles.categoryChip, 
+                  selectedCategory === category && styles.categoryChipActive
+                ]}
+                onPress={() => setSelectedCategory(category)}
+              >
+                <Text style={[
+                  styles.categoryText,
+                  selectedCategory === category && styles.categoryTextActive
+                ]}>
+                  {category}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        <FlatList
+          data={filteredDoctors}
+          keyExtractor={(item) => item.id}
+          renderItem={renderDoctorCard}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          ListHeaderComponent={() => (
+            <View style={styles.benefitSection}>
+              <View style={styles.benefitCard}>
+                <CheckCircle2 size={24} color={COLORS.primary} />
+                <View style={styles.benefitTextWrap}>
+                  <Text style={styles.benefitTitle}>No Overlaps</Text>
+                  <Text style={styles.benefitDesc}>Conflicts are automatically blocked</Text>
+                </View>
+              </View>
+            </View>
+          )}
+        />
+      </View>
+      <BottomNavBar />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  screenWrapper: { flex: 1, backgroundColor: '#F9FAFB' },
   container: { flex: 1, backgroundColor: '#F9FAFB' },
   headerGradient: {
     paddingTop: Platform.OS === 'ios' ? 60 : 50,
@@ -397,16 +402,17 @@ const styles = StyleSheet.create({
   },
   slotText: { fontSize: 11, fontWeight: '600', color: '#4B5563' },
   slotTextDisabled: { color: '#EF4444' },
-  bookBtn: { borderRadius: 16, overflow: 'hidden', marginTop: 8 },
-  bookBtnDisabled: { opacity: 0.6 },
+  bookBtn: { borderRadius: 20, overflow: 'hidden', marginTop: 12, shadowColor: '#724CF9', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 6 },
+  bookBtnDisabled: { opacity: 0.5 },
   gradientBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    gap: 10
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    gap: 12
   },
-  bookBtnText: { color: '#FFF', fontWeight: '700', fontSize: 14 }
+  bookBtnText: { color: '#FFF', fontWeight: '800', fontSize: 16, letterSpacing: 0.3 }
 });
 
 export default DoctorAvailability;

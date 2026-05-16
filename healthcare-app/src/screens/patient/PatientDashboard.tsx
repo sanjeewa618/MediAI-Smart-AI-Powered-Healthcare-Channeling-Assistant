@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, Dimensions, Animated, PanResponder } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import { Search, Calendar, User, FileText, Activity, MoreHorizontal, Home, Heart, Shield, MessageCircle, FilePenLine, FlaskConical, ChevronRight, Baby, Droplets, Sun, Sparkles, Plus } from 'lucide-react-native';
+import BottomNavBar from '../../components/BottomNavBar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -243,28 +244,7 @@ const PatientDashboard = () => {
       </ScrollView>
 
       {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('PatientDashboard')}>
-          <Home size={24} color={COLORS.primary} fill={COLORS.primary} />
-          <Text style={[styles.navText, {color: COLORS.primary}]}>Home</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('PatientAppointments')}>
-          <Calendar size={24} color="#9CA3AF" />
-          <Text style={styles.navText}>Appointments</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('AIHealthAssistant')}>
-          <Heart size={24} color="#9CA3AF" />
-          <Text style={styles.navText}>AI Health</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('DoctorAvailability')}>
-          <FileText size={24} color="#9CA3AF" />
-          <Text style={styles.navText}>Availability</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <User size={24} color="#9CA3AF" />
-          <Text style={styles.navText}>Profile</Text>
-        </TouchableOpacity>
-      </View>
+      <BottomNavBar />
 
       {/* Floating Action Button */}
       <Animated.View
@@ -291,7 +271,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB' 
   },
   scrollContent: { 
-    paddingBottom: 90 
+    paddingBottom: 120 
   },
   topPurpleBackground: {
     paddingTop: Platform.OS === 'ios' ? 60 : 50,

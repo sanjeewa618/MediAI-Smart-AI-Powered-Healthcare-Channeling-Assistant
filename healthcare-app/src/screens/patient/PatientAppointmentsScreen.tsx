@@ -3,8 +3,10 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, 
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/types';
-import { ArrowLeft, Home, Calendar, Heart, FileText, User } from 'lucide-react-native';
+import { ArrowLeft, ArrowRight, Home, Calendar, Heart, FileText, User, ChevronLeft } from 'lucide-react-native';
+import BottomNavBar from '../../components/BottomNavBar';
 import { COLORS } from '../../theme/theme';
+import { LinearGradient } from 'expo-linear-gradient';
 
 type AppointmentsNavProp = StackNavigationProp<RootStackParamList, 'PatientAppointments'>;
 
@@ -51,13 +53,17 @@ const PatientAppointmentsScreen = () => {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
         {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <ArrowLeft size={24} color="#1A1A4B" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Appointments</Text>
-          <View style={{ width: 40 }} /> {/* Spacer for centering */}
-        </View>
+        <LinearGradient colors={['#724CF9', '#5E3BEE']} style={styles.headerGradient}>
+          <View style={styles.headerContent}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+              <ChevronLeft size={28} color="#FFF" />
+            </TouchableOpacity>
+            <View>
+              <Text style={styles.headerTitle}>Appointments</Text>
+              <Text style={styles.headerSub}>Manage your bookings</Text>
+            </View>
+          </View>
+        </LinearGradient>
 
         {/* Custom Tabs */}
         <View style={styles.tabsContainer}>
@@ -97,33 +103,15 @@ const PatientAppointmentsScreen = () => {
         {/* Book Button */}
         <View style={styles.bookButtonContainer}>
           <TouchableOpacity style={styles.bookButton} onPress={() => navigation.navigate('DoctorAvailability')}>
-            <Text style={styles.bookButtonText}>Book New Appointment</Text>
+            <View style={styles.bookButtonContent}>
+              <Text style={styles.bookButtonText}>Book New Appointment</Text>
+              <ArrowRight size={20} color="#FFFFFF" strokeWidth={2.5} />
+            </View>
           </TouchableOpacity>
         </View>
 
         {/* Bottom Navigation */}
-        <View style={styles.bottomNav}>
-          <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('PatientDashboard')}>
-            <Home size={24} color="#9CA3AF" />
-            <Text style={styles.navText}>Home</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.navItem}>
-            <Calendar size={24} color={COLORS.primary} fill={COLORS.primary} />
-            <Text style={[styles.navText, { color: COLORS.primary }]}>Appointments</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('AIHealthAssistant')}>
-            <Heart size={24} color="#9CA3AF" />
-            <Text style={styles.navText}>AI Health</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.navItem}>
-            <FileText size={24} color="#9CA3AF" />
-            <Text style={styles.navText}>Records</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.navItem}>
-            <User size={24} color="#9CA3AF" />
-            <Text style={styles.navText}>Profile</Text>
-          </TouchableOpacity>
-        </View>
+        <BottomNavBar />
       </View>
     </SafeAreaView>
   );
@@ -132,33 +120,40 @@ const PatientAppointmentsScreen = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F9FAFB',
   },
   container: {
     flex: 1,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: '#F9FAFB',
   },
-  header: {
+  headerGradient: {
+    paddingTop: Platform.OS === 'ios' ? 60 : 50,
+    paddingHorizontal: 20,
+    paddingBottom: 24,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+  },
+  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingTop: Platform.OS === 'ios' ? 20 : 30,
-    paddingBottom: 20,
-    backgroundColor: '#FFFFFF'
+    gap: 16,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-    justifyContent: 'center',
+  backBtn: {
+    marginRight: 4,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    padding: 8,
+    borderRadius: 12
   },
   headerTitle: {
     fontSize: 20,
+    marginLeft: 1,
     fontWeight: '800',
-    color: '#1A1A4B',
+    color: '#FFF',
+  },
+  headerSub: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 2,
   },
   tabsContainer: {
     flexDirection: 'row',
@@ -256,19 +251,29 @@ const styles = StyleSheet.create({
   },
   bookButton: {
     backgroundColor: COLORS.primary,
-    borderRadius: 16,
-    paddingVertical: 18,
+    borderRadius: 20,
+    paddingVertical: 20,
+    marginBottom: 25,
+    paddingHorizontal: 24,
     alignItems: 'center',
+    justifyContent: 'center',
     shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  bookButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
   },
   bookButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   bottomNav: { 
     position: 'absolute', 

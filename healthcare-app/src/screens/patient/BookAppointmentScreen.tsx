@@ -349,8 +349,8 @@ const styles = StyleSheet.create({
   bottomOverview: { flex: 1 },
   bottomDocText: { fontSize: 14, fontWeight: '700', color: '#111827' },
   bottomTimeText: { fontSize: 12, color: '#6B7280', marginTop: 4 },
-  nextBtn: { backgroundColor: COLORS.primary, paddingHorizontal: 24, paddingVertical: 14, borderRadius: 14 },
-  nextBtnText: { color: '#FFF', fontWeight: '700', fontSize: 14 },
+  nextBtn: { backgroundColor: COLORS.primary, paddingHorizontal: 28, paddingVertical: 18, borderRadius: 18, shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 6 },
+  nextBtnText: { color: '#FFF', fontWeight: '800', fontSize: 16, letterSpacing: 0.3 },
   receiptContainer: { padding: 20, alignItems: 'center' },
   receiptCard: {
     backgroundColor: '#FFF', borderRadius: 24, width: '100%', padding: 24,

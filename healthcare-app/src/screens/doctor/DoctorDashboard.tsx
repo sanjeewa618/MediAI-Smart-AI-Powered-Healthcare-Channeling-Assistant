@@ -1,59 +1,101 @@
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, Platform } from 'react-native';
 import { COLORS, SHADOWS, SIZES } from '../../theme/theme';
-import { Users, Calendar, Clipboard, Bell, LogOut } from 'lucide-react-native';
+import { Users, Calendar, Clipboard, Bell, LogOut, ChevronLeft } from 'lucide-react-native';
+import BottomNavBar from '../../components/BottomNavBar';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const DoctorDashboard = () => {
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Doctor Portal</Text>
-          <TouchableOpacity><LogOut size={24} color={COLORS.error} /></TouchableOpacity>
-        </View>
-
-        <View style={[styles.profileCard, SHADOWS.medium]}>
-          <Image source={{ uri: 'https://img.icons8.com/bubbles/100/000000/doctor-male.png' }} style={styles.avatar} />
-          <View>
-            <Text style={styles.name}>Dr. Saman Perera</Text>
-            <Text style={styles.specialty}>Senior Cardiologist</Text>
-            <View style={styles.statusBadge}><Text style={styles.statusText}>Active</Text></View>
-          </View>
-        </View>
-
-        <View style={styles.statsRow}>
-          <View style={[styles.statBox, SHADOWS.small]}>
-            <Users size={24} color={COLORS.primary} />
-            <Text style={styles.statNumber}>120</Text>
-            <Text style={styles.statLabel}>Patients</Text>
-          </View>
-          <View style={[styles.statBox, SHADOWS.small]}>
-            <Calendar size={24} color="#4ADE80" />
-            <Text style={styles.statNumber}>8</Text>
-            <Text style={styles.statLabel}>Today</Text>
-          </View>
-        </View>
-
-        <Text style={styles.sectionTitle}>Upcoming Appointments</Text>
-        {[1, 2, 3].map((i) => (
-          <View key={i} style={[styles.appoCard, SHADOWS.small]}>
-            <View style={styles.patientInfo}>
-              <View style={styles.placeholderAvatar}><Text>P{i}</Text></View>
-              <View>
-                <Text style={styles.patientName}>Patient Name {i}</Text>
-                <Text style={styles.appoTime}>09:00 AM - Heart Checkup</Text>
-              </View>
+      <View style={styles.wrapper}>
+        <LinearGradient colors={['#724CF9', '#5E3BEE']} style={styles.headerGradient}>
+          <View style={styles.headerContent}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.headerTitle}>Doctor Portal</Text>
+              <Text style={styles.headerSub}>Manage your appointments</Text>
             </View>
-            <TouchableOpacity style={styles.viewBtn}><Text style={styles.viewBtnText}>Details</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.logoutBtn}>
+              <LogOut size={24} color="#FFF" />
+            </TouchableOpacity>
           </View>
-        ))}
-      </ScrollView>
+        </LinearGradient>
+
+        <ScrollView contentContainerStyle={styles.content}>
+
+          <View style={[styles.profileCard, SHADOWS.medium]}>
+            <Image source={{ uri: 'https://img.icons8.com/bubbles/100/000000/doctor-male.png' }} style={styles.avatar} />
+            <View>
+              <Text style={styles.name}>Dr. Saman Perera</Text>
+              <Text style={styles.specialty}>Senior Cardiologist</Text>
+              <View style={styles.statusBadge}><Text style={styles.statusText}>Active</Text></View>
+            </View>
+          </View>
+
+          <View style={styles.statsRow}>
+            <View style={[styles.statBox, SHADOWS.small]}>
+              <Users size={24} color={COLORS.primary} />
+              <Text style={styles.statNumber}>120</Text>
+              <Text style={styles.statLabel}>Patients</Text>
+            </View>
+            <View style={[styles.statBox, SHADOWS.small]}>
+              <Calendar size={24} color="#4ADE80" />
+              <Text style={styles.statNumber}>8</Text>
+              <Text style={styles.statLabel}>Today</Text>
+            </View>
+          </View>
+
+          <Text style={styles.sectionTitle}>Upcoming Appointments</Text>
+          {[1, 2, 3].map((i) => (
+            <View key={i} style={[styles.appoCard, SHADOWS.small]}>
+              <View style={styles.patientInfo}>
+                <View style={styles.placeholderAvatar}><Text>P{i}</Text></View>
+                <View>
+                  <Text style={styles.patientName}>Patient Name {i}</Text>
+                  <Text style={styles.appoTime}>09:00 AM - Heart Checkup</Text>
+                </View>
+              </View>
+              <TouchableOpacity style={styles.viewBtn}><Text style={styles.viewBtnText}>Details</Text></TouchableOpacity>
+            </View>
+          ))}
+        </ScrollView>
+        <BottomNavBar />
+      </View>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
+  wrapper: { flex: 1 },
+  headerGradient: {
+    paddingTop: Platform.OS === 'ios' ? 60 : 50,
+    paddingHorizontal: 20,
+    paddingBottom: 24,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    justifyContent: 'space-between',
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#FFF',
+  },
+  headerSub: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 2,
+  },
+  logoutBtn: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    padding: 8,
+    borderRadius: 12
+  },
   content: { padding: 24 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
   title: { fontSize: 24, fontWeight: '800', color: COLORS.textHeader },
