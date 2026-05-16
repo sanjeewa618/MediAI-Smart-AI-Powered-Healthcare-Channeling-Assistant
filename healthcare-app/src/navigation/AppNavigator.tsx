@@ -26,6 +26,7 @@ import AvailabilitySelectionScreen from '../screens/patient/AvailabilitySelectio
 import LabAvailabilityScreen from '../screens/patient/LabAvailabilityScreen';
 import LabBookingFlowScreen from '../screens/patient/LabBookingFlowScreen';
 import DoctorAvailability from '../screens/doctor/DoctorAvailability';
+import SettingsScreen from '../screens/patient/SettingsScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -57,6 +58,7 @@ const AppNavigator = () => {
       <Stack.Screen name="AvailabilitySelection" component={AvailabilitySelectionScreen} />
       <Stack.Screen name="LabAvailability" component={LabAvailabilityScreen} />
       <Stack.Screen name="LabBookingFlow" component={LabBookingFlowScreen} />
+      <Stack.Screen name="Settings" component={SettingsScreen} />
     </Stack.Navigator>
   );
 };

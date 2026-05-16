@@ -22,4 +22,5 @@ export type RootStackParamList = {
   AvailabilitySelection: undefined;
   LabAvailability: undefined;
   LabBookingFlow: { lab: any; initialDate?: string; initialTime?: string };
+  Settings: undefined;
 };
