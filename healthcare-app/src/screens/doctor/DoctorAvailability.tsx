@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, Image, ScrollView, Platform, Dimensions, TextInput } from 'react-native';
 import { ChevronLeft, Clock, Calendar, AlertCircle, CheckCircle2, Search, ArrowRight, User } from 'lucide-react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/types';
 import { COLORS, SHADOWS } from '../../theme/theme';
@@ -11,6 +11,7 @@ import BottomNavBar from '../../components/BottomNavBar';
 const { width } = Dimensions.get('window');
 
 type NavProp = StackNavigationProp<RootStackParamList, 'DoctorAvailability'>;
+type RoutePropType = RouteProp<RootStackParamList, 'DoctorAvailability'>;
 
 interface TimeSlot {
   time: string;
@@ -99,8 +100,11 @@ const categories = ['All', 'Cardiology', 'Paediatrics', 'Urology', 'Oncology', '
 
 const DoctorAvailability = () => {
   const navigation = useNavigation<NavProp>();
+  const route = useRoute<RoutePropType>();
+  const initialSpecialty = route.params?.specialty || 'All';
+
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedCategory, setSelectedCategory] = useState(initialSpecialty);
 
   const filteredDoctors = mockDoctors.filter((doc) => {
     const matchesSearch = doc.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -205,7 +209,7 @@ const DoctorAvailability = () => {
   return (
     <View style={styles.screenWrapper}>
       <View style={styles.container}>
-        <LinearGradient colors={['#724CF9', '#5E3BEE']} style={styles.headerGradient}>
+        <LinearGradient colors={['#8B3DFF', '#5F0FFF']} style={styles.headerGradient}>
           <View style={styles.headerContent}>
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
               <ChevronLeft size={28} color="#FFF" />

@@ -24,6 +24,7 @@ import AIHealthAssistantScreen from '../screens/patient/AIHealthAssistantScreen'
 import PatientAppointmentsScreen from '../screens/patient/PatientAppointmentsScreen';
 import PatientProfileScreen from '../screens/patient/PatientProfileScreen';
 import BookAppointmentScreen from '../screens/patient/BookAppointmentScreen';
+import SpecialtyDoctorsScreen from '../screens/patient/SpecialtyDoctorsScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -51,6 +52,7 @@ const AppNavigator = () => {
       <Stack.Screen name="PatientAppointments" component={PatientAppointmentsScreen} />
       <Stack.Screen name="BookAppointment" component={BookAppointmentScreen} />
       <Stack.Screen name="PatientProfile" component={PatientProfileScreen} />
+      <Stack.Screen name="SpecialtyDoctors" component={SpecialtyDoctorsScreen} />
     </Stack.Navigator>
   );
 };

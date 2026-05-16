@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, Dimensions, Animated, PanResponder, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, Dimensions, Animated, PanResponder, Pressable, StatusBar, Modal } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
-import { Search, Calendar, User, FileText, Activity, MoreHorizontal, Home, Heart, Shield, MessageCircle, FilePenLine, FlaskConical, ChevronRight, Baby, Droplets, Sun, Sparkles, Plus, Bell, LogOut } from 'lucide-react-native';
+import { Search, Calendar, User, FileText, Activity, MoreHorizontal, Home, Heart, Shield, MessageCircle, FileEdit, FlaskConical, ChevronRight, Baby, Droplets, Sparkles, Plus, Bell, LogOut, Pill, Truck, Settings, X, LifeBuoy, Stethoscope, Dna, Brain, Bone, Eye, Smile } from 'lucide-react-native';
 import BottomNavBar from '../../components/BottomNavBar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
@@ -14,6 +14,7 @@ type PatientDashboardProp = StackNavigationProp<RootStackParamList, 'PatientDash
 
 const PatientDashboard = () => {
   const navigation = useNavigation<PatientDashboardProp>();
+  const [moreModalVisible, setMoreModalVisible] = useState(false);
   const [aiCardPressed, setAiCardPressed] = useState(false);
   const [aiCardHovered, setAiCardHovered] = useState(false);
   const aiCardScale = useRef(new Animated.Value(1)).current;
@@ -102,11 +103,12 @@ const PatientDashboard = () => {
 
   return (
     <View style={styles.container}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         
         {/* Purple Top Background Section */}
         <LinearGradient
-          colors={['#724CF9', '#5E3BEE']}
+          colors={['#8B3DFF', '#6A11CB', '#5F0FFF']}
           style={styles.topPurpleBackground}
         >
           {/* Header */}
@@ -150,8 +152,6 @@ const PatientDashboard = () => {
           <Pressable
             onPressIn={handleAiCardPressIn}
             onPressOut={handleAiCardPressOut}
-            onHoverIn={handleAiCardHoverIn}
-            onHoverOut={handleAiCardHoverOut}
           >
             <Animated.View
               style={[
@@ -162,7 +162,11 @@ const PatientDashboard = () => {
             >
               <LinearGradient
                 colors={['#FFFFFF', '#F7F2FF']}
-                style={[styles.aiCard, aiCardPressed && styles.aiCardPressed, aiCardHovered && styles.aiCardHovered]}
+                style={[
+                  styles.aiCard, 
+                  aiCardPressed ? styles.aiCardPressed : null, 
+                  aiCardHovered ? styles.aiCardHovered : null
+                ]}
               >
                 <View style={styles.aiCardContent}>
                   <Text style={styles.aiCardTitle}>AI Health Assistant</Text>
@@ -202,39 +206,67 @@ const PatientDashboard = () => {
             contentContainerStyle={styles.categoriesContainer}
             
           >
-            <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('DoctorAvailability')}>
-              <View style={styles.categoryIconWrap}>
-                <Heart size={28} color="#4B5563" />
+            <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('SpecialtyDoctors', { specialty: 'Cardiology' })}>
+              <View style={[styles.categoryIconWrap, { backgroundColor: '#FFF1F2' }]}>
+                <Heart size={28} color="#E11D48" fill="#E11D48" />
               </View>
               <Text style={styles.categoryText}>Cardiology</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('DoctorAvailability')}>
-              <View style={styles.categoryIconWrap}>
-                <Baby size={28} color="#4B5563" />
+            <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('SpecialtyDoctors', { specialty: 'Paediatrics' })}>
+              <View style={[styles.categoryIconWrap, { backgroundColor: '#E0F2FE' }]}>
+                <Baby size={28} color="#0EA5E9" />
               </View>
               <Text style={styles.categoryText}>Paediatrics</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('DoctorAvailability')}>
-              <View style={styles.categoryIconWrap}>
-                <Droplets size={28} color="#4B5563" />
+            <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('SpecialtyDoctors', { specialty: 'Urology' })}>
+              <View style={[styles.categoryIconWrap, { backgroundColor: '#F0FDF4' }]}>
+                <Droplets size={28} color="#22C55E" />
               </View>
               <Text style={styles.categoryText}>Urology</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('DoctorAvailability')}>
-              <View style={styles.categoryIconWrap}>
-                <Sun size={28} color="#4B5563" />
+            <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('SpecialtyDoctors', { specialty: 'Oncology' })}>
+              <View style={[styles.categoryIconWrap, { backgroundColor: '#FFF7ED' }]}>
+                <Dna size={28} color="#F97316" />
               </View>
               <Text style={styles.categoryText}>Oncology</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('DoctorAvailability')}>
-              <View style={styles.categoryIconWrap}>
-                <Sparkles size={28} color="#4B5563" />
+            <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('SpecialtyDoctors', { specialty: 'Dermatology' })}>
+              <View style={[styles.categoryIconWrap, { backgroundColor: '#F5F3FF' }]}>
+                <Sparkles size={28} color={COLORS.primary} />
               </View>
               <Text style={styles.categoryText}>Dermatology</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('SpecialtyDoctors', { specialty: 'Neurology' })}>
+              <View style={[styles.categoryIconWrap, { backgroundColor: '#FDF2F8' }]}>
+                <Brain size={28} color="#DB2777" />
+              </View>
+              <Text style={styles.categoryText}>Neurology</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('SpecialtyDoctors', { specialty: 'Orthopedics' })}>
+              <View style={[styles.categoryIconWrap, { backgroundColor: '#F1F5F9' }]}>
+                <Bone size={28} color="#475569" />
+              </View>
+              <Text style={styles.categoryText}>Orthopedics</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('SpecialtyDoctors', { specialty: 'Ophthalmology' })}>
+              <View style={[styles.categoryIconWrap, { backgroundColor: '#FFF7ED' }]}>
+                <Eye size={28} color="#EA580C" />
+              </View>
+              <Text style={styles.categoryText}>Ophthalmology</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('SpecialtyDoctors', { specialty: 'Dental' })}>
+              <View style={[styles.categoryIconWrap, { backgroundColor: '#ECFDF5' }]}>
+                <Smile size={28} color="#059669" />
+              </View>
+              <Text style={styles.categoryText}>Dental</Text>
             </TouchableOpacity>
           </ScrollView>
 
@@ -262,7 +294,7 @@ const PatientDashboard = () => {
           {/* Two Info Cards Box */}
           <View style={styles.infoCardsRow}>
             {/* Live Queue Card */}
-            <LinearGradient colors={['#7C4DFF', '#5E3BEE']} style={styles.infoCard}>
+            <LinearGradient colors={['#9333EA', '#5F0FFF']} style={styles.infoCard}>
               <View style={styles.infoCardTop}>
                 <Text style={styles.infoCardTitle}>Live Queue</Text>
                 <View style={styles.smallArrowIndicator}>
@@ -282,7 +314,7 @@ const PatientDashboard = () => {
             </LinearGradient>
 
             {/* Medicine Reminder Card */}
-            <LinearGradient colors={['#7C4DFF', '#5E3BEE']} style={styles.infoCard}>
+            <LinearGradient colors={['#9333EA', '#5F0FFF']} style={styles.infoCard}>
               <View style={styles.infoCardTop}>
                 <Text style={styles.infoCardTitle}>Medicine Reminder</Text>
               </View>
@@ -302,28 +334,31 @@ const PatientDashboard = () => {
           {/* Quick Actions */}
           <Text style={[styles.sectionTitle, { marginTop: 24, marginBottom: 16 }]}>Quick Actions</Text>
           <View style={styles.quickActionsRow}>
-            <TouchableOpacity style={styles.quickActionItem} onPress={() => navigation.navigate('DoctorAvailability')}>
-              <View style={styles.quickActionIconWrap}>
-                <User size={24} color={COLORS.primary} />
+            <TouchableOpacity style={styles.quickActionItem} onPress={() => navigation.navigate('DoctorAvailability', {})}>
+              <View style={[styles.quickActionIconWrap, { backgroundColor: '#E0F2FE' }]}>
+                <User size={24} color="#0EA5E9" />
               </View>
               <Text style={styles.quickActionText}>Find Doctor</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.quickActionItem}>
-              <View style={styles.quickActionIconWrap}>
-                <FlaskConical size={24} color={COLORS.primary} />
+              <View style={[styles.quickActionIconWrap, { backgroundColor: '#ECFDF5' }]}>
+                <FlaskConical size={24} color="#10B981" />
               </View>
               <Text style={styles.quickActionText}>Book Lab Test</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.quickActionItem}>
-              <View style={styles.quickActionIconWrap}>
-                <FilePenLine size={24} color={COLORS.primary} />
+              <View style={[styles.quickActionIconWrap, { backgroundColor: '#F5F3FF' }]}>
+                <FileEdit size={24} color={COLORS.primary} />
               </View>
               <Text style={styles.quickActionText}>Health Records</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.quickActionItem}>
+            <TouchableOpacity 
+              style={styles.quickActionItem}
+              onPress={() => setMoreModalVisible(true)}
+            >
               <View style={styles.quickActionIconWrap}>
                 <MoreHorizontal size={24} color={COLORS.primary} />
               </View>
@@ -347,11 +382,101 @@ const PatientDashboard = () => {
       >
         <TouchableOpacity 
           style={[styles.fab, SHADOWS.medium]} 
-          onPress={() => navigation.navigate('DoctorAvailability')}
+          onPress={() => navigation.navigate('DoctorAvailability', {})}
         >
           <Plus size={28} color="#FFFFFF" />
         </TouchableOpacity>
       </Animated.View>
+
+      {/* More Options Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={moreModalVisible}
+        onRequestClose={() => setMoreModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <Pressable 
+            style={styles.modalDismissArea} 
+            onPress={() => setMoreModalVisible(false)} 
+          />
+          <Animated.View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>More Services</Text>
+              <TouchableOpacity 
+                onPress={() => setMoreModalVisible(false)}
+                style={styles.modalCloseBtn}
+              >
+                <X size={24} color={COLORS.textHeader} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalGrid}>
+              <TouchableOpacity style={styles.modalGridItem}>
+                <View style={[styles.modalIconWrap, { backgroundColor: '#E0F2FE' }]}>
+                  <Pill size={28} color="#0EA5E9" />
+                </View>
+                <Text style={styles.modalIconText}>Pharmacy</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.modalGridItem}>
+                <View style={[styles.modalIconWrap, { backgroundColor: '#FEF2F2' }]}>
+                  <Truck size={28} color="#EF4444" />
+                </View>
+                <Text style={styles.modalIconText}>Ambulance</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.modalGridItem}>
+                <View style={[styles.modalIconWrap, { backgroundColor: '#F0FDF4' }]}>
+                  <Activity size={28} color="#22C55E" />
+                </View>
+                <Text style={styles.modalIconText}>Blood Bank</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.modalGridItem}>
+                <View style={[styles.modalIconWrap, { backgroundColor: '#FFF7ED' }]}>
+                  <Shield size={28} color="#F97316" />
+                </View>
+                <Text style={styles.modalIconText}>Insurance</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.modalGridItem}>
+                <View style={[styles.modalIconWrap, { backgroundColor: '#F5F3FF' }]}>
+                  <Stethoscope size={28} color={COLORS.primary} />
+                </View>
+                <Text style={styles.modalIconText}>Telemedicine</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.modalGridItem}>
+                <View style={[styles.modalIconWrap, { backgroundColor: '#FDF2F8' }]}>
+                  <LifeBuoy size={28} color="#DB2777" />
+                </View>
+                <Text style={styles.modalIconText}>Support</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.modalGridItem}>
+                <View style={[styles.modalIconWrap, { backgroundColor: '#F1F5F9' }]}>
+                  <Settings size={28} color="#64748B" />
+                </View>
+                <Text style={styles.modalIconText}>Settings</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.modalGridItem}
+                onPress={() => {
+                  setMoreModalVisible(false);
+                  navigation.navigate('SignIn', { role: 'patient' });
+                }}
+              >
+                <View style={[styles.modalIconWrap, { backgroundColor: '#FFF1F2' }]}>
+                  <LogOut size={28} color="#E11D48" />
+                </View>
+                <Text style={styles.modalIconText}>Logout</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -359,7 +484,7 @@ const PatientDashboard = () => {
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: '#F9FAFB' 
+    backgroundColor: COLORS.background 
   },
   scrollContent: { 
     paddingBottom: 120 
@@ -422,11 +547,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF', 
     padding: 14, 
     borderRadius: 16, 
-    marginBottom: 24 
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
   },
   searchPlaceholder: { 
     marginLeft: 12, 
-    color: '#9CA3AF', 
+    color: COLORS.textSecondary, 
     fontSize: 14 
   },
   aiCard: { 
@@ -440,22 +570,22 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(114, 76, 249, 0.14)',
     overflow: 'hidden',
     marginTop: 10,
-    shadowColor: '#6D28D9',
+    shadowColor: COLORS.primary,
     shadowOpacity: 0.22,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 6 },
     elevation: 8,
   },
   aiCardPressed: {
-    shadowColor: '#6D28D9',
+    shadowColor: COLORS.primary,
     shadowOpacity: 0.35,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 12 },
     elevation: 12,
   },
   aiCardHovered: {
-    borderColor: 'rgba(114, 76, 249, 0.32)',
-    shadowColor: '#5B34DA',
+    borderColor: 'rgba(123, 47, 247, 0.32)',
+    shadowColor: COLORS.primaryDark,
     shadowOpacity: 0.3,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 9 },
@@ -473,7 +603,7 @@ const styles = StyleSheet.create({
     marginBottom: 6 
   },
   aiCardText: { 
-    color: '#6B7280', 
+    color: COLORS.textSecondary, 
     fontSize: 12, 
     marginBottom: 14, 
     lineHeight: 16 
@@ -516,7 +646,7 @@ const styles = StyleSheet.create({
     zIndex: 0,
   },
   whiteCurveContainer: {
-    backgroundColor: '#F9FAFB',
+    backgroundColor: COLORS.background,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     marginTop: -30, // Pulls the white section up over the purple background
@@ -542,10 +672,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 4,
   },
   categoryText: {
     fontSize: 12,
@@ -561,7 +691,7 @@ const styles = StyleSheet.create({
   sectionTitle: { 
     fontSize: 16, 
     fontWeight: '800', 
-    color: '#111827' 
+    color: COLORS.textHeader 
   },
   viewAll: { 
     color: COLORS.primary, 
@@ -594,24 +724,24 @@ const styles = StyleSheet.create({
   docName: { 
     fontSize: 15, 
     fontWeight: '700', 
-    color: '#111827',
+    color: COLORS.textHeader,
     marginBottom: 4
   },
   docSpecialty: { 
     fontSize: 12, 
-    color: '#6B7280',
+    color: COLORS.textSecondary,
     marginBottom: 6
   },
   docTime: {
     fontSize: 11,
-    color: '#4B5563',
+    color: COLORS.textMain,
     fontWeight: '600'
   },
   calendarIconBtn: {
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: '#F5F3FF',
+    backgroundColor: COLORS.primaryLight,
     alignItems: 'center',
     justifyContent: 'center'
   },
@@ -624,6 +754,11 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 20,
     padding: 16,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
   },
   infoCardTop: {
     flexDirection: 'row',
@@ -685,40 +820,27 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 18,
-    backgroundColor: '#F5F3FF',
+    backgroundColor: COLORS.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
   quickActionText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#4B5563',
+    color: COLORS.textMain,
     textAlign: 'center'
-  },
-  bottomNav: { 
-    position: 'absolute', 
-    bottom: 0, 
-    left: 0, 
-    right: 0, 
-    height: 85, 
-    backgroundColor: '#FFFFFF', 
-    flexDirection: 'row', 
-    justifyContent: 'space-around', 
-    alignItems: 'center', 
-    borderTopWidth: 1, 
-    borderTopColor: '#F3F4F6', 
-    paddingBottom: Platform.OS === 'ios' ? 20 : 10,
-    paddingTop: 10
-  },
-  navItem: { 
-    alignItems: 'center' 
   },
   navText: { 
     fontSize: 10, 
     marginTop: 6, 
     fontWeight: '600', 
-    color: '#9CA3AF'   },
+    color: COLORS.textSecondary   },
   fabWrapper: {
     position: 'absolute',
     bottom: 100, // Just above the bottom nav
@@ -737,7 +859,73 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 5,
     elevation: 8,
-  }
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalDismissArea: {
+    flex: 1,
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 30,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 30,
+    paddingHorizontal: 4,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: COLORS.textHeader,
+  },
+  modalCloseBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  modalGridItem: {
+    width: '23%',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modalIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  modalIconText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.textMain,
+    textAlign: 'center',
+  },
 });
 
 export default PatientDashboard;

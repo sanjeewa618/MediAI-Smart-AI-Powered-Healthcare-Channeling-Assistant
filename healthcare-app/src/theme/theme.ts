@@ -1,20 +1,21 @@
 export const COLORS = {
-  primary: '#633bf2', // Lighter, more modern violet-blue
-  primaryDark: '#5E3BEE',
-  primaryLight: '#F3F0FF',
-  secondary: '#FF6584',
+  primary: '#7B2FF7', // Primary Purple
+  primaryDark: '#5F0FFF', // Deep Violet
+  primaryLight: '#F3F0FF', // Very light violet for backgrounds
+  secondary: '#9333EA', // Secondary Purple
+  accent: '#C084FC', // Accent Light Purple
   white: '#FFFFFF',
-  background: '#FDFDFF',
-  textHeader: '#1A1A3E',
-  textMain: '#52527A',
-  textSecondary: '#9A9AB0',
-  border: '#E8E8F3',
-  inputBg: '#F8F8FB',
-  success: '#4CAF50',
-  error: '#F44336',
-  warning: '#FF9800',
-  gradientPrimary: ['#6139f1', '#A58BFF'] as const,
-  shadow: '#724CF915',
+  background: '#F8F9FC', // Soft White
+  textHeader: '#1F2937', // Dark Gray
+  textMain: '#4B5563', // Main Text
+  textSecondary: '#9CA3AF', // Light Gray
+  border: '#E5E7EB',
+  inputBg: '#F3F4F6', // Soft Gray
+  success: '#10B981',
+  error: '#EF4444',
+  warning: '#F59E0B',
+  gradientPrimary: ['#9333EA', '#7E22CE', '#5B21B6'] as const,
+  shadow: 'rgba(123, 47, 247, 0.15)',
 };
 
 export const SIZES = {

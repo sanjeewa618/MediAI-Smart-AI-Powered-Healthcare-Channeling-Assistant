@@ -85,7 +85,7 @@ const ReportsScreen = () => {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.wrapper}>
         {/* Header */}
-        <LinearGradient colors={['#724CF9', '#5E3BEE']} style={styles.headerGradient}>
+        <LinearGradient colors={['#8B3DFF', '#5F0FFF']} style={styles.headerGradient}>
           <View style={styles.headerTop}>
             <View style={styles.titleSection}>
               <View style={styles.titleRow}>

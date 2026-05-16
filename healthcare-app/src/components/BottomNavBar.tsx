@@ -28,7 +28,7 @@ const BottomNavBar = () => {
         <Text style={[styles.label, { color: currentRouteName === 'AIHealthAssistant' ? COLORS.primary : '#9CA3AF' }]}>AI Health</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('DoctorAvailability')}>
+      <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('DoctorAvailability', {})}>
         <Clock size={22} color={currentRouteName === 'DoctorAvailability' ? COLORS.primary : '#9CA3AF'} />
         <Text style={[styles.label, { color: currentRouteName === 'DoctorAvailability' ? COLORS.primary : '#9CA3AF' }]}>Availability</Text>
       </TouchableOpacity>
@@ -51,10 +51,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    height: 70,
+    height: 100,
     backgroundColor: 'transparent',
     borderTopWidth: 0,
-    marginTop: 2,
+    marginTop: 1,
   },
   item: {
     alignItems: 'center',
