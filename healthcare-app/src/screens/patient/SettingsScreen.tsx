@@ -95,7 +95,7 @@ const SettingsScreen = ({ navigation }: any) => {
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
       {/* Header */}
-      <LinearGradient colors={['#8B3DFF', '#5F0FFF']} style={styles.header}>
+      <LinearGradient colors={COLORS.screenHeaderGradient} style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <ChevronLeft size={26} color="#FFF" />
         </TouchableOpacity>

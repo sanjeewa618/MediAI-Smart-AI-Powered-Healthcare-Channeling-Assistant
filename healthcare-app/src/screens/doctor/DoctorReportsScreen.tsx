@@ -1,9 +1,10 @@
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, Platform } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, Platform, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { TrendingUp, Users, Calendar, Clock, Star, Activity } from 'lucide-react-native';
+import { TrendingUp, Users, Calendar, Clock, Star, Activity, ChevronRight } from 'lucide-react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import DoctorBottomNavBar from '../../components/DoctorBottomNavBar';
+import { useNavigation } from '@react-navigation/native';
 
 const STATS = [
   { label: 'Total Patients', value: '248', icon: Users, color: '#3B82F6', bg: '#EFF6FF' },
@@ -28,11 +29,21 @@ const TOP_CONDITIONS = [
   { name: 'Chest Pain', count: 12, pct: 25 },
 ];
 
-const DoctorReportsScreen = () => (
+const DoctorReportsScreen = () => {
+  const navigation = useNavigation<any>();
+
+  return (
   <SafeAreaView style={styles.safe}>
     <LinearGradient colors={['#8B3DFF', '#6A11CB']} style={styles.header}>
-      <Text style={styles.headerTitle}>Reports & Analytics</Text>
-      <Text style={styles.headerSub}>Your performance overview – May 2026</Text>
+      <View style={styles.headerRow}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <ChevronRight size={22} color="#FFF" style={{ transform: [{ rotate: '180deg' }] }} />
+        </TouchableOpacity>
+        <View style={styles.headerTextWrap}>
+          <Text style={styles.headerTitle}>Reports & Analytics</Text>
+          <Text style={styles.headerSub}>Your performance overview – May 2026</Text>
+        </View>
+      </View>
     </LinearGradient>
 
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -95,11 +106,15 @@ const DoctorReportsScreen = () => (
 
     <DoctorBottomNavBar />
   </SafeAreaView>
-);
+  );
+};
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F4F6FB' },
   header: { paddingTop: Platform.OS === 'ios' ? 60 : 50, paddingHorizontal: 20, paddingBottom: 24, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  headerTextWrap: { flex: 1 },
+  backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: 24, fontWeight: '800', color: '#FFF' },
   headerSub: { fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 4 },
   content: { padding: 16, gap: 16 },

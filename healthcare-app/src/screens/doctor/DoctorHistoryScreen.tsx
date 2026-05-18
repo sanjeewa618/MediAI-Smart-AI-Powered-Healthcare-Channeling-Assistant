@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Clock, User, Video, FileText, Calendar, ChevronRight } from 'lucide-react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import DoctorBottomNavBar from '../../components/DoctorBottomNavBar';
+import { useNavigation } from '@react-navigation/native';
 
 const HISTORY = [
   { id: '1', name: 'James Wilson', age: 52, date: 'May 18, 2026', time: '08:30 AM', type: 'Physical', diagnosis: 'Annual physical exam – Normal', img: 'https://i.pravatar.cc/150?img=8' },
@@ -17,12 +18,20 @@ const MONTHS = ['May 2026', 'April 2026', 'March 2026'];
 
 const DoctorHistoryScreen = () => {
   const [selectedMonth, setSelectedMonth] = useState('May 2026');
+  const navigation = useNavigation<any>();
 
   return (
     <SafeAreaView style={styles.safe}>
       <LinearGradient colors={['#8B3DFF', '#6A11CB']} style={styles.header}>
-        <Text style={styles.headerTitle}>Patient History</Text>
-        <Text style={styles.headerSub}>{HISTORY.length} past consultations</Text>
+        <View style={styles.headerRow}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <ChevronRight size={22} color="#FFF" style={{ transform: [{ rotate: '180deg' }] }} />
+          </TouchableOpacity>
+          <View style={styles.headerTextWrap}>
+            <Text style={styles.headerTitle}>Patient History</Text>
+            <Text style={styles.headerSub}>{HISTORY.length} past consultations</Text>
+          </View>
+        </View>
       </LinearGradient>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.monthScroll} contentContainerStyle={styles.monthContent}>
@@ -70,6 +79,9 @@ const DoctorHistoryScreen = () => {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F4F6FB' },
   header: { paddingTop: Platform.OS === 'ios' ? 60 : 50, paddingHorizontal: 20, paddingBottom: 24, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  headerTextWrap: { flex: 1 },
+  backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: 24, fontWeight: '800', color: '#FFF' },
   headerSub: { fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 4 },
   monthScroll: { maxHeight: 60 },

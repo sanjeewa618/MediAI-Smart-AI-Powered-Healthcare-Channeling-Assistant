@@ -7,6 +7,7 @@ import { Calendar, Clock, Video, User, ChevronRight, Search, AlertCircle } from 
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import DoctorBottomNavBar from '../../components/DoctorBottomNavBar';
+import { useNavigation } from '@react-navigation/native';
 
 const TABS = ['Today', 'Upcoming', 'Completed', 'Cancelled'];
 
@@ -36,6 +37,7 @@ const getStatusBg = (s: string) => {
 
 const DoctorAppointmentsScreen = () => {
   const [activeTab, setActiveTab] = useState('Today');
+  const navigation = useNavigation<any>();
 
   const filtered = APPOINTMENTS.filter((a) => {
     if (activeTab === 'Today') return a.date === 'Today' && a.status !== 'Completed' && a.status !== 'Cancelled';
@@ -48,8 +50,15 @@ const DoctorAppointmentsScreen = () => {
   return (
     <SafeAreaView style={styles.safe}>
       <LinearGradient colors={['#8B3DFF', '#6A11CB']} style={styles.header}>
-        <Text style={styles.headerTitle}>Appointments</Text>
-        <Text style={styles.headerSub}>{APPOINTMENTS.filter(a => a.date === 'Today').length} appointments today</Text>
+        <View style={styles.headerRow}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <ChevronRight size={22} color="#FFF" style={{ transform: [{ rotate: '180deg' }] }} />
+          </TouchableOpacity>
+          <View style={styles.headerTextWrap}>
+            <Text style={styles.headerTitle}>Appointments</Text>
+            <Text style={styles.headerSub}>{APPOINTMENTS.filter(a => a.date === 'Today').length} appointments today</Text>
+          </View>
+        </View>
       </LinearGradient>
 
       {/* Tabs */}
@@ -131,6 +140,9 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
   },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  headerTextWrap: { flex: 1 },
+  backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: 24, fontWeight: '800', color: '#FFF' },
   headerSub: { fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 4 },
   tabRow: {

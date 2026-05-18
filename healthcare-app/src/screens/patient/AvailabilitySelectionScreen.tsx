@@ -17,7 +17,7 @@ const AvailabilitySelectionScreen = () => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
       <LinearGradient
-        colors={['#8B3DFF', '#5F0FFF']}
+        colors={COLORS.screenHeaderGradient}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={styles.header}

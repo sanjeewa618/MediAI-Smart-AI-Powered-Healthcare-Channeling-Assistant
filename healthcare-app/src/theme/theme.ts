@@ -4,6 +4,10 @@ export const COLORS = {
   primaryLight: '#F3F0FF', // Very light violet for backgrounds
   secondary: '#9333EA', // Secondary Purple
   accent: '#C084FC', // Accent Light Purple
+  screenHeaderGradient: ['#8B3DFF', '#5F0FFF'] as const,
+  screenHeaderText: '#FFFFFF',
+  screenHeaderSubText: 'rgba(255,255,255,0.8)',
+  screenHeaderIconBg: 'rgba(255,255,255,0.2)',
   white: '#FFFFFF',
   background: '#F8F9FC', // Soft White
   textHeader: '#1F2937', // Dark Gray

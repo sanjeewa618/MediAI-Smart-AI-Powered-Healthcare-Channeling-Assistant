@@ -4,6 +4,7 @@ import { Home, Calendar, Clock, History, FileText, User } from 'lucide-react-nat
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SHADOWS } from '../theme/theme';
+import { useAuth } from '../context/AuthContext';
 
 const TABS = [
   { name: 'DoctorDashboard', label: 'Home', icon: Home },
@@ -19,6 +20,11 @@ const DoctorBottomNavBar = () => {
   const route = useRoute<any>();
   const currentRouteName = route?.name;
   const insets = useSafeAreaInsets();
+  const { role } = useAuth();
+
+  if (role !== 'doctor') {
+    return null;
+  }
 
   return (
     <View style={[styles.container, SHADOWS.medium, { paddingBottom: insets.bottom }]}>

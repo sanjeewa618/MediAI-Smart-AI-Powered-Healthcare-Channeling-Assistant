@@ -20,6 +20,9 @@ const DoctorProfileScreen = () => {
     <SafeAreaView style={styles.safe}>
       <LinearGradient colors={['#8B3DFF', '#6A11CB']} style={styles.header}>
         <View style={styles.headerRow}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <ChevronRight size={22} color="#FFF" style={{ transform: [{ rotate: '180deg' }] }} />
+          </TouchableOpacity>
           <Text style={styles.headerTitle}>My Profile</Text>
           <TouchableOpacity style={styles.editBtn}>
             <Edit3 size={18} color="#FFF" />
@@ -126,6 +129,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F4F6FB' },
   header: { paddingTop: Platform.OS === 'ios' ? 60 : 50, paddingHorizontal: 20, paddingBottom: 28, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: 22, fontWeight: '800', color: '#FFF' },
   editBtn: { padding: 8, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 12 },
   profileCard: { flexDirection: 'row', alignItems: 'center', gap: 16 },

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Modal, TextInput, Platform, Switch } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Plus, Clock, Trash2, Edit3, X, CheckCircle, AlertCircle } from 'lucide-react-native';
+import { Plus, Clock, Trash2, Edit3, X, CheckCircle, AlertCircle, ChevronRight } from 'lucide-react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import DoctorBottomNavBar from '../../components/DoctorBottomNavBar';
+import { useNavigation } from '@react-navigation/native';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const DATES = ['19', '20', '21', '22', '23', '24', '25'];
@@ -41,6 +42,7 @@ const SLOT_COLORS: Record<SlotType, { bg: string; border: string; label: string 
 };
 
 const DoctorSchedulingScreen = () => {
+  const navigation = useNavigation<any>();
   const [selectedDay, setSelectedDay] = useState('Mon');
   const [slots, setSlots] = useState<Slot[]>(INITIAL_SLOTS);
   const [showModal, setShowModal] = useState(false);
@@ -95,12 +97,15 @@ const DoctorSchedulingScreen = () => {
     <SafeAreaView style={styles.safe}>
       <LinearGradient colors={['#8B3DFF', '#6A11CB']} style={styles.header}>
         <View style={styles.headerRow}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <ChevronRight size={22} color="#FFF" style={{ transform: [{ rotate: '180deg' }] }} />
+          </TouchableOpacity>
           <View>
             <Text style={styles.headerTitle}>Schedule Manager</Text>
             <Text style={styles.headerSub}>Manage your time slots</Text>
           </View>
           <TouchableOpacity style={styles.addBtn} onPress={openAddModal}>
-            <Plus size={20} color="#FFF" />
+            <Plus size={18} color={COLORS.primary} />
             <Text style={styles.addBtnText}>Add Slot</Text>
           </TouchableOpacity>
         </View>
@@ -143,7 +148,7 @@ const DoctorSchedulingScreen = () => {
           daySlots.map(slot => {
             const colors = SLOT_COLORS[slot.type];
             return (
-              <View key={slot.id} style={[styles.slotCard, { backgroundColor: colors.bg, borderColor: colors.border }, SHADOWS.small]}>
+              <View key={slot.id} style={styles.slotCard}>
                 <View style={styles.slotLeft}>
                   <View style={[styles.slotTypeDot, { backgroundColor: colors.border }]} />
                   <View>
@@ -257,10 +262,11 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F4F6FB' },
   header: { paddingTop: Platform.OS === 'ios' ? 60 : 50, paddingHorizontal: 20, paddingBottom: 24, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   headerTitle: { fontSize: 22, fontWeight: '800', color: '#FFF' },
   headerSub: { fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 4 },
-  addBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.25)', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14 },
-  addBtnText: { color: '#FFF', fontWeight: '700', fontSize: 13 },
+  addBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFF', paddingHorizontal: 12, paddingVertical: 9, borderRadius: 14, maxWidth: 104 },
+  addBtnText: { color: COLORS.primary, fontWeight: '700', fontSize: 12 },
   legend: { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#FFF', borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
@@ -278,7 +284,21 @@ const styles = StyleSheet.create({
   emptyBox: { alignItems: 'center', marginTop: 60, gap: 10 },
   emptyTitle: { fontSize: 16, fontWeight: '700', color: '#4B5563' },
   emptySub: { fontSize: 13, color: '#9CA3AF' },
-  slotCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 16, borderWidth: 1.5, padding: 14 },
+  slotCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 18,
+    minHeight: 84,
+    backgroundColor: '#FFF',
+    shadowColor: '#9CA3AF',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.16,
+    shadowRadius: 16,
+    elevation: 8,
+  },
   slotLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   slotTypeDot: { width: 10, height: 10, borderRadius: 5 },
   slotTime: { fontSize: 14, fontWeight: '700', color: '#1F2937' },

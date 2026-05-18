@@ -7,6 +7,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/types';
 import { ArrowLeft, EyeOff } from 'lucide-react-native';
+import { useAuth } from '../../context/AuthContext';
 
 const { width, height } = Dimensions.get('window');
 
@@ -17,6 +18,10 @@ const SignInScreen = () => {
   const navigation = useNavigation<SignInScreenProp>();
   const route = useRoute<SignInRouteProp>();
   const { role } = route.params;
+  const { setRole } = useAuth();
+  const authRole = role === 'patient' || role === 'doctor' || role === 'lab' || role === 'nurse' || role === 'admin'
+    ? role
+    : null;
 
   // Capitalize role for display
   const displayRole = role ? role.charAt(0).toUpperCase() + role.slice(1) : '';
@@ -65,6 +70,7 @@ const SignInScreen = () => {
           <CustomButton 
             title="Sign In" 
             onPress={() => {
+              setRole(authRole);
               if (role === 'patient') navigation.replace('PatientDashboard');
               else if (role === 'doctor') navigation.replace('DoctorDashboard');
               else if (role === 'lab') navigation.replace('LabDashboard');

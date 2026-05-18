@@ -155,7 +155,7 @@ const PatientAppointmentsScreen = () => {
         <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
         
         {/* Header Section */}
-        <LinearGradient colors={['#8B3DFF', '#5F0FFF']} style={styles.headerGradient}>
+        <LinearGradient colors={COLORS.screenHeaderGradient} style={styles.headerGradient}>
           <View style={styles.headerContent}>
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
               <ChevronLeft size={28} color="#FFF" />

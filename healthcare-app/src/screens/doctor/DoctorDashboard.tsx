@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, Platform, TextInput } from 'react-native';
 import { COLORS, SHADOWS, SIZES } from '../../theme/theme';
 import { Search, Bell, Video, User, FileText, Calendar, Activity, Phone, Clock, FileEdit, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react-native';
@@ -7,11 +7,24 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 
 const MOCK_APPOINTMENTS = [
-  { id: '1', name: 'Sarah Johnson', age: 28, time: '09:00 AM', type: 'Physical', status: 'Emergency', img: 'https://i.pravatar.cc/150?img=5' },
-  { id: '2', name: 'Michael Smith', age: 45, time: '09:30 AM', type: 'Video', status: 'Waiting', img: 'https://i.pravatar.cc/150?img=11' },
-  { id: '3', name: 'Emma Brown', age: 34, time: '10:00 AM', type: 'Physical', status: 'Upcoming', img: 'https://i.pravatar.cc/150?img=9' },
-  { id: '4', name: 'James Wilson', age: 52, time: '08:30 AM', type: 'Physical', status: 'Completed', img: 'https://i.pravatar.cc/150?img=8' },
+  { id: '1', name: 'Sarah Johnson', age: 28, time: '09:00 AM', minutes: 540, type: 'Physical', status: 'Emergency', img: 'https://i.pravatar.cc/150?img=5' },
+  { id: '2', name: 'Michael Smith', age: 45, time: '09:15 AM', minutes: 555, type: 'Video', status: 'Waiting', img: 'https://i.pravatar.cc/150?img=11' },
+  { id: '3', name: 'Emma Brown', age: 34, time: '10:00 AM', minutes: 600, type: 'Physical', status: 'Upcoming', img: 'https://i.pravatar.cc/150?img=9' },
+  { id: '4', name: 'James Wilson', age: 52, time: '10:30 AM', minutes: 630, type: 'Physical', status: 'Completed', img: 'https://i.pravatar.cc/150?img=8' },
+  { id: '5', name: 'Ayesha Fernando', age: 31, time: '10:45 AM', minutes: 645, type: 'Video', status: 'Upcoming', img: 'https://i.pravatar.cc/150?img=47' },
+  { id: '6', name: 'David Perera', age: 39, time: '11:15 AM', minutes: 675, type: 'Physical', status: 'Upcoming', img: 'https://i.pravatar.cc/150?img=12' },
+  { id: '7', name: 'Nuwan Silva', age: 41, time: '11:45 AM', minutes: 705, type: 'Physical', status: 'Cancelled', img: 'https://i.pravatar.cc/150?img=15' },
+  { id: '8', name: 'Priya Nair', age: 29, time: '12:00 PM', minutes: 720, type: 'Video', status: 'Cancelled', img: 'https://i.pravatar.cc/150?img=25' },
+  { id: '9', name: 'Tom Baker', age: 44, time: '12:15 PM', minutes: 735, type: 'Physical', status: 'Waiting', img: 'https://i.pravatar.cc/150?img=19' },
+  { id: '10', name: 'Anna Scott', age: 28, time: '12:45 PM', minutes: 765, type: 'Physical', status: 'Completed', img: 'https://i.pravatar.cc/150?img=31' },
 ];
+
+type Appointment = (typeof MOCK_APPOINTMENTS)[number];
+
+const todayStartMinutes = () => {
+  const now = new Date();
+  return now.getHours() * 60 + now.getMinutes();
+};
 
 const greyShadow = {
   shadowColor: '#000',
@@ -24,12 +37,70 @@ const greyShadow = {
 const DoctorDashboard = () => {
   const navigation = useNavigation<any>();
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentMinutes, setCurrentMinutes] = useState(todayStartMinutes());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentMinutes(todayStartMinutes());
+    }, 60000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  const filteredAppointments = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+
+    return MOCK_APPOINTMENTS.filter((appointment) => {
+      if (!query) return true;
+      return (
+        appointment.name.toLowerCase().includes(query) ||
+        String(appointment.age).includes(query) ||
+        appointment.time.toLowerCase().includes(query) ||
+        appointment.status.toLowerCase().includes(query)
+      );
+    });
+  }, [searchQuery]);
+
+  const nextThreePatients = useMemo(() => {
+    return filteredAppointments
+      .filter((appointment) => appointment.status === 'Upcoming' && appointment.minutes >= currentMinutes)
+      .sort((a, b) => a.minutes - b.minutes)
+      .slice(0, 3);
+  }, [filteredAppointments, currentMinutes]);
+
+  const emergencyList = useMemo(
+    () => filteredAppointments.filter((appointment) => appointment.status === 'Emergency'),
+    [filteredAppointments]
+  );
+
+  const waitingList = useMemo(
+    () => filteredAppointments.filter((appointment) => appointment.status === 'Waiting'),
+    [filteredAppointments]
+  );
+
+  const completedList = useMemo(
+    () => filteredAppointments.filter((appointment) => appointment.status === 'Completed'),
+    [filteredAppointments]
+  );
+
+  const cancelledList = useMemo(
+    () => filteredAppointments.filter((appointment) => appointment.status === 'Cancelled'),
+    [filteredAppointments]
+  );
+
+  const summaryCards = [
+    { label: 'Next 3', value: nextThreePatients.length, color: '#7C3AED', bg: '#F3E8FF' },
+    { label: 'Emergency', value: emergencyList.length, color: '#EF4444', bg: '#FEE2E2' },
+    { label: 'Waiting', value: waitingList.length, color: '#F59E0B', bg: '#FFFBEB' },
+    { label: 'Completed', value: completedList.length, color: '#10B981', bg: '#ECFDF5' },
+  ];
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Emergency': return '#EF4444';
       case 'Waiting': return '#F59E0B';
       case 'Completed': return '#10B981';
+      case 'Cancelled': return '#6B7280';
       default: return '#3B82F6';
     }
   };
@@ -39,12 +110,13 @@ const DoctorDashboard = () => {
       case 'Emergency': return '#FEF2F2';
       case 'Waiting': return '#FFFBEB';
       case 'Completed': return '#ECFDF5';
+      case 'Cancelled': return '#F3F4F6';
       default: return '#EFF6FF';
     }
   };
 
   const renderAppointmentCard = (patient: any) => (
-    <View key={patient.id} style={[styles.patientCard, greyShadow]}>
+    <View key={patient.id} style={[styles.patientCard, greyShadow, patient.status === 'Emergency' && styles.emergencyCard]}>
       <View style={styles.patientHeader}>
         <Image source={{ uri: patient.img }} style={styles.patientAvatar} />
         <View style={styles.patientInfo}>
@@ -72,9 +144,31 @@ const DoctorDashboard = () => {
         </TouchableOpacity>
         <TouchableOpacity style={[styles.actionBtnPrimary, patient.status === 'Emergency' && { backgroundColor: '#EF4444' }]}>
           {patient.type === 'Video' ? <Video size={16} color="#FFF" /> : <User size={16} color="#FFF" />}
-          <Text style={styles.actionBtnTextPrimary}>Start</Text>
+          <Text style={styles.actionBtnTextPrimary}>{patient.status === 'Completed' ? 'Done' : patient.status === 'Cancelled' ? 'Cancelled' : 'Start'}</Text>
         </TouchableOpacity>
       </View>
+    </View>
+  );
+
+  const renderSection = (title: string, data: Appointment[], emptyText: string, accentColor: string, highlight?: boolean) => (
+    <View style={[styles.queueSection, highlight && styles.nextSection]}>
+      <View style={styles.queueSectionHeader}>
+        <View>
+          <Text style={styles.queueSectionTitle}>{title}</Text>
+          <Text style={styles.queueSectionSub}>{emptyText}</Text>
+        </View>
+        <View style={[styles.queuePill, { backgroundColor: accentColor + '18' }]}>
+          <Text style={[styles.queuePillText, { color: accentColor }]}>{data.length}</Text>
+        </View>
+      </View>
+
+      {data.length === 0 ? (
+        <View style={styles.emptyStateBox}>
+          <Text style={styles.emptyStateText}>No patients in this section</Text>
+        </View>
+      ) : (
+        data.map(renderAppointmentCard)
+      )}
     </View>
   );
 
@@ -115,45 +209,41 @@ const DoctorDashboard = () => {
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           
-          {/* Quick Stats Scroll */}
+          {/* Queue Overview */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statsScroll} contentContainerStyle={styles.statsScrollContent}>
-            <View style={[styles.statBox, greyShadow]}>
-              <View style={[styles.statIconWrap, { backgroundColor: '#EFF6FF' }]}>
-                <Calendar size={22} color="#3B82F6" />
+            {summaryCards.map((item) => (
+              <View key={item.label} style={[styles.statBox, greyShadow, { borderColor: item.color + '22' }]}>
+                <View style={[styles.statIconWrap, { backgroundColor: item.bg }]}>
+                  {item.label === 'Next 3' ? <Clock size={22} color={item.color} /> : null}
+                  {item.label === 'Emergency' ? <AlertCircle size={22} color={item.color} /> : null}
+                  {item.label === 'Waiting' ? <RefreshCw size={22} color={item.color} /> : null}
+                  {item.label === 'Completed' ? <CheckCircle2 size={22} color={item.color} /> : null}
+                </View>
+                <Text style={styles.statNum}>{item.value}</Text>
+                <Text style={styles.statLabel}>{item.label}</Text>
               </View>
-              <Text style={styles.statNum}>12</Text>
-              <Text style={styles.statLabel}>Appointments</Text>
-            </View>
-            <View style={[styles.statBox, greyShadow]}>
-              <View style={[styles.statIconWrap, { backgroundColor: '#FFFBEB' }]}>
-                <Clock size={22} color="#F59E0B" />
-              </View>
-              <Text style={styles.statNum}>4</Text>
-              <Text style={styles.statLabel}>Waiting</Text>
-            </View>
-            <View style={[styles.statBox, greyShadow]}>
-              <View style={[styles.statIconWrap, { backgroundColor: '#FEF2F2' }]}>
-                <AlertCircle size={22} color="#EF4444" />
-              </View>
-              <Text style={styles.statNum}>1</Text>
-              <Text style={styles.statLabel}>Emergency</Text>
-            </View>
-            <View style={[styles.statBox, greyShadow]}>
-              <View style={[styles.statIconWrap, { backgroundColor: '#ECFDF5' }]}>
-                <CheckCircle2 size={22} color="#10B981" />
-              </View>
-              <Text style={styles.statNum}>5</Text>
-              <Text style={styles.statLabel}>Completed</Text>
-            </View>
+            ))}
           </ScrollView>
 
-          {/* Main Appointments Area */}
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Today's Queue</Text>
-            <TouchableOpacity><Text style={styles.seeAllText}>See All</Text></TouchableOpacity>
+          <View style={styles.highlightStrip}>
+            <View style={styles.highlightRow}>
+             
+              <View style={{ flex: 1 }}>
+                <Text style={styles.highlightTitle}>Live Upcoming Queue</Text>
+                <Text style={styles.highlightSub}>Next 3 updates automatically as the time moves forward</Text>
+              </View>
+              <View style={styles.liveBadge}>
+                <View style={styles.liveDot} />
+                <Text style={styles.liveBadgeText}>Live</Text>
+              </View>
+            </View>
           </View>
 
-          {MOCK_APPOINTMENTS.map(renderAppointmentCard)}
+          {renderSection('Upcoming - Next 3', nextThreePatients, 'Automatically sorted by time', '#7C3AED', true)}
+          {renderSection('Emergency List', emergencyList, 'Needs immediate attention', '#141313')}
+          {renderSection('Waiting List', waitingList, 'Waiting for the doctor now', '#F59E0B')}
+          {renderSection('Completed List', completedList, 'Already seen today', '#10B981')}
+          {renderSection('Cancelled Appointments', cancelledList, 'Appointments cancelled by patient or doctor', '#6B7280')}
           
           <View style={{ height: 60 }} />
         </ScrollView>
@@ -300,12 +390,113 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#7C3AED',
   },
+  highlightStrip: {
+    marginHorizontal: 20,
+    marginBottom: 16,
+    borderRadius: 24,
+    padding: 16,
+    backgroundColor: '#FFF',
+    borderWidth: 1,
+    borderColor: '#EDE9FE',
+    ...SHADOWS.small,
+  },
+  highlightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  highlightTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1F2937',
+  },
+  highlightSub: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 4,
+  },
+  liveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#D1FAE5',
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
+    marginRight: 5,
+  },
+  liveBadgeText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#10B981',
+  },
+  queueSection: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+  },
+  nextSection: {
+    padding: 18,
+    borderRadius: 28,
+    backgroundColor: '#FFF',
+    borderWidth: 1,
+    borderColor: '#EDE9FE',
+    ...SHADOWS.medium,
+    marginBottom: 24,
+  },
+  queueSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  queueSectionTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  queueSectionSub: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 3,
+  },
+  queuePill: {
+    minWidth: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  queuePillText: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  emptyStateBox: {
+    paddingVertical: 22,
+    borderRadius: 18,
+    backgroundColor: '#F9FAFB',
+    alignItems: 'center',
+  },
+  emptyStateText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#9CA3AF',
+  },
   patientCard: {
     backgroundColor: '#FFF',
     borderRadius: 24,
     padding: 16,
-    marginHorizontal: 20,
     marginBottom: 16,
+  },
+  emergencyCard: {
+    borderWidth: 1,
+    borderColor: '#FECACA',
   },
   patientHeader: {
     flexDirection: 'row',

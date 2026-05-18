@@ -202,7 +202,7 @@ const PatientDashboard = () => {
         
         {/* Purple Top Background Section */}
         <LinearGradient
-          colors={['#8B3DFF', '#6A11CB', '#5F0FFF']}
+          colors={COLORS.screenHeaderGradient}
           style={styles.topPurpleBackground}
         >
           {/* Header */}
