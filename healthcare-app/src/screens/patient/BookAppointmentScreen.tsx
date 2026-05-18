@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Platform, SafeAreaView, Dimensions, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Platform, SafeAreaView, Dimensions, Alert, StatusBar } from 'react-native';
 import { ChevronLeft, CheckCircle2, User, Calendar, CreditCard, Download, FileText, Upload, Stethoscope, FilePlus2, Receipt } from 'lucide-react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -232,15 +232,16 @@ const BookAppointmentScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.header}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <LinearGradient colors={COLORS.screenHeaderGradient} style={styles.header}>
         {currentStep < 3 && (
           <TouchableOpacity onPress={prevStep} style={styles.backBtn}>
-            <ChevronLeft size={24} color="#111827" />
+            <ChevronLeft size={24} color="#FFFFFF" />
           </TouchableOpacity>
         )}
         <Text style={styles.headerTitle}>{currentStep === 3 ? 'Booking Status' : 'Book Appointment'}</Text>
         <View style={{ width: 40 }} />
-      </View>
+      </LinearGradient>
 
       {currentStep < 3 && renderStepIndicator()}
 
@@ -272,18 +273,24 @@ const BookAppointmentScreen = () => {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
   header: {
-    paddingTop: Platform.OS === 'ios' ? 10 : 30,
+    paddingTop: Platform.OS === 'ios' ? 14 : 36,
     paddingHorizontal: 20,
-    paddingBottom: 15,
+    paddingBottom: 22,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6'
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
   },
-  backBtn: { padding: 4 },
-  headerTitle: { fontSize: 18, fontWeight: '800', color: '#111827' },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: { fontSize: 18, fontWeight: '800', color: '#FFFFFF' },
   stepIndicatorContainer: {
     flexDirection: 'row',
     alignItems: 'center',

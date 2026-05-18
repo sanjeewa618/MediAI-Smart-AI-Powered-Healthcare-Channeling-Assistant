@@ -6,7 +6,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/types';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import { LinearGradient } from 'expo-linear-gradient';
-import BottomNavBar from '../../components/BottomNavBar';
+import DoctorBottomNavBar from '../../components/DoctorBottomNavBar';
 
 const { width } = Dimensions.get('window');
 
@@ -273,7 +273,7 @@ const DoctorAvailability = () => {
           )}
         />
       </View>
-      <BottomNavBar />
+      <DoctorBottomNavBar />
     </View>
   );
 };

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, Dimensions, Animated, PanResponder, Pressable, StatusBar, Modal } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
-import { Search, Calendar, User, FileText, Activity, MoreHorizontal, Home, Heart, Shield, MessageCircle, FileEdit, FlaskConical, ChevronRight, Baby, Droplets, Sparkles, Plus, Bell, LogOut, Pill, Truck, Settings, X, LifeBuoy, Stethoscope, Dna, Brain, Bone, Eye, Smile, Wallet } from 'lucide-react-native';
+import { Search, Calendar, User, FileText, Activity, MoreHorizontal, Home, Heart, Shield, MessageCircle, FileEdit, FlaskConical, ChevronRight, Baby, Droplets, Sparkles, Plus, Bell, LogOut, Pill, Truck, Settings, X, LifeBuoy, Stethoscope, Dna, Brain, Bone, Eye, Smile, Wallet, Clock } from 'lucide-react-native';
 import BottomNavBar from '../../components/BottomNavBar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
@@ -41,6 +41,67 @@ const PatientDashboard = () => {
   const aiCardScale = useRef(new Animated.Value(1)).current;
   const aiCardLift  = useRef(new Animated.Value(0)).current;
   const aiGlowPulse = useRef(new Animated.Value(0.75)).current;
+
+  // Menu Animation & PanResponder
+  const menuAnimX = useRef(new Animated.Value(-width * 0.75)).current;
+
+  const overlayOpacity = menuAnimX.interpolate({
+    inputRange: [-width * 0.75, 0],
+    outputRange: [0, 0.5],
+    extrapolate: 'clamp'
+  });
+
+  const closeMenu = () => {
+    Animated.spring(menuAnimX, {
+      toValue: -width * 0.75,
+      damping: 20,
+      stiffness: 90,
+      useNativeDriver: true,
+    }).start(() => {
+      setMenuModalVisible(false);
+    });
+  };
+
+  const openMenu = () => {
+    setMenuModalVisible(true);
+    menuAnimX.setValue(-width * 0.75);
+    Animated.spring(menuAnimX, {
+      toValue: 0,
+      damping: 20,
+      stiffness: 90,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const menuPanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (e, gestureState) => {
+        return gestureState.dx < -15 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+      },
+      onPanResponderGrant: () => {
+        menuAnimX.setOffset((menuAnimX as any)._value);
+        menuAnimX.setValue(0);
+      },
+      onPanResponderMove: (e, gestureState) => {
+        if (gestureState.dx < 0) {
+          menuAnimX.setValue(gestureState.dx);
+        }
+      },
+      onPanResponderRelease: (e, gestureState) => {
+        menuAnimX.flattenOffset();
+        if (gestureState.dx < -50 || gestureState.vx < -0.5) {
+          closeMenu();
+        } else {
+          Animated.spring(menuAnimX, {
+            toValue: 0,
+            damping: 20,
+            stiffness: 90,
+            useNativeDriver: true,
+          }).start();
+        }
+      }
+    })
+  ).current;
 
   // Live countdown state
   const [doctorCountdown, setDoctorCountdown] = useState(() => calcCountdown(DOCTOR_APPT));
@@ -141,14 +202,14 @@ const PatientDashboard = () => {
         
         {/* Purple Top Background Section */}
         <LinearGradient
-          colors={['#8B3DFF', '#6A11CB', '#5F0FFF']}
+          colors={COLORS.screenHeaderGradient}
           style={styles.topPurpleBackground}
         >
           {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity 
               style={styles.menuIconBtn}
-              onPress={() => setMenuModalVisible(true)}
+              onPress={openMenu}
             >
               <View style={styles.hamburgerLine} />
               <View style={[styles.hamburgerLine, { width: 18 }]} />
@@ -169,6 +230,12 @@ const PatientDashboard = () => {
               </TouchableOpacity>
               <TouchableOpacity style={[styles.headerActionButton, { marginLeft: 10 }]}>
                 <Bell size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.headerActionButton, { marginLeft: 10 }]}
+                onPress={() => navigation.navigate('SignIn', { role: 'patient' })}
+              >
+                <LogOut size={20} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
           </View>
@@ -448,17 +515,26 @@ const PatientDashboard = () => {
         animationType="none"
         transparent={true}
         visible={menuModalVisible}
-        onRequestClose={() => setMenuModalVisible(false)}
+        onRequestClose={closeMenu}
       >
-        <View style={[styles.menuOverlay, { flexDirection: 'row' }]}>
-          <Animated.View style={styles.menuContent}>
+        <View style={styles.menuOverlay}>
+          <Animated.View style={[styles.menuDismissArea, { opacity: overlayOpacity }]}>
+            <Pressable 
+              style={StyleSheet.absoluteFill} 
+              onPress={closeMenu} 
+            />
+          </Animated.View>
+          <Animated.View 
+            style={[styles.menuContent, { transform: [{ translateX: menuAnimX }] }]}
+            {...menuPanResponder.panHandlers}
+          >
             <LinearGradient
               colors={['#8B3DFF', '#5F0FFF']}
               style={styles.menuHeader}
             >
               <TouchableOpacity 
                 style={styles.menuCloseBtn}
-                onPress={() => setMenuModalVisible(false)}
+                onPress={closeMenu}
               >
                 <X size={24} color="#FFF" />
               </TouchableOpacity>
@@ -478,37 +554,51 @@ const PatientDashboard = () => {
 
             <View style={styles.menuItemsContainer}>
               <ScrollView style={styles.menuItemsList} showsVerticalScrollIndicator={false}>
-                <TouchableOpacity style={styles.menuItem}>
+                <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuModalVisible(false); menuAnimX.setValue(-width * 0.75); navigation.navigate('PatientDashboard'); }}>
                   <View style={[styles.menuIconBox, { backgroundColor: '#F3F0FF' }]}>
-                    <User size={20} color={COLORS.primary} />
+                    <Home size={20} color={COLORS.primary} />
                   </View>
-                  <Text style={styles.menuItemText}>My Profile</Text>
+                  <Text style={styles.menuItemText}>Home</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.menuItem}>
+                <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuModalVisible(false); menuAnimX.setValue(-width * 0.75); navigation.navigate('PatientAppointments'); }}>
                   <View style={[styles.menuIconBox, { backgroundColor: '#E0F2FE' }]}>
                     <Calendar size={20} color="#0EA5E9" />
                   </View>
                   <Text style={styles.menuItemText}>My Appointments</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.menuItem}>
+                <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuModalVisible(false); menuAnimX.setValue(-width * 0.75); navigation.navigate('AIHealthAssistant'); }}>
+                  <View style={[styles.menuIconBox, { backgroundColor: '#FDF2F8' }]}>
+                    <Heart size={20} color="#DB2777" />
+                  </View>
+                  <Text style={styles.menuItemText}>AI Health Assistant</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuModalVisible(false); menuAnimX.setValue(-width * 0.75); navigation.navigate('AvailabilitySelection'); }}>
+                  <View style={[styles.menuIconBox, { backgroundColor: '#FEF9C3' }]}>
+                    <Clock size={20} color="#CA8A04" />
+                  </View>
+                  <Text style={styles.menuItemText}>Availability</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuModalVisible(false); menuAnimX.setValue(-width * 0.75); navigation.navigate('Reports'); }}>
                   <View style={[styles.menuIconBox, { backgroundColor: '#ECFDF5' }]}>
                     <FileText size={20} color="#10B981" />
                   </View>
-                  <Text style={styles.menuItemText}>Medical Records</Text>
+                  <Text style={styles.menuItemText}>Reports</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.menuItem}>
+                <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuModalVisible(false); menuAnimX.setValue(-width * 0.75); navigation.navigate('PatientProfile'); }}>
                   <View style={[styles.menuIconBox, { backgroundColor: '#FFF7ED' }]}>
-                    <Wallet size={20} color="#F97316" />
+                    <User size={20} color="#F97316" />
                   </View>
-                  <Text style={styles.menuItemText}>Payments & Billing</Text>
+                  <Text style={styles.menuItemText}>My Profile</Text>
                 </TouchableOpacity>
 
                 <View style={styles.menuDivider} />
 
-                <TouchableOpacity style={styles.menuItem}>
+                <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuModalVisible(false); menuAnimX.setValue(-width * 0.75); navigation.navigate('Settings'); }}>
                   <View style={[styles.menuIconBox, { backgroundColor: '#F9FAFB' }]}>
                     <Settings size={20} color="#6B7280" />
                   </View>
@@ -525,7 +615,7 @@ const PatientDashboard = () => {
                 <TouchableOpacity 
                   style={[styles.menuItem, { marginTop: 5 }]}
                   onPress={() => {
-                    setMenuModalVisible(false);
+                    closeMenu();
                     navigation.navigate('SignIn', { role: 'patient' });
                   }}
                 >
@@ -541,10 +631,6 @@ const PatientDashboard = () => {
             
             <Text style={styles.menuVersion}>Version 1.0.2 (Beta)</Text>
           </Animated.View>
-          <Pressable 
-            style={styles.menuDismissArea} 
-            onPress={() => setMenuModalVisible(false)} 
-          />
         </View>
       </Modal>
 
@@ -673,12 +759,6 @@ const PatientDashboard = () => {
                 <Text style={styles.modalIconText}>Support</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.modalGridItem}>
-                <View style={[styles.modalIconWrap, { backgroundColor: '#F1F5F9' }]}>
-                  <Settings size={28} color="#64748B" />
-                </View>
-                <Text style={styles.modalIconText}>Settings</Text>
-              </TouchableOpacity>
 
               <TouchableOpacity 
                 style={styles.modalGridItem}
@@ -780,15 +860,18 @@ const styles = StyleSheet.create({
   // Side Menu Styles
   menuOverlay: {
     flex: 1,
-    flexDirection: 'row',
   },
   menuDismissArea: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000',
   },
   menuContent: {
     width: width * 0.75,
     height: '100%',
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
     backgroundColor: '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: { width: 5, height: 0 },

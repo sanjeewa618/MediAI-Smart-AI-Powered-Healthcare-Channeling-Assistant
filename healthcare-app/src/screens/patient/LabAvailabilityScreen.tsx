@@ -224,7 +224,7 @@ const LabAvailabilityScreen = () => {
       
       {/* Header */}
       <LinearGradient
-        colors={['#8B3DFF', '#5F0FFF']}
+        colors={COLORS.screenHeaderGradient}
         style={styles.header}
       >
         <View style={styles.headerTop}>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { createStackNavigator } from '@react-navigation/stack';
+import { createStackNavigator, TransitionPresets } from '@react-navigation/stack';
 import { RootStackParamList } from './types';
 
 // Auth Screens
@@ -12,6 +12,11 @@ import RoleSelectionScreen from '../screens/auth/RoleSelectionScreen';
 // Dashboard Screens
 import PatientDashboard from '../screens/patient/PatientDashboard';
 import DoctorDashboard from '../screens/doctor/DoctorDashboard';
+import DoctorAppointmentsScreen from '../screens/doctor/DoctorAppointmentsScreen';
+import DoctorSchedulingScreen from '../screens/doctor/DoctorSchedulingScreen';
+import DoctorHistoryScreen from '../screens/doctor/DoctorHistoryScreen';
+import DoctorReportsScreen from '../screens/doctor/DoctorReportsScreen';
+import DoctorProfileScreen from '../screens/doctor/DoctorProfileScreen';
 import LabDashboard from '../screens/lab/LabDashboard';
 import ReportsScreen from '../screens/patient/ReportsScreen';
 
@@ -37,6 +42,7 @@ const AppNavigator = () => {
       screenOptions={{
         headerShown: false,
         cardStyle: { backgroundColor: '#FFFFFF' },
+        ...TransitionPresets.FadeFromBottomAndroid,
       }}
     >
       <Stack.Screen name="Splash" component={SplashScreen} />
@@ -46,6 +52,11 @@ const AppNavigator = () => {
       <Stack.Screen name="RoleSelection" component={RoleSelectionScreen} />
       <Stack.Screen name="PatientDashboard" component={PatientDashboard} />
       <Stack.Screen name="DoctorDashboard" component={DoctorDashboard} />
+      <Stack.Screen name="DoctorAppointments" component={DoctorAppointmentsScreen} />
+      <Stack.Screen name="DoctorScheduling" component={DoctorSchedulingScreen} />
+      <Stack.Screen name="DoctorHistory" component={DoctorHistoryScreen} />
+      <Stack.Screen name="DoctorReports" component={DoctorReportsScreen} />
+      <Stack.Screen name="DoctorProfile" component={DoctorProfileScreen} />
       <Stack.Screen name="LabDashboard" component={LabDashboard} />
       <Stack.Screen name="Reports" component={ReportsScreen} />
       <Stack.Screen name="FindDoctors" component={FindDoctorsScreen} />
