@@ -9,6 +9,11 @@ export type RootStackParamList = {
   RoleSelection: undefined;
   PatientDashboard: undefined;
   DoctorDashboard: undefined;
+  DoctorAppointments: undefined;
+  DoctorScheduling: undefined;
+  DoctorHistory: undefined;
+  DoctorReports: undefined;
+  DoctorProfile: undefined;
   LabDashboard: undefined;
   Reports: undefined;
   // Patient sub-screens
