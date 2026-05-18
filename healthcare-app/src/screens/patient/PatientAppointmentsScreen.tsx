@@ -459,13 +459,15 @@ const styles = StyleSheet.create({
   },
   floatingButtonContainer: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 100 : 90,
+    bottom: Platform.OS === 'ios' ? 100 : 100,
     left: 24,
     right: 24,
+    
   },
   mainBookBtn: {
     borderRadius: 20,
     overflow: 'hidden',
+    
   },
   btnGradient: {
     flexDirection: 'row',

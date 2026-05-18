@@ -1,5 +1,5 @@
 import React from 'react';
-import { createStackNavigator } from '@react-navigation/stack';
+import { createStackNavigator, TransitionPresets } from '@react-navigation/stack';
 import { RootStackParamList } from './types';
 
 // Auth Screens
@@ -37,6 +37,7 @@ const AppNavigator = () => {
       screenOptions={{
         headerShown: false,
         cardStyle: { backgroundColor: '#FFFFFF' },
+        ...TransitionPresets.FadeFromBottomAndroid,
       }}
     >
       <Stack.Screen name="Splash" component={SplashScreen} />
