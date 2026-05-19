@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { TrendingUp, Users, Calendar, Clock, Star, Activity, ChevronRight } from 'lucide-react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import DoctorBottomNavBar from '../../components/DoctorBottomNavBar';
+import NurseBottomNavBar from '../../components/NurseBottomNavBar';
 import { useNavigation } from '@react-navigation/native';
 
 const STATS = [
@@ -105,6 +106,7 @@ const DoctorReportsScreen = () => {
     </ScrollView>
 
     <DoctorBottomNavBar />
+    <NurseBottomNavBar />
   </SafeAreaView>
   );
 };

@@ -73,7 +73,7 @@ const SignInScreen = () => {
               setRole(authRole);
               if (role === 'patient') navigation.replace('PatientDashboard');
               else if (role === 'doctor') navigation.replace('DoctorDashboard');
-              else if (role === 'lab') navigation.replace('LabDashboard');
+              else if (role === 'lab' || role === 'nurse') navigation.replace('LabDashboard');
             }}
             style={styles.signInButton}
           />

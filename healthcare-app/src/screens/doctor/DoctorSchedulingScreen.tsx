@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Plus, Clock, Trash2, Edit3, X, CheckCircle, AlertCircle, ChevronRight } from 'lucide-react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import DoctorBottomNavBar from '../../components/DoctorBottomNavBar';
+import NurseBottomNavBar from '../../components/NurseBottomNavBar';
 import { useNavigation } from '@react-navigation/native';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -254,6 +255,7 @@ const DoctorSchedulingScreen = () => {
       </Modal>
 
       <DoctorBottomNavBar />
+      <NurseBottomNavBar />
     </SafeAreaView>
   );
 };

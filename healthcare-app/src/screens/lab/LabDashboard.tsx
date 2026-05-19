@@ -1,122 +1,796 @@
-import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, Platform } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, Platform, StatusBar, Modal, Pressable, Animated, PanResponder, Dimensions } from 'react-native';
 import { COLORS, SHADOWS, SIZES } from '../../theme/theme';
-import { Microscope, FileText, Bell, Plus, CheckCircle, Clock, ChevronLeft } from 'lucide-react-native';
-import BottomNavBar from '../../components/BottomNavBar';
+import { Microscope, FileText, Bell, Plus, CheckCircle, Clock, ChevronLeft, LogOut, Calendar, Activity, AlertCircle, FlaskConical, ClipboardList, TrendingUp, Users, Heart, Droplets, Baby, Dna, Sparkles, X, ChevronRight, MapPin } from 'lucide-react-native';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+import NurseBottomNavBar from '../../components/NurseBottomNavBar';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useNavigation } from '@react-navigation/native';
+import { useAuth } from '../../context/AuthContext';
+
+const greyShadow = {
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.08,
+  shadowRadius: 12,
+  elevation: 4,
+};
 
 const LabDashboard = () => {
+  const navigation = useNavigation<any>();
+  const { role } = useAuth();
+  const [selectedLab, setSelectedLab] = useState<any>(null);
+  const panY = useRef(new Animated.Value(0)).current;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy > 0) {
+          panY.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > 120) {
+          closeModal();
+        } else {
+          Animated.spring(panY, {
+            toValue: 0,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    })
+  ).current;
+
+  const closeModal = () => {
+    Animated.timing(panY, {
+      toValue: SCREEN_HEIGHT,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setSelectedLab(null);
+      panY.setValue(0);
+    });
+  };
+
+  const taskStats = [
+    { label: 'Today\'s Tests', value: '42', icon: <FlaskConical size={20} color="#FFF" />, bg: COLORS.primary },
+    { label: 'Pending', value: '12', icon: <Clock size={20} color="#FFF" />, bg: COLORS.warning },
+    { label: 'Processing', value: '08', icon: <Activity size={20} color="#FFF" />, bg: '#60A5FA' },
+    { label: 'Completed', value: '22', icon: <CheckCircle size={20} color="#FFF" />, bg: COLORS.success },
+  ];
+
+  const laboratorySections = [
+    { 
+      id: '1', name: 'Blood Tests', type: 'Hematology', icon: <Droplets size={24} color="#E11D48" />, color: '#FEE2E2', queue: 4,
+      floor: '2nd Floor', openTime: '07:00 AM', closeTime: '02:00 PM', currentToken: 21, nextToken: 25, status: 'Active',
+      remainingSlots: 15
+    },
+    { 
+      id: '2', name: 'Urine Tests', type: 'Urology', icon: <Droplets size={24} color="#22C55E" />, color: '#F0FDF4', queue: 2,
+      floor: '3rd Floor', openTime: '07:30 AM', closeTime: '01:30 PM', currentToken: 30, nextToken: 33, status: 'Active',
+      remainingSlots: 8
+    },
+    { 
+      id: '3', name: 'Diabetes', type: 'Endocrine', icon: <Activity size={24} color="#0EA5E9" />, color: '#E0F2FE', queue: 5,
+      floor: '2nd Floor', openTime: '07:00 AM', closeTime: '02:00 PM', currentToken: 45, nextToken: 51, status: 'Busy',
+      remainingSlots: 3
+    },
+    { 
+      id: '4', name: 'Heart', type: 'Cardiology', icon: <Heart size={24} color="#E11D48" />, color: '#FFF1F2', queue: 8,
+      floor: '4th Floor', openTime: '08:00 AM', closeTime: '04:00 PM', currentToken: 12, nextToken: 21, status: 'Overloaded',
+      remainingSlots: 0
+    },
+    { 
+      id: '5', name: 'Liver', type: 'Hepatology', icon: <Activity size={24} color="#F97316" />, color: '#FFF7ED', queue: 3,
+      floor: '2nd Floor', openTime: '07:00 AM', closeTime: '02:00 PM', currentToken: 8, nextToken: 12, status: 'Active',
+      remainingSlots: 12
+    },
+    { 
+      id: '6', name: 'Kidney', type: 'Nephrology', icon: <Dna size={24} color="#9333EA" />, color: '#F5F3FF', queue: 6,
+      floor: '3rd Floor', openTime: '07:30 AM', closeTime: '01:30 PM', currentToken: 15, nextToken: 22, status: 'Active',
+      remainingSlots: 5
+    },
+    { 
+      id: '7', name: 'Thyroid', type: 'Thyroidology', icon: <Sparkles size={24} color="#CA8A04" />, color: '#FEF9C3', queue: 1,
+      floor: '2nd Floor', openTime: '07:00 AM', closeTime: '02:00 PM', currentToken: 5, nextToken: 7, status: 'Available',
+      remainingSlots: 20
+    },
+    { 
+      id: '8', name: 'Hormone', type: 'Endocrinology', icon: <FlaskConical size={24} color="#10B981" />, color: '#ECFDF5', queue: 4,
+      floor: '3rd Floor', openTime: '07:30 AM', closeTime: '01:30 PM', currentToken: 19, nextToken: 24, status: 'Active',
+      remainingSlots: 7
+    },
+    { 
+      id: '9', name: 'Pregnancy', type: 'Obs/Gyn', icon: <Baby size={24} color="#DB2777" />, color: '#FDF2F8', queue: 2,
+      floor: '1st Floor', openTime: '08:00 AM', closeTime: '08:00 PM', currentToken: 10, nextToken: 13, status: 'Active',
+      remainingSlots: 10
+    },
+    { 
+      id: '10', name: 'Full Body', type: 'Diagnostic', icon: <Microscope size={24} color="#475569" />, color: '#F1F5F9', queue: 10,
+      floor: 'Ground Floor', openTime: '07:00 AM', closeTime: '09:00 PM', currentToken: 55, nextToken: 66, status: 'Critical',
+      remainingSlots: 2
+    },
+  ];
+
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" />
       <View style={styles.wrapper}>
-        <LinearGradient colors={['#724CF9', '#5E3BEE']} style={styles.headerGradient}>
+        {/* Modern Task-Oriented Header */}
+        <LinearGradient colors={COLORS.screenHeaderGradient as any} style={styles.headerGradient}>
           <View style={styles.headerContent}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.headerTitle}>Laboratory Portal</Text>
-              <Text style={styles.headerSub}>Manage test results</Text>
+            <View>
+              <Text style={styles.welcomeText}>Hospital-Wide Management</Text>
+              <Text style={styles.headerTitle}>{role === 'nurse' ? 'Nurse Portal' : 'Lab Portal'}</Text>
             </View>
-            <TouchableOpacity style={styles.notificationBtn}>
-              <Bell size={24} color="#FFF" />
-            </TouchableOpacity>
+            <View style={styles.headerActions}>
+              <TouchableOpacity style={styles.iconBtn}>
+                <Clock size={20} color="#FFF" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.iconBtn}>
+                <Bell size={20} color="#FFF" />
+                <View style={styles.notificationDot} />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.iconBtn} 
+                onPress={() => navigation.navigate('SignIn', { role: role || 'lab' })}
+              >
+                <LogOut size={20} color="#FFF" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Quick Stats Row */}
+          <View style={styles.quickStatsRow}>
+            <View style={styles.quickStat}>
+              <TrendingUp size={16} color="rgba(255,255,255,0.7)" />
+              <Text style={styles.quickStatText}>12% Load Increase</Text>
+            </View>
+            <View style={styles.quickStat}>
+              <AlertCircle size={16} color="#FCA5A5" />
+              <Text style={[styles.quickStatText, { color: '#FCA5A5' }]}>3 Urgent Tasks</Text>
+            </View>
           </View>
         </LinearGradient>
 
-        <ScrollView contentContainerStyle={styles.content}>
-
-          <View style={styles.statsPanel}>
-            <View style={[styles.mainStat, SHADOWS.medium]}>
-              <Text style={styles.mainStatTitle}>Pending Tests</Text>
-              <Text style={styles.mainStatValue}>24</Text>
-              <TouchableOpacity style={styles.addBtn}><Plus size={20} color={COLORS.white} /><Text style={styles.addBtnText}>New Result</Text></TouchableOpacity>
-            </View>
+        <ScrollView 
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.scrollContent} 
+          showsVerticalScrollIndicator={false}
+        >
+          
+          {/* Workflow Status Grid */}
+          <Text style={styles.sectionTitle}>Workflow Overview</Text>
+          <View style={styles.statusGrid}>
+            {taskStats.map((stat, idx) => (
+              <TouchableOpacity key={idx} style={[styles.statCard, greyShadow]}>
+                <View style={[styles.statIconBox, { backgroundColor: stat.bg }]}>
+                  {stat.icon}
+                </View>
+                <Text style={styles.statValue}>{stat.value}</Text>
+                <Text style={styles.statLabel}>{stat.label}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
 
-          <View style={styles.recentGrid}>
-            <View style={[styles.gridItem, SHADOWS.small]}>
-              <CheckCircle size={24} color="#4ADE80" />
-              <Text style={styles.gridVal}>142</Text>
-              <Text style={styles.gridLab}>Completed</Text>
-            </View>
-            <View style={[styles.gridItem, SHADOWS.small]}>
-              <Clock size={24} color="#FB923C" />
-              <Text style={styles.gridVal}>08</Text>
-              <Text style={styles.gridLab}>Urgent</Text>
-            </View>
+          {/* Laboratory Sections - Mirroring Patient Dashboard Lab Types */}
+          <View style={[styles.sectionHeader, { marginTop: 24 }]}>
+            <Text style={styles.sectionTitle}>Laboratory Sections</Text>
+            <TouchableOpacity><Text style={styles.viewAllText}>Manage Labs</Text></TouchableOpacity>
+          </View>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false} 
+            contentContainerStyle={styles.labCategoriesContainer}
+          >
+            {laboratorySections.map((lab) => (
+              <TouchableOpacity 
+                key={lab.id} 
+                style={[styles.labSectionCard, greyShadow]}
+                onPress={() => setSelectedLab(lab)}
+              >
+                <View style={[styles.labIconCircle, { backgroundColor: lab.color }]}>
+                  {lab.icon}
+                </View>
+                <Text style={styles.labIdText} numberOfLines={1}>{lab.name}</Text>
+                <Text style={styles.labTypeText} numberOfLines={1}>{lab.type}</Text>
+                <View style={styles.labBadgeContainer}>
+                  <Users size={12} color={COLORS.textSecondary} />
+                  <Text style={styles.queueCount}>{lab.queue} In Queue</Text>
+                </View>
+                <View style={[styles.labBadgeContainer, { backgroundColor: lab.remainingSlots > 0 ? '#ECFDF5' : '#FEE2E2', marginTop: 5 }]}>
+                  <Calendar size={12} color={lab.remainingSlots > 0 ? '#10B981' : '#E11D48'} />
+                  <Text style={[styles.queueCount, { color: lab.remainingSlots > 0 ? '#10B981' : '#E11D48' }]}>
+                    {lab.remainingSlots} Slots Left
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {/* Urgent Queue Management */}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Processing Queue</Text>
+            <TouchableOpacity><Text style={styles.viewAllText}>View Queue</Text></TouchableOpacity>
           </View>
 
-          <Text style={styles.sectionTitle}>Recently Submitted Reports</Text>
-          {[1, 2].map((i) => (
-            <View key={i} style={[styles.reportCard, SHADOWS.small]}>
-              <View style={styles.reportIcon}><FileText size={24} color={COLORS.primary} /></View>
-              <View style={styles.reportInfo}>
-                <Text style={styles.reportTitle}>Full Blood Count - Lab#{1024 + i}</Text>
-                <Text style={styles.reportPatient}>Patient: Sarah Connor</Text>
-                <Text style={styles.reportDate}>Submitted 2 hours ago</Text>
+          <View style={[styles.queueCard, greyShadow, { borderLeftColor: COLORS.error, borderLeftWidth: 4 }]}>
+            <View style={styles.queueInfo}>
+              <View style={styles.patientRow}>
+                <Text style={styles.patientName}>John Doe</Text>
+                <View style={styles.urgentBadge}><Text style={styles.urgentText}>URGENT</Text></View>
               </View>
-              <View style={styles.statusDone}><Text style={styles.statusDoneText}>Sent</Text></View>
+              <Text style={styles.testType}>Full Blood Count + CRP</Text>
+              <View style={styles.timeRow}>
+                <Clock size={14} color={COLORS.textSecondary} />
+                <Text style={styles.timeText}>Sample collected 15 mins ago</Text>
+              </View>
+            </View>
+            <TouchableOpacity style={styles.processBtn}>
+              <Text style={styles.processBtnText}>Process</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Active Tasks List */}
+          <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Recent Activities</Text>
+          {[
+            { id: '1025', test: 'Lipid Profile', status: 'Processing', color: '#60A5FA' },
+            { id: '1026', test: 'Liver Function Test', status: 'Pending', color: COLORS.warning },
+            { id: '1027', test: 'Blood Glucose', status: 'Completed', color: COLORS.success },
+          ].map((item) => (
+            <View key={item.id} style={[styles.activityItem, greyShadow]}>
+              <View style={[styles.activityIcon, { backgroundColor: item.color + '15' }]}>
+                <ClipboardList size={22} color={item.color} />
+              </View>
+              <View style={styles.activityDetails}>
+                <Text style={styles.activityTitle}>{item.test}</Text>
+                <Text style={styles.activitySub}>ID: #{item.id} • Lab Station 02</Text>
+              </View>
+              <View style={[styles.statusPill, { backgroundColor: item.color + '15' }]}>
+                <Text style={[styles.statusPillText, { color: item.color }]}>{item.status}</Text>
+              </View>
             </View>
           ))}
         </ScrollView>
-        <BottomNavBar />
+        
+        <NurseBottomNavBar />
+
+        {/* Lab Status Detail Modal */}
+        <Modal
+          visible={!!selectedLab}
+          transparent
+          animationType="fade"
+          onRequestClose={closeModal}
+        >
+          <View style={styles.modalOverlay}>
+            <Animated.View 
+              style={[
+                styles.modalContent,
+                { transform: [{ translateY: panY }] }
+              ]}
+              {...panResponder.panHandlers}
+            >
+              <View style={styles.dragHandleContainer}>
+                <View style={styles.dragHandle} />
+              </View>
+              <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+                <View style={styles.modalHeader}>
+                  <View style={styles.modalHeaderTitleBox}>
+                    <View style={[styles.modalIconWrap, { backgroundColor: selectedLab?.color }]}>
+                      {selectedLab?.icon}
+                    </View>
+                    <View>
+                      <Text style={styles.modalTitle}>{selectedLab?.name}</Text>
+                      <Text style={styles.modalSub}>{selectedLab?.type} Department</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity onPress={closeModal} style={styles.closeBtn}>
+                    <X size={24} color="#6B7280" />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.modalBody}>
+                  {/* Availability Section */}
+                  <Text style={styles.modalSectionLabel}>Daily Availability</Text>
+                  <View style={[styles.infoRow, { backgroundColor: '#F9FAFB' }]}>
+                    <View style={styles.infoItem}>
+                      <Clock size={16} color={COLORS.primary} />
+                      <Text style={styles.infoLabel}>Operating Hours</Text>
+                      <Text style={styles.infoValue}>{selectedLab?.openTime} - {selectedLab?.closeTime}</Text>
+                    </View>
+                    <View style={styles.infoItem}>
+                      <Calendar size={16} color={COLORS.primary} />
+                      <Text style={styles.infoLabel}>Avail. Appointments</Text>
+                      <Text style={[styles.infoValue, { color: selectedLab?.remainingSlots > 5 ? COLORS.success : COLORS.warning }]}>
+                        {selectedLab?.remainingSlots} Bookings Left
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={[styles.infoRow, { backgroundColor: '#F9FAFB', marginTop: 10 }]}>
+                    <View style={styles.infoItem}>
+                      <MapPin size={16} color={COLORS.primary} />
+                      <Text style={styles.infoLabel}>Location</Text>
+                      <Text style={styles.infoValue}>{selectedLab?.floor}</Text>
+                    </View>
+                  </View>
+
+                  {/* Live Queue Status */}
+                  <Text style={[styles.modalSectionLabel, { marginTop: 20 }]}>Live Queue Status</Text>
+                  <View style={styles.queueMainBox}>
+                    <View style={styles.tokenBox}>
+                      <Text style={styles.tokenLabel}>CURRENT TOKEN</Text>
+                      <Text style={styles.tokenValue}>{selectedLab?.currentToken}</Text>
+                    </View>
+                    <View style={styles.tokenDivider} />
+                    <View style={styles.tokenBox}>
+                      <Text style={styles.tokenLabel}>NEXT TOKEN</Text>
+                      <Text style={[styles.tokenValue, { color: COLORS.primary }]}>{selectedLab?.nextToken}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.queueStatsRow}>
+                    <View style={styles.qStat}>
+                      <Users size={18} color="#4B5563" />
+                      <Text style={styles.qStatValue}>{selectedLab?.queue}</Text>
+                      <Text style={styles.qStatLabel}>Waiting</Text>
+                    </View>
+                    <View style={styles.qStat}>
+                      <Activity size={18} color="#4B5563" />
+                      <Text style={styles.qStatValue}>{selectedLab?.status}</Text>
+                      <Text style={styles.qStatLabel}>Status</Text>
+                    </View>
+                    <View style={styles.qStat}>
+                      <TrendingUp size={18} color="#4B5563" />
+                      <Text style={styles.qStatValue}>~15m</Text>
+                      <Text style={styles.qStatLabel}>Avg. Wait</Text>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity style={styles.manageBtn}>
+                    <Text style={styles.manageBtnText}>Manage Tokens</Text>
+                    <ChevronRight size={18} color="#FFF" />
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            </Animated.View>
+          </View>
+        </Modal>
       </View>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: '#F8F9FC' },
   wrapper: { flex: 1 },
   headerGradient: {
     paddingTop: Platform.OS === 'ios' ? 60 : 50,
-    paddingHorizontal: 20,
-    paddingBottom: 24,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
+    paddingHorizontal: 24,
+    paddingBottom: 28,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
   },
   headerContent: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
     justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  welcomeText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: '800',
     color: '#FFF',
-  },
-  headerSub: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.8)',
+    fontSize: 24,
+    fontWeight: '800',
     marginTop: 2,
   },
-  notificationBtn: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    padding: 8,
-    borderRadius: 12
+  headerActions: {
+    flexDirection: 'row',
+    gap: 12,
   },
-  content: { padding: 24 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-  title: { fontSize: 24, fontWeight: '800', color: COLORS.textHeader },
-  bellBtn: { padding: 4 },
-  statsPanel: { marginBottom: 20 },
-  mainStat: { backgroundColor: COLORS.primary, borderRadius: 24, padding: 24, alignItems: 'center' },
-  mainStatTitle: { color: 'rgba(255, 255, 255, 0.8)', fontSize: 16, fontWeight: '600' },
-  mainStatValue: { color: COLORS.white, fontSize: 48, fontWeight: '800', marginVertical: 8 },
-  addBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.2)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 },
-  addBtnText: { color: COLORS.white, fontWeight: '700', marginLeft: 8 },
-  recentGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 },
-  gridItem: { backgroundColor: COLORS.white, width: '48%', padding: 20, borderRadius: 20, alignItems: 'center' },
-  gridVal: { fontSize: 20, fontWeight: '800', color: COLORS.textHeader, marginTop: 10 },
-  gridLab: { color: COLORS.textSecondary, fontSize: 13 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: COLORS.textHeader, marginBottom: 16 },
-  reportCard: { backgroundColor: COLORS.white, borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  reportIcon: { width: 48, height: 48, borderRadius: 12, backgroundColor: COLORS.primaryLight, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  reportInfo: { flex: 1 },
-  reportTitle: { fontWeight: '700', color: COLORS.textHeader, fontSize: 14 },
-  reportPatient: { fontSize: 12, color: COLORS.textSecondary, marginTop: 2 },
-  reportDate: { fontSize: 11, color: COLORS.primary, marginTop: 4, fontWeight: '600' },
-  statusDone: { backgroundColor: '#DCFCE7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  statusDoneText: { color: '#166534', fontSize: 11, fontWeight: '700' }
+  iconBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  notificationDot: {
+    position: 'absolute',
+    top: 10,
+    right: 12,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FF4D4D',
+    borderWidth: 2,
+    borderColor: '#8B3DFF',
+  },
+  quickStatsRow: {
+    flexDirection: 'row',
+    marginTop: 20,
+    gap: 15,
+  },
+  quickStat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  quickStatText: {
+    color: '#FFF',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  scrollContent: {
+    padding: 24,
+    paddingBottom: 110,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1F2937',
+    marginBottom: 16,
+  },
+  labCategoriesContainer: {
+    paddingRight: 20,
+    paddingBottom: 20,
+    gap: 16,
+  },
+  labSectionCard: {
+    backgroundColor: '#FFF',
+    width: 140,
+    padding: 16,
+    borderRadius: 24,
+    alignItems: 'center',
+  },
+  labIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  labIdText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  labTypeText: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  labBadgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+  },
+  queueCount: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#4B5563',
+  },
+  statusGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    padding: 24,
+    paddingTop: 8,
+    paddingBottom: 40,
+    minHeight: 500,
+  },
+  dragHandleContainer: {
+    width: '100%',
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  dragHandle: {
+    width: 40,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: '#E5E7EB',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 24,
+  },
+  modalHeaderTitleBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  modalIconWrap: {
+    width: 60,
+    height: 60,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  modalSub: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  closeBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalBody: {
+    flex: 1,
+  },
+  modalSectionLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#374151',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 12,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    borderRadius: 20,
+    padding: 16,
+    gap: 20,
+  },
+  infoItem: {
+    flex: 1,
+    gap: 4,
+  },
+  infoLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#9CA3AF',
+  },
+  infoValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  queueMainBox: {
+    flexDirection: 'row',
+    backgroundColor: '#F5F3FF',
+    borderRadius: 24,
+    padding: 20,
+    alignItems: 'center',
+  },
+  tokenBox: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  tokenDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: 'rgba(139, 61, 255, 0.2)',
+  },
+  tokenLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: COLORS.primary,
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  tokenValue: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: '#111827',
+  },
+  queueStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+    backgroundColor: '#FFF',
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    borderRadius: 20,
+    padding: 16,
+  },
+  qStat: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  qStatValue: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#111827',
+    marginTop: 6,
+  },
+  qStatLabel: {
+    fontSize: 11,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  manageBtn: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 18,
+    height: 56,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 24,
+    gap: 8,
+  },
+  manageBtnText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  statCard: {
+    width: '48%',
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 15,
+    alignItems: 'flex-start',
+  },
+  statIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  statValue: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  viewAllText: {
+    color: COLORS.primary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  queueCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  queueInfo: {
+    flex: 1,
+  },
+  patientRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  patientName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  urgentBadge: {
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  urgentText: {
+    color: '#EF4444',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  testType: {
+    fontSize: 13,
+    color: '#4B5563',
+    marginBottom: 8,
+  },
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  timeText: {
+    fontSize: 11,
+    color: '#9CA3AF',
+  },
+  processBtn: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  processBtnText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  activityItem: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  activityIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  activityDetails: {
+    flex: 1,
+  },
+  activityTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  activitySub: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginTop: 2,
+  },
+  statusPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  statusPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
 });
 
 export default LabDashboard;
+
+
