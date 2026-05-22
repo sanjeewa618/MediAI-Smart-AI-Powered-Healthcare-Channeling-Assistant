@@ -120,7 +120,7 @@ const LabAppointmentsScreen: React.FC = () => {
               <ChevronLeft size={24} color="#FFF" />
             </TouchableOpacity>
             <View>
-              <Text style={styles.labName}>MediCare Lab Center</Text>
+              <Text style={styles.labName}>Test Appointments</Text>
               <Text style={styles.dateTime}>Oct 24, 2023 • 10:15 AM</Text>
             </View>
           </View>
@@ -149,7 +149,7 @@ const LabAppointmentsScreen: React.FC = () => {
         {/* Stats */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsScroll}>
           {STATS.map((stat, idx) => (
-            <View key={idx} style={[styles.statCard, SHADOWS.light]}>
+            <View key={idx} style={styles.statCard}>
               <View style={[styles.statIconWrapper, { backgroundColor: stat.color + '1A' }]}>
                 <stat.icon size={20} color={stat.color} />
               </View>
@@ -203,7 +203,7 @@ const LabAppointmentsScreen: React.FC = () => {
         {/* Appointment Cards */}
         <View style={styles.listContainer}>
           {APPOINTMENTS.map((item) => (
-            <View key={item.id} style={[styles.appCard, SHADOWS.medium]}>
+            <View key={item.id} style={styles.appCard}>
               <View style={styles.appCardHeader}>
                 <View style={styles.appCardHeaderLeft}>
                   <Image source={{ uri: item.photo }} style={styles.patientPhoto} />
@@ -264,7 +264,7 @@ const LabAppointmentsScreen: React.FC = () => {
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 20, paddingBottom: 10 }}>
             {PAST_HISTORY.map((hist) => (
-              <View key={hist.id} style={[styles.historyItemCard, SHADOWS.light]}>
+              <View key={hist.id} style={styles.historyItemCard}>
                 <View style={styles.historyItemHeader}>
                   <Image source={{ uri: hist.photo }} style={styles.historyItemPhoto} />
                   <View>
@@ -360,7 +360,7 @@ const LabAppointmentsScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  headerGradient: { paddingTop: Platform.OS === 'ios' ? 50 : 40, paddingBottom: 24, paddingHorizontal: 20, borderBottomLeftRadius: 30, borderBottomRightRadius: 30 },
+  headerGradient: { paddingTop: Platform.OS === 'ios' ? 60 : 50, paddingBottom: 24, paddingHorizontal: 20, borderBottomLeftRadius: 30, borderBottomRightRadius: 30 },
   headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   headerTitleRow: { flexDirection: 'row', alignItems: 'center' },
   backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
@@ -399,9 +399,9 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3
   },
   alertHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   alertBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
@@ -473,7 +473,16 @@ const styles = StyleSheet.create({
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendText: { fontSize: 12, color: COLORS.textSecondary, fontWeight: '500' },
-  historyCard: { backgroundColor: COLORS.primaryDark, borderRadius: 20, padding: 20 },
+  historyCard: { 
+    backgroundColor: COLORS.primaryDark, 
+    borderRadius: 20, 
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    elevation: 6
+  },
   historyRow: { flexDirection: 'row', justifyContent: 'space-between' },
   historyLabel: { fontSize: 12, color: 'rgba(255,255,255,0.7)', marginBottom: 4 },
   historyValue: { fontSize: 16, fontWeight: '800', color: '#FFF' },

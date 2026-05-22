@@ -9,14 +9,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 
-const greyShadow = {
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.08,
-  shadowRadius: 12,
-  elevation: 4,
-};
-
 const LabDashboard = () => {
   const navigation = useNavigation<any>();
   const { role } = useAuth();
@@ -169,7 +161,7 @@ const LabDashboard = () => {
           <Text style={styles.sectionTitle}>Workflow Overview</Text>
           <View style={styles.statusGrid}>
             {taskStats.map((stat, idx) => (
-              <TouchableOpacity key={idx} style={[styles.statCard, greyShadow]}>
+              <TouchableOpacity key={idx} style={styles.statCard}>
                 <View style={[styles.statIconBox, { backgroundColor: stat.bg }]}>
                   {stat.icon}
                 </View>
@@ -189,7 +181,7 @@ const LabDashboard = () => {
 
           {/* New Schedule Management Quick Access Card */}
           <TouchableOpacity 
-            style={[styles.scheduleFastCard, greyShadow]}
+            style={styles.scheduleFastCard}
             onPress={() => navigation.navigate('LabScheduling')}
           >
             <LinearGradient
@@ -218,7 +210,7 @@ const LabDashboard = () => {
             {laboratorySections.map((lab) => (
               <TouchableOpacity 
                 key={lab.id} 
-                style={[styles.labSectionCard, greyShadow]}
+                style={styles.labSectionCard}
                 onPress={() => setSelectedLab(lab)}
               >
                 <View style={[styles.labIconCircle, { backgroundColor: lab.color }]}>
@@ -240,7 +232,7 @@ const LabDashboard = () => {
             <TouchableOpacity><Text style={styles.viewAllText}>View Queue</Text></TouchableOpacity>
           </View>
 
-          <View style={[styles.queueCard, greyShadow, { borderLeftColor: COLORS.error, borderLeftWidth: 4 }]}>
+          <View style={[styles.queueCard, { borderLeftColor: COLORS.error, borderLeftWidth: 4 }]}>
             <View style={styles.queueInfo}>
               <View style={styles.patientRow}>
                 <Text style={styles.patientName}>John Doe</Text>
@@ -264,7 +256,7 @@ const LabDashboard = () => {
             { id: '1026', test: 'Liver Function Test', status: 'Pending', color: COLORS.warning },
             { id: '1027', test: 'Blood Glucose', status: 'Completed', color: COLORS.success },
           ].map((item) => (
-            <View key={item.id} style={[styles.activityItem, greyShadow]}>
+            <View key={item.id} style={styles.activityItem}>
               <View style={[styles.activityIcon, { backgroundColor: item.color + '15' }]}>
                 <ClipboardList size={22} color={item.color} />
               </View>
@@ -488,6 +480,11 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 24,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
   },
   labIconCircle: {
     width: 56,
@@ -709,6 +706,11 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 15,
     alignItems: 'flex-start',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
   },
   statIconBox: {
     width: 36,
@@ -745,6 +747,11 @@ const styles = StyleSheet.create({
     marginVertical: 10,
     overflow: 'hidden',
     height: 90,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 5,
   },
   scheduleGradient: {
     flex: 1,
@@ -784,6 +791,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
   },
   queueInfo: {
     flex: 1,
@@ -842,6 +854,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
   },
   activityIcon: {
     width: 44,

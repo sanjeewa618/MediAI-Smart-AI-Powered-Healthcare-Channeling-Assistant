@@ -16,6 +16,7 @@ import { useNavigation } from '@react-navigation/native';
 import { COLORS, SHADOWS, SIZES } from '../../theme/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import NurseBottomNavBar from '../../components/NurseBottomNavBar';
+import moment from 'moment';
 
 const { width } = Dimensions.get('window');
 
@@ -67,10 +68,70 @@ const LabSchedulingScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const [selectedLab, setSelectedLab] = useState('1');
   const [selectedDate, setSelectedDate] = useState(24);
+  const [currentMonthYear, setCurrentMonthYear] = useState('October 2023');
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
+  const [slots, setSlots] = useState(SCHEDULE_SLOTS);
   const [showAddModal, setShowAddModal] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
+  const [editingSlot, setEditingSlot] = useState<any>(null);
 
-  const renderLabTypeItem = ({ item }: { item: typeof LAB_TYPES[0] }) => {
+  // Form States
+  const [formData, setFormData] = useState({
+    type: '',
+    startTime: '',
+    endTime: '',
+    capacity: '',
+    nurse: ''
+  });
+
+  const handleEdit = (slot: any) => {
+    setEditingSlot(slot);
+    setFormData({
+      type: slot.type,
+      startTime: slot.time.split(' - ')[0],
+      endTime: slot.time.split(' - ')[1],
+      capacity: slot.maxPatients.toString(),
+      nurse: slot.nurse
+    });
+    setShowAddModal(true);
+  };
+
+  const handleDelete = (id: string) => {
+    setSlots(slots.filter(s => s.id !== id));
+  };
+
+  const saveSlot = () => {
+    if (editingSlot) {
+      setSlots(slots.map(s => s.id === editingSlot.id ? {
+        ...s,
+        time: `${formData.startTime} - ${formData.endTime}`,
+        type: formData.type,
+        maxPatients: parseInt(formData.capacity),
+        nurse: formData.nurse
+      } : s));
+    } else {
+      const newSlot = {
+        id: Math.random().toString(36).substr(2, 9),
+        time: `${formData.startTime} - ${formData.endTime}`,
+        maxPatients: parseInt(formData.capacity),
+        booked: 0,
+        nurse: formData.nurse,
+        status: 'Active',
+        room: 'Room 01',
+        type: formData.type
+      };
+      setSlots([...slots, newSlot]);
+    }
+    closeModal();
+  };
+
+  const closeModal = () => {
+    setShowAddModal(false);
+    setEditingSlot(null);
+    setFormData({ type: '', startTime: '', endTime: '', capacity: '', nurse: '' });
+  };
+
+  const renderLabTypeItem = ({ item }: { item: any }) => {
     const isSelected = selectedLab === item.id;
     return (
       <TouchableOpacity 
@@ -84,10 +145,10 @@ const LabSchedulingScreen: React.FC = () => {
         <View style={[styles.labIconCircle, { backgroundColor: item.color }]}>
           <item.icon size={20} color={item.iconColor} />
         </View>
-        <Text style={[styles.labTypeName, isSelected && styles.whiteText]}>{item.name}</Text>
+        <Text style={styles.labTypeName}>{item.name}</Text>
         <View style={styles.labStatsMini}>
-          <Text style={[styles.labStatText, isSelected && styles.whiteText]}>{item.bookings} Booked</Text>
-          <Text style={[styles.labStatText, isSelected && styles.whiteText]}>{item.slots} Available</Text>
+          <Text style={styles.labStatText}>{item.bookings} Booked</Text>
+          <Text style={styles.labStatText}>{item.slots} Available</Text>
         </View>
       </TouchableOpacity>
     );
@@ -148,14 +209,14 @@ const LabSchedulingScreen: React.FC = () => {
         {/* Quick Stats */}
         <View style={styles.statsRow}>
           { [
-            { label: 'Total Slots', value: '48', icon: CalendarIcon },
-            { label: 'Available', value: '12', icon: CheckCircle },
-            { label: 'Fully Booked', value: '05', icon: AlertTriangle },
-            { label: 'Nurses', value: '08', icon: Users },
+            { label: 'Total Slots', value: '48', icon: CalendarIcon, color: COLORS.primary },
+            { label: 'Available', value: '12', icon: CheckCircle, color: COLORS.success },
+            { label: 'Fully Booked', value: '05', icon: AlertTriangle, color: COLORS.error },
+            { label: 'Nurses', value: '08', icon: Users, color: '#6366F1' },
           ].map((stat, idx) => (
             <View key={idx} style={[styles.statCard, greyShadow]}>
-              <View style={styles.statIconBox}>
-                <stat.icon size={16} color={COLORS.primary} />
+              <View style={[styles.statIconBox, { backgroundColor: stat.color + '1A' }]}>
+                <stat.icon size={16} color={stat.color} />
               </View>
               <View>
                 <Text style={styles.statValue}>{stat.value}</Text>
@@ -185,10 +246,12 @@ const LabSchedulingScreen: React.FC = () => {
         {/* Calendar / Date Picker Area */}
         <View style={styles.calendarSection}>
           <View style={styles.calendarHeader}>
-            <Text style={styles.monthText}>October 2023</Text>
-            <TouchableOpacity style={styles.filterBtn}>
+            <TouchableOpacity onPress={() => setShowCalendarModal(true)}>
+              <Text style={styles.monthText}>{currentMonthYear} <CalendarIcon size={16} color={COLORS.primary} /></Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.filterBtn} onPress={() => setShowCalendarModal(true)}>
               <Filter size={16} color={COLORS.textSecondary} />
-              <Text style={styles.filterText}>Filter Date</Text>
+              <Text style={styles.filterText}>Select Date</Text>
             </TouchableOpacity>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.datePicker}>
@@ -221,7 +284,7 @@ const LabSchedulingScreen: React.FC = () => {
           </View>
         </View>
         
-        {SCHEDULE_SLOTS.map((slot) => (
+        {slots.map((slot) => (
           <View key={slot.id} style={[styles.slotCard, greyShadow]}>
             <View style={styles.slotHeader}>
               <View style={styles.slotInfoMain}>
@@ -256,10 +319,20 @@ const LabSchedulingScreen: React.FC = () => {
                 <Text style={styles.nurseName}>{slot.nurse}</Text>
               </View>
               <View style={styles.slotActions}>
-                <TouchableOpacity style={styles.slotActionBtn}><Edit2 size={16} color={COLORS.primary} /></TouchableOpacity>
+                <TouchableOpacity 
+                   style={styles.slotActionBtn}
+                   onPress={() => handleEdit(slot)}
+                >
+                   <Edit2 size={16} color={COLORS.primary} />
+                </TouchableOpacity>
                 <TouchableOpacity style={styles.slotActionBtn}><Copy size={16} color="#6366F1" /></TouchableOpacity>
                 <TouchableOpacity style={styles.slotActionBtn}><Pause size={16} color={COLORS.warning} /></TouchableOpacity>
-                <TouchableOpacity style={styles.slotActionBtn}><Trash2 size={16} color={COLORS.error} /></TouchableOpacity>
+                <TouchableOpacity 
+                   style={styles.slotActionBtn}
+                   onPress={() => handleDelete(slot.id)}
+                >
+                   <Trash2 size={16} color={COLORS.error} />
+                </TouchableOpacity>
               </View>
             </View>
           </View>
@@ -342,8 +415,8 @@ const LabSchedulingScreen: React.FC = () => {
           <View style={styles.modalContent}>
             <View style={styles.dragHandle} />
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>New Schedule Slot</Text>
-              <TouchableOpacity onPress={() => setShowAddModal(false)} style={styles.modalCloseBtn}>
+              <Text style={styles.modalTitle}>{editingSlot ? 'Edit Schedule Slot' : 'New Schedule Slot'}</Text>
+              <TouchableOpacity onPress={closeModal} style={styles.modalCloseBtn}>
                 <X size={20} color={COLORS.textHeader} />
               </TouchableOpacity>
             </View>
@@ -353,7 +426,13 @@ const LabSchedulingScreen: React.FC = () => {
                 <Text style={styles.inputLabel}>Lab Category</Text>
                 <View style={styles.inputWrapper}>
                   <FlaskConical size={20} color={COLORS.primary} style={styles.inputIcon} />
-                  <TextInput placeholder="Select Lab Type (e.g. PCR, Blood)" style={styles.textInput} placeholderTextColor="#94A3B8" />
+                  <TextInput 
+                    placeholder="Select Lab Type (e.g. PCR, Blood)" 
+                    style={styles.textInput} 
+                    placeholderTextColor="#94A3B8"
+                    value={formData.type}
+                    onChangeText={(val) => setFormData({...formData, type: val})}
+                  />
                 </View>
               </View>
 
@@ -362,14 +441,26 @@ const LabSchedulingScreen: React.FC = () => {
                   <Text style={styles.inputLabel}>Start Time</Text>
                   <View style={styles.inputWrapper}>
                     <Clock size={18} color={COLORS.textSecondary} />
-                    <TextInput placeholder="08:00 AM" style={styles.textInput} placeholderTextColor="#94A3B8" />
+                    <TextInput 
+                      placeholder="08:00 AM" 
+                      style={styles.textInput} 
+                      placeholderTextColor="#94A3B8"
+                      value={formData.startTime}
+                      onChangeText={(val) => setFormData({...formData, startTime: val})}
+                    />
                   </View>
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.inputLabel}>End Time</Text>
                   <View style={styles.inputWrapper}>
                     <Clock size={18} color={COLORS.textSecondary} />
-                    <TextInput placeholder="10:00 AM" style={styles.textInput} placeholderTextColor="#94A3B8" />
+                    <TextInput 
+                      placeholder="10:00 AM" 
+                      style={styles.textInput} 
+                      placeholderTextColor="#94A3B8"
+                      value={formData.endTime}
+                      onChangeText={(val) => setFormData({...formData, endTime: val})}
+                    />
                   </View>
                 </View>
               </View>
@@ -378,7 +469,14 @@ const LabSchedulingScreen: React.FC = () => {
                 <Text style={styles.inputLabel}>Max Capacity (Patients)</Text>
                 <View style={styles.inputWrapper}>
                   <Users size={20} color={COLORS.textSecondary} style={styles.inputIcon} />
-                  <TextInput placeholder="Enter limit (e.g. 25)" keyboardType="numeric" style={styles.textInput} placeholderTextColor="#94A3B8" />
+                  <TextInput 
+                    placeholder="Enter limit (e.g. 25)" 
+                    keyboardType="numeric" 
+                    style={styles.textInput} 
+                    placeholderTextColor="#94A3B8"
+                    value={formData.capacity}
+                    onChangeText={(val) => setFormData({...formData, capacity: val})}
+                  />
                 </View>
               </View>
 
@@ -386,7 +484,13 @@ const LabSchedulingScreen: React.FC = () => {
                 <Text style={styles.inputLabel}>Assign Medical Staff</Text>
                 <View style={styles.inputWrapper}>
                   <User size={20} color={COLORS.textSecondary} style={styles.inputIcon} />
-                  <TextInput placeholder="Search Nurse/Technician" style={styles.textInput} placeholderTextColor="#94A3B8" />
+                  <TextInput 
+                    placeholder="Search Nurse/Technician" 
+                    style={styles.textInput} 
+                    placeholderTextColor="#94A3B8"
+                    value={formData.nurse}
+                    onChangeText={(val) => setFormData({...formData, nurse: val})}
+                  />
                 </View>
               </View>
 
@@ -398,10 +502,77 @@ const LabSchedulingScreen: React.FC = () => {
                 <Switch trackColor={{ false: '#E2E8F0', true: COLORS.primary }} thumbColor="#FFF" />
               </View>
 
-              <TouchableOpacity style={styles.saveBtn} onPress={() => setShowAddModal(false)}>
-                <Text style={styles.saveBtnText}>Generate Schedule</Text>
+              <TouchableOpacity style={styles.saveBtn} onPress={saveSlot}>
+                <Text style={styles.saveBtnText}>{editingSlot ? 'Update Schedule' : 'Generate Schedule'}</Text>
               </TouchableOpacity>
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Full Calendar Modal */}
+      <Modal visible={showCalendarModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.calendarModalContent, greyShadow]}>
+            <View style={styles.calendarModalHeader}>
+              <Text style={styles.calendarModalTitle}>Select Date</Text>
+              <TouchableOpacity onPress={() => setShowCalendarModal(false)}>
+                <X size={20} color={COLORS.textHeader} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.calendarControls}>
+              <TouchableOpacity onPress={() => {
+                const prev = moment(currentMonthYear, 'MMMM YYYY').subtract(1, 'month').format('MMMM YYYY');
+                setCurrentMonthYear(prev);
+              }}>
+                <ChevronLeft size={20} color={COLORS.primary} />
+              </TouchableOpacity>
+              <Text style={styles.currentMonthText}>{currentMonthYear}</Text>
+              <TouchableOpacity onPress={() => {
+                const next = moment(currentMonthYear, 'MMMM YYYY').add(1, 'month').format('MMMM YYYY');
+                setCurrentMonthYear(next);
+              }}>
+                <View style={{ transform: [{ rotate: '180deg' }] }}>
+                  <ChevronLeft size={20} color={COLORS.primary} />
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.weekDaysRow}>
+              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, idx) => (
+                <Text key={idx} style={styles.weekDayText}>{day}</Text>
+              ))}
+            </View>
+
+            <View style={styles.daysGrid}>
+              {Array.from({ length: moment(currentMonthYear, 'MMMM YYYY').startOf('month').day() }).map((_, i) => (
+                <View key={`empty-${i}`} style={styles.dayCell} />
+              ))}
+              {Array.from({ length: moment(currentMonthYear, 'MMMM YYYY').daysInMonth() }).map((_, i) => {
+                const day = i + 1;
+                const isSelected = selectedDate === day;
+                return (
+                  <TouchableOpacity 
+                    key={day} 
+                    style={[styles.dayCell, isSelected && styles.dayCellActive]}
+                    onPress={() => {
+                      setSelectedDate(day);
+                      setShowCalendarModal(false);
+                    }}
+                  >
+                    <Text style={[styles.dayCellText, isSelected && styles.whiteText]}>{day}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <TouchableOpacity 
+              style={styles.calendarCloseBtnFull}
+              onPress={() => setShowCalendarModal(false)}
+            >
+              <Text style={styles.calendarCloseBtnText}>Confirm Selection</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -412,7 +583,7 @@ const LabSchedulingScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFFFFF' },
   headerGradient: { 
-    paddingTop: Platform.OS === 'ios' ? 50 : 20, 
+    paddingTop: Platform.OS === 'ios' ? 60 : 50, 
     paddingBottom: 24, 
     paddingHorizontal: 20, 
     borderBottomLeftRadius: 30, 
@@ -510,14 +681,14 @@ const styles = StyleSheet.create({
     marginRight: 16,
     alignItems: 'center',
   },
-  labTypeSelected: { backgroundColor: COLORS.primary },
+  labTypeSelected: { backgroundColor: '#FFF', borderWidth: 2, borderColor: COLORS.primary },
   labTypeUnselected: { backgroundColor: '#FFF', borderWidth: 1.5, borderColor: COLORS.primary + '15' },
   labIconCircle: { width: 52, height: 52, borderRadius: 26, justifyContent: 'center', alignItems: 'center', marginBottom: 14 },
   labTypeName: { fontSize: 15, fontWeight: '800', color: COLORS.textHeader, marginBottom: 8 },
   labStatsMini: { alignItems: 'center', gap: 3 },
   labStatText: { fontSize: 11, color: COLORS.textSecondary, fontWeight: '600' },
   whiteText: { color: '#FFF' },
-  calendarSection: { paddingHorizontal: 20, marginTop: 10 },
+  calendarSection: { paddingHorizontal: 20, marginTop: 10, marginBottom: 20 },
   calendarHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 },
   monthText: { fontSize: 17, fontWeight: '800', color: COLORS.textHeader },
   filterBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F1F5F9', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12 },
@@ -548,8 +719,8 @@ const styles = StyleSheet.create({
   capacityHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   capacityLabel: { fontSize: 12, fontWeight: '700', color: COLORS.textSecondary },
   capacityValue: { fontSize: 12, fontWeight: '800', color: COLORS.textHeader },
-  progressBarBg: { height: 10, backgroundColor: '#E2E8F0', borderRadius: 5, overflow: 'hidden' },
-  progressBarFill: { height: '100%', borderRadius: 5 },
+  progressBarBg: { height: 6, backgroundColor: '#E2E8F0', borderRadius: 3, overflow: 'hidden' },
+  progressBarFill: { height: '100%', borderRadius: 3 },
   slotFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 15, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
   nurseInfo: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   nurseAvatarMini: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
@@ -588,7 +759,7 @@ const styles = StyleSheet.create({
   timelineSubText: { fontSize: 12, color: COLORS.textSecondary, fontWeight: '600' },
   fab: { 
     position: 'absolute', 
-    bottom: 100, 
+    bottom: 70, 
     left: 20, 
     right: 20, 
     height: 60, 
@@ -643,6 +814,84 @@ const styles = StyleSheet.create({
     elevation: 6
   },
   saveBtnText: { color: '#FFF', fontSize: 16, fontWeight: '800' },
+  calendarModalContent: {
+    backgroundColor: '#FFF',
+    width: width * 0.9,
+    borderRadius: 30,
+    padding: 24,
+    alignSelf: 'center',
+    marginTop: '20%',
+  },
+  calendarModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  calendarModalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: COLORS.textHeader,
+  },
+  calendarControls: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    padding: 12,
+    borderRadius: 15,
+    marginBottom: 20,
+  },
+  currentMonthText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.textHeader,
+  },
+  weekDaysRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  weekDayText: {
+    width: (width * 0.9 - 48) / 7,
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+  },
+  daysGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+  },
+  dayCell: {
+    width: (width * 0.9 - 48) / 7,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 5,
+  },
+  dayCellActive: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 12,
+  },
+  dayCellText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.textHeader,
+  },
+  calendarCloseBtnFull: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 14,
+    borderRadius: 15,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  calendarCloseBtnText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '800',
+  },
 });
 
 export default LabSchedulingScreen;
