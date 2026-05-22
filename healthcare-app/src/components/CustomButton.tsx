@@ -79,7 +79,7 @@ const styles = StyleSheet.create({
   },
   container: {
     borderRadius: 30, // Fully rounded like the images
-    paddingVertical: 18,
+    paddingVertical: 14,
     paddingHorizontal: SIZES.extraLarge,
     alignItems: 'center',
     justifyContent: 'center',

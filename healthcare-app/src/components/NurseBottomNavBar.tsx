@@ -29,9 +29,9 @@ const NurseBottomNavBar = () => {
         <Text style={[styles.label, { color: currentRouteName === 'LabAppointments' ? COLORS.primary : '#9CA3AF' }]}>Appointments</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.item} onPress={() => alert('Schedule screen for nurses is under development.')}>
-        <Clock size={22} color={'#9CA3AF'} />
-        <Text style={styles.label}>Schedule</Text>
+      <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('LabScheduling')}>
+        <Clock size={22} color={currentRouteName === 'LabScheduling' ? COLORS.primary : '#9CA3AF'} />
+        <Text style={[styles.label, { color: currentRouteName === 'LabScheduling' ? COLORS.primary : '#9CA3AF' }]}>Schedule</Text>
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.item} onPress={() => alert('Reports screen for nurses is under development.')}>

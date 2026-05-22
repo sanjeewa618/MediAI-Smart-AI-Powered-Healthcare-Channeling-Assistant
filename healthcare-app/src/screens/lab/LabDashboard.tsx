@@ -127,8 +127,11 @@ const LabDashboard = () => {
               <Text style={styles.headerTitle}>{role === 'nurse' ? 'Nurse Portal' : 'Lab Portal'}</Text>
             </View>
             <View style={styles.headerActions}>
-              <TouchableOpacity style={styles.iconBtn}>
-                <Clock size={20} color="#FFF" />
+              <TouchableOpacity 
+                style={styles.iconBtn}
+                onPress={() => navigation.navigate('LabScheduling')}
+              >
+                <Calendar size={20} color="#FFF" />
               </TouchableOpacity>
               <TouchableOpacity style={styles.iconBtn}>
                 <Bell size={20} color="#FFF" />
@@ -179,8 +182,34 @@ const LabDashboard = () => {
           {/* Laboratory Sections - Mirroring Patient Dashboard Lab Types */}
           <View style={[styles.sectionHeader, { marginTop: 24 }]}>
             <Text style={styles.sectionTitle}>Laboratory Sections</Text>
-            <TouchableOpacity><Text style={styles.viewAllText}>Manage Labs</Text></TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.navigate('LabScheduling')}>
+              <Text style={styles.viewAllText}>Manage Schedule</Text>
+            </TouchableOpacity>
           </View>
+
+          {/* New Schedule Management Quick Access Card */}
+          <TouchableOpacity 
+            style={[styles.scheduleFastCard, greyShadow]}
+            onPress={() => navigation.navigate('LabScheduling')}
+          >
+            <LinearGradient
+              colors={['#8B5CF6', '#7C3AED']}
+              style={styles.scheduleGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              <View style={styles.scheduleFastInfo}>
+                <View style={styles.scheduleFastIconBox}>
+                  <Calendar size={24} color="#8B5CF6" />
+                </View>
+                <View>
+                  <Text style={styles.scheduleFastTitle}>Schedule Management</Text>
+                  <Text style={styles.scheduleFastSub}>Configure slots, staff & lab capacity</Text>
+                </View>
+              </View>
+              <ChevronRight size={20} color="#FFF" />
+            </LinearGradient>
+          </TouchableOpacity>
           <ScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false} 
@@ -200,12 +229,6 @@ const LabDashboard = () => {
                 <View style={styles.labBadgeContainer}>
                   <Users size={12} color={COLORS.textSecondary} />
                   <Text style={styles.queueCount}>{lab.queue} In Queue</Text>
-                </View>
-                <View style={[styles.labBadgeContainer, { backgroundColor: lab.remainingSlots > 0 ? '#ECFDF5' : '#FEE2E2', marginTop: 5 }]}>
-                  <Calendar size={12} color={lab.remainingSlots > 0 ? '#10B981' : '#E11D48'} />
-                  <Text style={[styles.queueCount, { color: lab.remainingSlots > 0 ? '#10B981' : '#E11D48' }]}>
-                    {lab.remainingSlots} Slots Left
-                  </Text>
                 </View>
               </TouchableOpacity>
             ))}
@@ -316,6 +339,17 @@ const LabDashboard = () => {
                       <Text style={styles.infoValue}>{selectedLab?.floor}</Text>
                     </View>
                   </View>
+
+                  <TouchableOpacity 
+                    style={[styles.modalActionBtn, { backgroundColor: COLORS.primary, marginTop: 15 }]}
+                    onPress={() => {
+                      closeModal();
+                      navigation.navigate('LabScheduling');
+                    }}
+                  >
+                    <Calendar size={18} color="#FFF" style={{ marginRight: 8 }} />
+                    <Text style={styles.modalActionText}>Manage Category Schedule</Text>
+                  </TouchableOpacity>
 
                   {/* Live Queue Status */}
                   <Text style={[styles.modalSectionLabel, { marginTop: 20 }]}>Live Queue Status</Text>
@@ -587,6 +621,19 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#111827',
   },
+  modalActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 16,
+    ...SHADOWS.small,
+  },
+  modalActionText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFF',
+  },
   queueMainBox: {
     flexDirection: 'row',
     backgroundColor: '#F5F3FF',
@@ -692,6 +739,43 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontSize: 13,
     fontWeight: '700',
+  },
+  scheduleFastCard: {
+    borderRadius: 24,
+    marginVertical: 10,
+    overflow: 'hidden',
+    height: 90,
+  },
+  scheduleGradient: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+  },
+  scheduleFastInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  scheduleFastIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: '#FFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scheduleFastTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#FFF',
+  },
+  scheduleFastSub: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 2,
+    fontWeight: '500',
   },
   queueCard: {
     backgroundColor: '#FFF',

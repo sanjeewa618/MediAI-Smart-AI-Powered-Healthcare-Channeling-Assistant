@@ -243,7 +243,10 @@ const LabAppointmentsScreen: React.FC = () => {
               <View style={styles.appCardActions}>
                 <TouchableOpacity style={styles.btnSecondary}
                   onPress={() => { setSelectedAppt(item); setModalVisible(true); }}>
-                  <Text style={styles.btnSecondaryText}>View Details</Text>
+                  <Text style={styles.btnSecondaryText}>View</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.btnRemind} onPress={() => alert('Reminder sent to ' + item.patientName)}>
+                  <Text style={styles.btnRemindText}>Remind</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.btnPrimary}>
                   <Text style={styles.btnPrimaryText}>Accept</Text>
@@ -253,28 +256,12 @@ const LabAppointmentsScreen: React.FC = () => {
           ))}
         </View>
 
-        {/* Calendar Availability */}
+        {/* Appointments History Section */}
         <View style={styles.bottomSection}>
-          <Text style={styles.sectionTitle}>Lab Availability Slots</Text>
-          <View style={[styles.calendarCard, SHADOWS.small]}>
-            <View style={styles.calDaysRow}>
-              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d, i) => (
-                <View key={i} style={styles.calDay}>
-                  <Text style={styles.calDayText}>{d}</Text>
-                  <View style={[styles.calSlot,
-                    i === 0 || i === 2 ? styles.calSlotGreen :
-                    i === 1 ? styles.calSlotRed : styles.calSlotOrange]} />
-                </View>
-              ))}
-            </View>
-            <View style={styles.calLegend}>
-              <View style={styles.legendItem}><View style={[styles.legendDot, styles.calSlotGreen]} /><Text style={styles.legendText}>Available</Text></View>
-              <View style={styles.legendItem}><View style={[styles.legendDot, styles.calSlotOrange]} /><Text style={styles.legendText}>Limited</Text></View>
-              <View style={styles.legendItem}><View style={[styles.legendDot, styles.calSlotRed]} /><Text style={styles.legendText}>Booked</Text></View>
-            </View>
+          <View style={[styles.sectionHeader, { marginTop: 0 }]}>
+            <Text style={styles.sectionTitle}>Appointments History</Text>
+            <TouchableOpacity><Text style={styles.viewAllText}>View All</Text></TouchableOpacity>
           </View>
-
-          <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Appointments History</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 20, paddingBottom: 10 }}>
             {PAST_HISTORY.map((hist) => (
               <View key={hist.id} style={[styles.historyItemCard, SHADOWS.light]}>
@@ -388,11 +375,34 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, marginLeft: 12, fontSize: 14, color: COLORS.textHeader },
   scrollContent: { paddingBottom: 40 },
   statsScroll: { padding: 20, gap: 12 },
-  statCard: { backgroundColor: '#FFF', padding: 16, borderRadius: 20, minWidth: 140 },
+  statCard: { 
+    backgroundColor: '#FFF', 
+    padding: 16, 
+    borderRadius: 20, 
+    minWidth: 140,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4
+  },
   statIconWrapper: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   statValue: { fontSize: 22, fontWeight: '800', color: COLORS.textHeader },
   statLabel: { fontSize: 12, color: COLORS.textSecondary, marginTop: 4, fontWeight: '500' },
-  alertContainer: { marginHorizontal: 20, backgroundColor: COLORS.primaryLight, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: COLORS.primary + '30', marginBottom: 20 },
+  alertContainer: { 
+    marginHorizontal: 20, 
+    backgroundColor: COLORS.primaryLight, 
+    borderRadius: 16, 
+    padding: 16, 
+    borderWidth: 1, 
+    borderColor: COLORS.primary + '30', 
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2
+  },
   alertHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   alertBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   alertDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#FFF', marginRight: 6 },
@@ -409,7 +419,16 @@ const styles = StyleSheet.create({
   filterTabTextActive: { color: COLORS.primary, fontWeight: '800' },
   activeUnderline: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, backgroundColor: COLORS.primary, borderRadius: 3 },
   listContainer: { paddingHorizontal: 20, gap: 16 },
-  appCard: { backgroundColor: '#FFF', borderRadius: 20, padding: 16 },
+  appCard: { 
+    backgroundColor: '#FFF', 
+    borderRadius: 20, 
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4
+  },
   appCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   appCardHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   patientPhoto: { width: 48, height: 48, borderRadius: 24, backgroundColor: COLORS.primaryLight },
@@ -423,13 +442,26 @@ const styles = StyleSheet.create({
   appCardBadges: { flexDirection: 'row', gap: 8, marginBottom: 16 },
   badge: { fontSize: 11, fontWeight: '700', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, overflow: 'hidden' },
   appCardActions: { flexDirection: 'row', gap: 12 },
-  btnSecondary: { flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: COLORS.primaryLight, alignItems: 'center' },
+  btnSecondary: { flex: 1, paddingVertical: 8, borderRadius: 12, backgroundColor: COLORS.primaryLight, alignItems: 'center' },
   btnSecondaryText: { fontSize: 14, fontWeight: '700', color: COLORS.primary },
-  btnPrimary: { flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: COLORS.primary, alignItems: 'center' },
+  btnPrimary: { flex: 1, paddingVertical: 8, borderRadius: 12, backgroundColor: COLORS.primary, alignItems: 'center' },
   btnPrimaryText: { fontSize: 14, fontWeight: '700', color: '#FFF' },
+  btnRemind: { flex: 1, paddingVertical: 8, borderRadius: 12, backgroundColor: '#EFF6FF', alignItems: 'center', borderWidth: 1, borderColor: '#BFDBFE' },
+  btnRemindText: { fontSize: 14, fontWeight: '700', color: '#2563EB' },
   bottomSection: { padding: 20 },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: COLORS.textHeader, marginBottom: 16 },
-  calendarCard: { backgroundColor: '#FFF', borderRadius: 20, padding: 20 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: COLORS.textHeader, marginBottom: 0 },
+  viewAllText: { color: COLORS.primary, fontSize: 14, fontWeight: '700' },
+  calendarCard: { 
+    backgroundColor: '#FFF', 
+    borderRadius: 20, 
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4
+  },
   calDaysRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
   calDay: { alignItems: 'center', gap: 8 },
   calDayText: { fontSize: 13, fontWeight: '600', color: COLORS.textSecondary },
@@ -445,14 +477,27 @@ const styles = StyleSheet.create({
   historyRow: { flexDirection: 'row', justifyContent: 'space-between' },
   historyLabel: { fontSize: 12, color: 'rgba(255,255,255,0.7)', marginBottom: 4 },
   historyValue: { fontSize: 16, fontWeight: '800', color: '#FFF' },
-  historyItemCard: { backgroundColor: '#FFF', borderRadius: 16, padding: 16, marginRight: 16, width: 260, borderWidth: 1, borderColor: '#F3F4F6' },
+  historyItemCard: { 
+    backgroundColor: '#FFF', 
+    borderRadius: 16, 
+    padding: 16, 
+    marginRight: 16, 
+    width: 260, 
+    borderWidth: 1, 
+    borderColor: '#F3F4F6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4
+  },
   historyItemHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
   historyItemPhoto: { width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.primaryLight },
   historyItemName: { fontSize: 15, fontWeight: '700', color: COLORS.textHeader },
   historyItemTest: { fontSize: 12, color: COLORS.primary, fontWeight: '600', marginTop: 2 },
   historyItemDetails: { gap: 6, marginBottom: 16, backgroundColor: '#F9FAFB', padding: 10, borderRadius: 12 },
   detailTextSmall: { fontSize: 12, color: COLORS.textSecondary, fontWeight: '500' },
-  viewReportBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: COLORS.primaryLight, paddingVertical: 10, borderRadius: 12 },
+  viewReportBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: COLORS.primaryLight, paddingVertical: 6, borderRadius: 12 },
   viewReportBtnText: { fontSize: 13, fontWeight: '700', color: COLORS.primary },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: '#FFF', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 24, paddingTop: 10, maxHeight: '90%' },

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, Dimensions, Animated, PanResponder, Pressable, StatusBar, Modal } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
-import { Search, Calendar, User, FileText, Activity, MoreHorizontal, Home, Heart, Shield, MessageCircle, FileEdit, FlaskConical, ChevronRight, Baby, Droplets, Sparkles, Plus, Bell, LogOut, Pill, Truck, Settings, X, LifeBuoy, Stethoscope, Dna, Brain, Bone, Eye, Smile, Wallet, Clock } from 'lucide-react-native';
+import { Search, Calendar, User, FileText, Activity, MoreHorizontal, Home, Heart, Shield, MessageCircle, FileEdit, FlaskConical, ChevronRight, Baby, Droplets, Sparkles, Plus, Bell, LogOut, Pill, Truck, Settings, X, LifeBuoy, Stethoscope, Dna, Brain, Bone, Eye, Smile, Wallet, Clock, AlertCircle } from 'lucide-react-native';
 import BottomNavBar from '../../components/BottomNavBar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
@@ -106,11 +106,31 @@ const PatientDashboard = () => {
   // Live countdown state
   const [doctorCountdown, setDoctorCountdown] = useState(() => calcCountdown(DOCTOR_APPT));
   const [labCountdown,    setLabCountdown]    = useState(() => calcCountdown(LAB_APPT));
+  const [reminderVisible, setReminderVisible] = useState(false);
+  const [reminderMsg, setReminderMsg] = useState('');
 
   useEffect(() => {
+    const checkReminders = () => {
+      const now = Date.now();
+      const labDiff = LAB_APPT.getTime() - now;
+      const docDiff = DOCTOR_APPT.getTime() - now;
+
+      // Check for 30 minutes (1800000 ms)
+      if (labDiff > 0 && labDiff <= 1800000) {
+        setReminderMsg('Your Lab Appointment is coming up in 30 minutes!');
+        setReminderVisible(true);
+      } else if (docDiff > 0 && docDiff <= 1800000) {
+        setReminderMsg('Your Doctor Appointment is coming up in 30 minutes!');
+        setReminderVisible(true);
+      } else {
+        setReminderVisible(false);
+      }
+    };
+
     const timer = setInterval(() => {
       setDoctorCountdown(calcCountdown(DOCTOR_APPT));
       setLabCountdown(calcCountdown(LAB_APPT));
+      checkReminders();
     }, 1000);
     return () => clearInterval(timer);
   }, []);
@@ -245,6 +265,18 @@ const PatientDashboard = () => {
             <Search size={20} color="#9CA3AF" />
             <Text style={styles.searchPlaceholder}>Search doctors, hospitals, tests...</Text>
           </View>
+
+          {/* Appointment Reminder Alert */}
+          {reminderVisible && (
+            <TouchableOpacity 
+              style={styles.reminderBanner}
+              onPress={() => setReminderVisible(false)}
+            >
+              <AlertCircle size={24} color={COLORS.error} />
+              <Text style={styles.reminderText}>{reminderMsg}</Text>
+              <X size={18} color={COLORS.textSecondary} />
+            </TouchableOpacity>
+          )}
 
           {/* AI Health Assistant Card */}
           <Pressable
@@ -839,6 +871,24 @@ const styles = StyleSheet.create({
     fontSize: 14, 
     color: 'rgba(255,255,255,0.85)', 
     marginTop: 4 
+  },
+  reminderBanner: {
+    marginHorizontal: 24,
+    marginTop: 10,
+    backgroundColor: '#FFF2F2',
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FCCACA',
+  },
+  reminderText: {
+    flex: 1,
+    marginLeft: 12,
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.error,
   },
   // Menu Icon Styles
   menuIconBtn: {
