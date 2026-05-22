@@ -20,7 +20,7 @@ const DoctorProfileScreen = () => {
   const [profileImage, setProfileImage] = useState('https://img.icons8.com/bubbles/100/000000/doctor-male.png');
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
-  
+
   // Contact Info State
   const [contactInfo, setContactInfo] = useState({
     phone: '+94 77 123 4567',
@@ -37,7 +37,7 @@ const DoctorProfileScreen = () => {
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
+
     if (status !== 'granted') {
       Alert.alert('Permission Denied', 'Sorry, we need camera roll permissions to change your profile picture.');
       return;
@@ -50,8 +50,11 @@ const DoctorProfileScreen = () => {
       quality: 1,
     });
 
-    if (!result.canceled) {
-      setProfileImage(result.assets[0].uri);
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      const selectedAsset = result.assets[0];
+      if (selectedAsset && selectedAsset.uri) {
+        setProfileImage(selectedAsset.uri);
+      }
     }
   };
 
@@ -71,7 +74,7 @@ const DoctorProfileScreen = () => {
         <View style={styles.profileCard}>
           <View>
             <Image source={{ uri: profileImage }} style={styles.docAvatarImg} />
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.pencilBadge}
               onPress={pickImage}
               activeOpacity={0.7}
@@ -114,7 +117,7 @@ const DoctorProfileScreen = () => {
         <View style={[styles.section, SHADOWS.small]}>
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Contact Information</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.sectionPencilBtn}
               onPress={() => setEditModalVisible(true)}
             >
@@ -152,8 +155,8 @@ const DoctorProfileScreen = () => {
         {/* Menu Items */}
         <View style={[styles.section, SHADOWS.small]}>
           {MENU_ITEMS.map((item, i) => (
-            <TouchableOpacity 
-              key={i} 
+            <TouchableOpacity
+              key={i}
               style={[styles.menuRow, i < MENU_ITEMS.length - 1 && styles.menuDivider]}
               onPress={() => item.action === 'password' && setPasswordModalVisible(true)}
             >
@@ -194,28 +197,28 @@ const DoctorProfileScreen = () => {
             <View style={styles.modalBody}>
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Phone Number</Text>
-                <TextInput 
-                  style={styles.input} 
+                <TextInput
+                  style={styles.input}
                   value={contactInfo.phone}
-                  onChangeText={(t) => setContactInfo({...contactInfo, phone: t})}
+                  onChangeText={(t) => setContactInfo({ ...contactInfo, phone: t })}
                   keyboardType="phone-pad"
                 />
               </View>
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Email Address</Text>
-                <TextInput 
-                  style={styles.input} 
+                <TextInput
+                  style={styles.input}
                   value={contactInfo.email}
-                  onChangeText={(t) => setContactInfo({...contactInfo, email: t})}
+                  onChangeText={(t) => setContactInfo({ ...contactInfo, email: t })}
                   keyboardType="email-address"
                 />
               </View>
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Hospital/Clinic</Text>
-                <TextInput 
-                  style={styles.input} 
+                <TextInput
+                  style={styles.input}
                   value={contactInfo.hospital}
-                  onChangeText={(t) => setContactInfo({...contactInfo, hospital: t})}
+                  onChangeText={(t) => setContactInfo({ ...contactInfo, hospital: t })}
                 />
               </View>
               <TouchableOpacity style={styles.saveBtn} onPress={() => setEditModalVisible(false)}>
@@ -239,29 +242,29 @@ const DoctorProfileScreen = () => {
             <View style={styles.modalBody}>
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Current Password</Text>
-                <TextInput 
-                  style={styles.input} 
+                <TextInput
+                  style={styles.input}
                   secureTextEntry
                   placeholder="********"
-                  onChangeText={(t) => setPasswords({...passwords, current: t})}
+                  onChangeText={(t) => setPasswords({ ...passwords, current: t })}
                 />
               </View>
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>New Password</Text>
-                <TextInput 
-                  style={styles.input} 
+                <TextInput
+                  style={styles.input}
                   secureTextEntry
                   placeholder="Enter new password"
-                  onChangeText={(t) => setPasswords({...passwords, new: t})}
+                  onChangeText={(t) => setPasswords({ ...passwords, new: t })}
                 />
               </View>
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Confirm New Password</Text>
-                <TextInput 
-                  style={styles.input} 
+                <TextInput
+                  style={styles.input}
                   secureTextEntry
                   placeholder="Confirm new password"
-                  onChangeText={(t) => setPasswords({...passwords, confirm: t})}
+                  onChangeText={(t) => setPasswords({ ...passwords, confirm: t })}
                 />
               </View>
               <TouchableOpacity style={styles.saveBtn} onPress={() => {
@@ -313,11 +316,11 @@ const styles = StyleSheet.create({
   statusTitle: { fontSize: 14, fontWeight: '700', color: '#1F2937' },
   statusSub: { fontSize: 12, color: '#6B7280', marginTop: 2 },
   section: { backgroundColor: '#FFF', borderRadius: 20, padding: 18 },
-  sectionHeaderRow: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14 
+    marginBottom: 14
   },
   sectionTitle: { fontSize: 15, fontWeight: '700', color: '#1F2937', marginBottom: 0 },
   sectionPencilBtn: {
@@ -343,7 +346,7 @@ const styles = StyleSheet.create({
   menuSub: { fontSize: 12, color: '#6B7280', marginTop: 2 },
   logoutBtn: { backgroundColor: '#FFF', borderRadius: 18, padding: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderWidth: 1.5, borderColor: '#FEE2E2' },
   logoutText: { fontSize: 15, fontWeight: '700', color: COLORS.error },
-  
+
   // Modal Styles
   modalOverlay: {
     flex: 1,

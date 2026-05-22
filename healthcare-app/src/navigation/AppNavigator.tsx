@@ -18,6 +18,7 @@ import DoctorHistoryScreen from '../screens/doctor/DoctorHistoryScreen';
 import DoctorReportsScreen from '../screens/doctor/DoctorReportsScreen';
 import DoctorProfileScreen from '../screens/doctor/DoctorProfileScreen';
 import LabDashboard from '../screens/lab/LabDashboard';
+import LabAppointmentsScreen from '../screens/lab/LabAppointmentsScreen';
 import ReportsScreen from '../screens/patient/ReportsScreen';
 
 // Patient Sub-screens
@@ -58,6 +59,7 @@ const AppNavigator = () => {
       <Stack.Screen name="DoctorReports" component={DoctorReportsScreen} />
       <Stack.Screen name="DoctorProfile" component={DoctorProfileScreen} />
       <Stack.Screen name="LabDashboard" component={LabDashboard} />
+      <Stack.Screen name="LabAppointments" component={LabAppointmentsScreen} />
       <Stack.Screen name="Reports" component={ReportsScreen} />
       <Stack.Screen name="FindDoctors" component={FindDoctorsScreen} />
       <Stack.Screen name="AIHealthAssistant" component={AIHealthAssistantScreen} />
