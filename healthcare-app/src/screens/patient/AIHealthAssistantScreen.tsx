@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, TouchableOpacity,
   ScrollView, TextInput, KeyboardAvoidingView, Platform,
-  Image, Animated, StatusBar,
+  Image, Animated, StatusBar, Keyboard,
 } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import {
@@ -68,8 +68,24 @@ const AIHealthAssistantScreen = ({ navigation }: any) => {
   const [input, setInput]           = useState('');
   const [isTyping, setIsTyping]     = useState(false);
   const [showFeatures, setShowFeatures] = useState(true);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const typingDot = useRef(new Animated.Value(0)).current;
+
+  // Show/hide bottom nav with keyboard
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', () => {
+      setKeyboardVisible(true);
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150);
+    });
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardVisible(false);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   // Typing indicator animation
   useEffect(() => {
@@ -107,7 +123,11 @@ const AIHealthAssistantScreen = ({ navigation }: any) => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-      <View style={styles.container}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
 
         {/* ── Header ─────────────────────────────────────────────── */}
         <LinearGradient colors={COLORS.screenHeaderGradient} style={styles.header}>
@@ -213,11 +233,7 @@ const AIHealthAssistantScreen = ({ navigation }: any) => {
         )}
 
         {/* ── Input Bar ──────────────────────────────────────────── */}
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={90}
-        >
-          <View style={styles.inputBar}>
+        <View style={styles.inputBar}>
             <TouchableOpacity style={styles.micBtn}>
               <Mic size={22} color={COLORS.primary} />
             </TouchableOpacity>
@@ -244,10 +260,9 @@ const AIHealthAssistantScreen = ({ navigation }: any) => {
               </LinearGradient>
             </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
 
-        <BottomNavBar />
-      </View>
+        {!keyboardVisible && <BottomNavBar />}
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
