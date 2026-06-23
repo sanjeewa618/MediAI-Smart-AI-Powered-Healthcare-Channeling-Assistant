@@ -12,7 +12,7 @@ const BottomNavBar = () => {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.container, SHADOWS.medium, { paddingBottom: insets.bottom }]}>
+    <View style={[styles.container, SHADOWS.medium, { paddingBottom: insets.bottom + 12 }]}>
       <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('PatientDashboard')}>
         <Home size={22} color={currentRouteName === 'PatientDashboard' ? COLORS.primary : '#9CA3AF'} />
         <Text style={[styles.label, { color: currentRouteName === 'PatientDashboard' ? COLORS.primary : '#9CA3AF' }]}>Home</Text>
@@ -51,10 +51,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    height: 100,
-    backgroundColor: 'transparent',
-    borderTopWidth: 0,
-    marginTop: 1,
+    paddingTop: 16,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
   },
   item: {
     alignItems: 'center',

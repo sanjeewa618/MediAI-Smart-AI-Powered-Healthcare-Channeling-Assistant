@@ -759,7 +759,7 @@ const styles = StyleSheet.create({
   timelineSubText: { fontSize: 12, color: COLORS.textSecondary, fontWeight: '600' },
   fab: { 
     position: 'absolute', 
-    bottom: 70, 
+    bottom: 120,
     left: 20, 
     right: 20, 
     height: 60, 

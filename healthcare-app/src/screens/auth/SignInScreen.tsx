@@ -29,13 +29,14 @@ const SignInScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <ArrowLeft size={24} color={COLORS.primary} />
-        </TouchableOpacity>
-
-        <View style={styles.header}>
-          <Text style={styles.title}>{displayRole} Sign In</Text>
-          <Text style={styles.subtitle}>Sign in to continue as a {role}</Text>
+        <View style={styles.topHeaderRow}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <ArrowLeft size={30} color={COLORS.primary} />
+          </TouchableOpacity>
+          <View style={styles.headerTextWrap}>
+            <Text style={styles.title}>{displayRole} Sign In</Text>
+            <Text style={styles.subtitle}>Sign in to continue as a {role}</Text>
+          </View>
         </View>
 
         <View style={styles.imageContainer}>
@@ -73,6 +74,7 @@ const SignInScreen = () => {
               setRole(authRole);
               if (role === 'patient') navigation.replace('PatientDashboard');
               else if (role === 'doctor') navigation.replace('DoctorDashboard');
+              else if (role === 'admin') navigation.replace('AdminDashboard');
               else if (role === 'lab' || role === 'nurse') navigation.replace('LabDashboard');
             }}
             style={styles.signInButton}
@@ -111,8 +113,9 @@ const SignInScreen = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.white },
   scrollContent: { paddingHorizontal: 28, paddingBottom: 40 },
-  backButton: { marginTop: 10, width: 40, height: 40, justifyContent: 'center' },
-  header: { alignItems: 'center', marginTop: 10, marginBottom: 20 },
+  topHeaderRow: { flexDirection: 'row', alignItems: 'center', marginTop: 45, marginBottom: 20 },
+  backButton: { width: 48, height: 48, justifyContent: 'center', marginRight: 10 },
+  headerTextWrap: { flex: 1 },
   title: { fontSize: 32, fontWeight: '800', color: '#1A1A4B' },
   subtitle: { fontSize: 16, color: '#9CA3AF', marginTop: 8 },
   imageContainer: { 

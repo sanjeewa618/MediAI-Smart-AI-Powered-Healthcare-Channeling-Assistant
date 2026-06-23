@@ -18,7 +18,7 @@ const NurseBottomNavBar = () => {
   }
 
   return (
-    <View style={[styles.container, SHADOWS.medium, { paddingBottom: insets.bottom }]}>
+    <View style={[styles.container, SHADOWS.medium, { paddingBottom: insets.bottom + 12 }]}>
       <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('LabDashboard')}>
         <Home size={22} color={currentRouteName === 'LabDashboard' ? COLORS.primary : '#9CA3AF'} />
         <Text style={[styles.label, { color: currentRouteName === 'LabDashboard' ? COLORS.primary : '#9CA3AF' }]}>Home</Text>
@@ -34,14 +34,14 @@ const NurseBottomNavBar = () => {
         <Text style={[styles.label, { color: currentRouteName === 'LabScheduling' ? COLORS.primary : '#9CA3AF' }]}>Schedule</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.item} onPress={() => alert('Reports screen for nurses is under development.')}>
-        <FileText size={22} color={'#9CA3AF'} />
-        <Text style={styles.label}>Reports</Text>
+      <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('LabReports')}>
+        <FileText size={22} color={currentRouteName === 'LabReports' ? COLORS.primary : '#9CA3AF'} />
+        <Text style={[styles.label, { color: currentRouteName === 'LabReports' ? COLORS.primary : '#9CA3AF' }]}>Reports</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.item} onPress={() => alert('Profile screen for nurses is under development.')}>
-        <User size={22} color={'#9CA3AF'} />
-        <Text style={styles.label}>Profile</Text>
+      <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('LabProfile')}>
+        <User size={22} color={currentRouteName === 'LabProfile' ? COLORS.primary : '#9CA3AF'} />
+        <Text style={[styles.label, { color: currentRouteName === 'LabProfile' ? COLORS.primary : '#9CA3AF' }]}>Profile</Text>
       </TouchableOpacity>
     </View>
   );
@@ -52,7 +52,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    paddingTop: 12,
+    paddingTop: 16,
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#F3F4F6',

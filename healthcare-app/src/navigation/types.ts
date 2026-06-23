@@ -17,6 +17,8 @@ export type RootStackParamList = {
   LabDashboard: undefined;
   LabAppointments: undefined;
   LabScheduling: undefined;
+  LabReports: undefined;
+  LabProfile: undefined;
   Reports: undefined;
   // Patient sub-screens
   BookAppointment: { doctorId?: string; doctorName?: string; specialty?: string; date?: string; time?: string };
@@ -30,4 +32,15 @@ export type RootStackParamList = {
   LabAvailability: undefined;
   LabBookingFlow: { lab: any; initialDate?: string; initialTime?: string };
   Settings: undefined;
+  // Admin screens
+  AdminDashboard: undefined;
+  AdminUserManagement: undefined;
+  AdminDoctorVerification: undefined;
+  AdminActivityMonitoring: undefined;
+  AdminAnalytics: undefined;
+  AdminAIMonitoring: undefined;
+  AdminReports: undefined;
+  AdminSettings: undefined;
+  AdminLaboratories: undefined;
 };
+
