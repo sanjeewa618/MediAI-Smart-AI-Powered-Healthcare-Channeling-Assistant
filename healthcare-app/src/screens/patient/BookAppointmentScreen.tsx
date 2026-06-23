@@ -131,7 +131,7 @@ const BookAppointmentScreen = () => {
 
   const renderReviewAndPay = () => (
     <View style={styles.formSection}>
-      <View style={[styles.summaryCard, SHADOWS.sm]}>
+      <View style={[styles.summaryCard, SHADOWS.small]}>
         <Text style={styles.summaryTitle}>Appointment Summary</Text>
         <View style={styles.divider} />
         <View style={styles.sumRow}><Text style={styles.sumLabel}>Doctor:</Text><Text style={styles.sumValue}>{doctorName}</Text></View>

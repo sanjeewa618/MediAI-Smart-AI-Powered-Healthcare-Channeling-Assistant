@@ -7,6 +7,7 @@ import { Calendar, Clock, Video, User, ChevronRight, Search, AlertCircle } from 
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import DoctorBottomNavBar from '../../components/DoctorBottomNavBar';
+import NurseBottomNavBar from '../../components/NurseBottomNavBar';
 import { useNavigation } from '@react-navigation/native';
 
 const TABS = ['Today', 'Upcoming', 'Completed', 'Cancelled'];
@@ -127,6 +128,7 @@ const DoctorAppointmentsScreen = () => {
       </ScrollView>
 
       <DoctorBottomNavBar />
+      <NurseBottomNavBar />
     </SafeAreaView>
   );
 };

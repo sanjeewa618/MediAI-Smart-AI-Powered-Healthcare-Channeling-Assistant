@@ -49,7 +49,7 @@ const OnboardingScreen = () => {
 
           <TouchableOpacity 
             style={[styles.getStartedBtn, SHADOWS.medium]}
-            onPress={() => navigation.navigate('SignIn')}
+            onPress={() => navigation.navigate('RoleSelection')}
           >
             <Text style={styles.getStartedText}>Get Started</Text>
           </TouchableOpacity>

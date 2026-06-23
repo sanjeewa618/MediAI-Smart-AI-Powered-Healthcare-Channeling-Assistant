@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Clock, User, Video, FileText, Calendar, ChevronRight } from 'lucide-react-native';
+import { Clock, User, Video, FileText, Calendar, ChevronRight, FileSearch } from 'lucide-react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import DoctorBottomNavBar from '../../components/DoctorBottomNavBar';
 import { useNavigation } from '@react-navigation/native';
@@ -34,13 +34,7 @@ const DoctorHistoryScreen = () => {
         </View>
       </LinearGradient>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.monthScroll} contentContainerStyle={styles.monthContent}>
-        {MONTHS.map(m => (
-          <TouchableOpacity key={m} style={[styles.monthBtn, selectedMonth === m && styles.monthBtnActive]} onPress={() => setSelectedMonth(m)}>
-            <Text style={[styles.monthText, selectedMonth === m && styles.monthTextActive]}>{m}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      
 
       <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
         {HISTORY.map(h => (
@@ -61,10 +55,19 @@ const DoctorHistoryScreen = () => {
               <Text style={styles.diagText}>{h.diagnosis}</Text>
             </View>
             <View style={styles.dateRow}>
-              <Calendar size={13} color="#9CA3AF" />
-              <Text style={styles.dateText}>{h.date}</Text>
-              <Clock size={13} color="#9CA3AF" style={{ marginLeft: 10 }} />
-              <Text style={styles.dateText}>{h.time}</Text>
+              <View style={styles.dateTimeWrap}>
+                <Calendar size={13} color="#9CA3AF" />
+                <Text style={styles.dateText}>{h.date}</Text>
+                <Clock size={13} color="#9CA3AF" style={{ marginLeft: 10 }} />
+                <Text style={styles.dateText}>{h.time}</Text>
+              </View>
+              <TouchableOpacity 
+                style={styles.seeReportBtn}
+                onPress={() => navigation.navigate('DoctorReports')}
+              >
+                <FileSearch size={14} color="#FFF" />
+                <Text style={styles.seeReportBtnText}>See Report</Text>
+              </TouchableOpacity>
             </View>
           </View>
         ))}
@@ -101,8 +104,23 @@ const styles = StyleSheet.create({
   typeText: { fontSize: 11, fontWeight: '600', color: '#374151' },
   diagBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: COLORS.primaryLight, padding: 10, borderRadius: 10, marginBottom: 10 },
   diagText: { fontSize: 13, color: COLORS.primaryDark, fontWeight: '600', flex: 1 },
-  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  dateRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  dateTimeWrap: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   dateText: { fontSize: 12, color: '#9CA3AF', fontWeight: '500' },
+  seeReportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  seeReportBtnText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
 });
 
 export default DoctorHistoryScreen;

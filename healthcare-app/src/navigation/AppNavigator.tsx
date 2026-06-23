@@ -18,6 +18,10 @@ import DoctorHistoryScreen from '../screens/doctor/DoctorHistoryScreen';
 import DoctorReportsScreen from '../screens/doctor/DoctorReportsScreen';
 import DoctorProfileScreen from '../screens/doctor/DoctorProfileScreen';
 import LabDashboard from '../screens/lab/LabDashboard';
+import LabAppointmentsScreen from '../screens/lab/LabAppointmentsScreen';
+import LabSchedulingScreen from '../screens/lab/LabSchedulingScreen';
+import LabReportsScreen from '../screens/lab/LabReportsScreen';
+import LabProfileScreen from '../screens/lab/LabProfileScreen';
 import ReportsScreen from '../screens/patient/ReportsScreen';
 
 // Patient Sub-screens
@@ -32,6 +36,19 @@ import LabAvailabilityScreen from '../screens/patient/LabAvailabilityScreen';
 import LabBookingFlowScreen from '../screens/patient/LabBookingFlowScreen';
 import DoctorAvailability from '../screens/doctor/DoctorAvailability';
 import SettingsScreen from '../screens/patient/SettingsScreen';
+
+// Admin Screens
+import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
+import UserManagementScreen from '../screens/admin/UserManagementScreen';
+import DoctorVerificationScreen from '../screens/admin/DoctorVerificationScreen';
+import ActivityMonitoringScreen from '../screens/admin/ActivityMonitoringScreen';
+import AnalyticsScreen from '../screens/admin/AnalyticsScreen';
+import AIMonitoringScreen from '../screens/admin/AIMonitoringScreen';
+import AdminReportsScreen from '../screens/admin/ReportsScreen';
+import AdminSettingsScreen from '../screens/admin/SettingsScreen';
+import AdminLaboratoriesScreen from '../screens/admin/AdminLaboratoriesScreen';
+
+
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -58,6 +75,10 @@ const AppNavigator = () => {
       <Stack.Screen name="DoctorReports" component={DoctorReportsScreen} />
       <Stack.Screen name="DoctorProfile" component={DoctorProfileScreen} />
       <Stack.Screen name="LabDashboard" component={LabDashboard} />
+      <Stack.Screen name="LabAppointments" component={LabAppointmentsScreen} />
+      <Stack.Screen name="LabScheduling" component={LabSchedulingScreen} />
+      <Stack.Screen name="LabReports" component={LabReportsScreen} />
+      <Stack.Screen name="LabProfile" component={LabProfileScreen} />
       <Stack.Screen name="Reports" component={ReportsScreen} />
       <Stack.Screen name="FindDoctors" component={FindDoctorsScreen} />
       <Stack.Screen name="AIHealthAssistant" component={AIHealthAssistantScreen} />
@@ -70,6 +91,15 @@ const AppNavigator = () => {
       <Stack.Screen name="LabAvailability" component={LabAvailabilityScreen} />
       <Stack.Screen name="LabBookingFlow" component={LabBookingFlowScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />
+      <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
+      <Stack.Screen name="AdminUserManagement" component={UserManagementScreen} />
+      <Stack.Screen name="AdminDoctorVerification" component={DoctorVerificationScreen} />
+      <Stack.Screen name="AdminActivityMonitoring" component={ActivityMonitoringScreen} />
+      <Stack.Screen name="AdminAnalytics" component={AnalyticsScreen} />
+      <Stack.Screen name="AdminAIMonitoring" component={AIMonitoringScreen} />
+      <Stack.Screen name="AdminReports" component={AdminReportsScreen} />
+      <Stack.Screen name="AdminSettings" component={AdminSettingsScreen} />
+      <Stack.Screen name="AdminLaboratories" component={AdminLaboratoriesScreen} />
     </Stack.Navigator>
   );
 };

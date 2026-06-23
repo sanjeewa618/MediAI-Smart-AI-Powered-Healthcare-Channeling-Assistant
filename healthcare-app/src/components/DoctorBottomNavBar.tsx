@@ -27,7 +27,7 @@ const DoctorBottomNavBar = () => {
   }
 
   return (
-    <View style={[styles.container, SHADOWS.medium, { paddingBottom: insets.bottom }]}>
+    <View style={[styles.container, SHADOWS.medium, { paddingBottom: insets.bottom + 12 }]}>
       {TABS.map((tab) => {
         const isActive = currentRouteName === tab.name;
         const IconComp = tab.icon;
@@ -54,10 +54,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    height: 100,
-    backgroundColor: 'transparent',
-    borderTopWidth: 0,
-    marginTop: 1,
+    paddingTop: 16,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
   },
   item: {
     alignItems: 'center',
