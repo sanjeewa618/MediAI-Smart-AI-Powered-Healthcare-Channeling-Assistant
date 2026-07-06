@@ -1,16 +1,23 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
-import './config/db.js';
+import connectDB from './config/db.js';
+import authRoutes from './routers/authRoutes.js';
 
-// Load environment variables
+// 1. Load environment variables FIRST
 dotenv.config();
+
+// 2. Connect to Database AFTER env is loaded
+connectDB();
 
 const app = express();
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// 3. Mount Route Paths
+app.use('/api/auth', authRoutes);
 
 // Base Route
 app.get('/', (req, res) => {
