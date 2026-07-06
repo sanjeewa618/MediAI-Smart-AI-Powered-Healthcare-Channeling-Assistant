@@ -6,6 +6,7 @@ import authRoutes from './routers/authRoutes.js';
 import patientRoutes from './routers/patientRoutes.js';
 import doctorRoutes from './routers/doctorRoutes.js';
 import nurseRoutes from './routers/nurseRoutes.js';
+import adminRoutes from './routers/adminRoutes.js';
 
 // 1. Load environment variables FIRST
 dotenv.config();
@@ -24,6 +25,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/patient', patientRoutes);
 app.use('/api/doctor', doctorRoutes);
 app.use('/api/nurse', nurseRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Base Route
 app.get('/', (req, res) => {
