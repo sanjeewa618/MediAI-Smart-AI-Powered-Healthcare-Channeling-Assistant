@@ -4,6 +4,7 @@ import cors from 'cors';
 import connectDB from './config/db.js';
 import authRoutes from './routers/authRoutes.js';
 import patientRoutes from './routers/patientRoutes.js';
+import doctorRoutes from './routers/doctorRoutes.js';
 
 // 1. Load environment variables FIRST
 dotenv.config();
@@ -20,6 +21,7 @@ app.use(express.json());
 // 3. Mount Route Paths
 app.use('/api/auth', authRoutes);
 app.use('/api/patient', patientRoutes);
+app.use('/api/doctor', doctorRoutes);
 
 // Base Route
 app.get('/', (req, res) => {
