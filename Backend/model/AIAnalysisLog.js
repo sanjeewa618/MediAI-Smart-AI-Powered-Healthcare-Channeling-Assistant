@@ -11,5 +11,5 @@ const aiAnalysisLogSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-mongoose.model('AIAnalysisLog', aiAnalysisLogSchema);
-export default aiAnalysisLogSchema;
+const AIAnalysisLog = mongoose.model('AIAnalysisLog', aiAnalysisLogSchema);
+export default AIAnalysisLog;

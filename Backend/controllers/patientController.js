@@ -1,11 +1,7 @@
 import mongoose from 'mongoose';
-import '../model/User.js';
-import '../model/Appointment.js';
-import '../model/LabTest.js';
-
-const User = mongoose.model('User');
-const Appointment = mongoose.model('Appointment');
-const LabTest = mongoose.model('LabTest');
+import User from '../model/User.js';
+import Appointment from '../model/Appointment.js';
+import LabTest from '../model/LabTest.js';
 
 // @desc    Get patient dashboard summary (Upcoming appointments & lab tests)
 // @route   GET /api/patient/dashboard

@@ -1,9 +1,6 @@
 import mongoose from 'mongoose';
-import '../model/User.js';
-import '../model/Appointment.js';
-
-const User = mongoose.model('User');
-const Appointment = mongoose.model('Appointment');
+import User from '../model/User.js';
+import Appointment from '../model/Appointment.js';
 
 // @desc    Get doctor dashboard data (Stats & Upcoming appointments)
 // @route   GET /api/doctor/dashboard

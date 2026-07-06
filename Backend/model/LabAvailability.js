@@ -14,5 +14,5 @@ const labAvailabilitySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-mongoose.model('LabAvailability', labAvailabilitySchema);
-export default labAvailabilitySchema;
+const LabAvailability = mongoose.model('LabAvailability', labAvailabilitySchema);
+export default LabAvailability;

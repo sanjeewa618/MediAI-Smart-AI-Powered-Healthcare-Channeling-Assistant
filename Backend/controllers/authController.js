@@ -1,10 +1,7 @@
 import mongoose from 'mongoose';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import '../model/User.js';
-
-// Get the User model from mongoose registry
-const User = mongoose.model('User');
+import User from '../model/User.js';
 
 // Generate JWT Token
 const generateToken = (id) => {
