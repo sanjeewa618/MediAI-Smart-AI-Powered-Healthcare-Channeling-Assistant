@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import connectDB from './config/db.js';
 import authRoutes from './routers/authRoutes.js';
+import patientRoutes from './routers/patientRoutes.js';
 
 // 1. Load environment variables FIRST
 dotenv.config();
@@ -18,6 +19,7 @@ app.use(express.json());
 
 // 3. Mount Route Paths
 app.use('/api/auth', authRoutes);
+app.use('/api/patient', patientRoutes);
 
 // Base Route
 app.get('/', (req, res) => {
