@@ -5,6 +5,7 @@ import connectDB from './config/db.js';
 import authRoutes from './routers/authRoutes.js';
 import patientRoutes from './routers/patientRoutes.js';
 import doctorRoutes from './routers/doctorRoutes.js';
+import nurseRoutes from './routers/nurseRoutes.js';
 
 // 1. Load environment variables FIRST
 dotenv.config();
@@ -22,6 +23,7 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/patient', patientRoutes);
 app.use('/api/doctor', doctorRoutes);
+app.use('/api/nurse', nurseRoutes);
 
 // Base Route
 app.get('/', (req, res) => {
