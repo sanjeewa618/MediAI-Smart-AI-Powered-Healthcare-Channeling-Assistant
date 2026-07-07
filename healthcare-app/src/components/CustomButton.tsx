@@ -35,7 +35,7 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
           colors={COLORS.gradientPrimary}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
-          style={[styles.container, SHADOWS.medium]}
+          style={[styles.container, { width: '100%' }, SHADOWS.medium, style]}
         >
           {loading ? (
             <ActivityIndicator color={COLORS.white} />

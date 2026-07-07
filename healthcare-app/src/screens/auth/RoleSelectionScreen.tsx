@@ -13,10 +13,10 @@ type RoleKey = 'patient' | 'doctor' | 'nurse' | 'admin';
 
 const RoleSelectionScreen = () => {
   const navigation = useNavigation<RoleNav>();
-  const [role, setRole] = React.useState<RoleKey>('patient');
+  const [role, setRole] = React.useState<RoleKey>('doctor');
 
   const onContinue = () => {
-    navigation.navigate('SignIn', { role });
+    navigation.navigate('SignUp', { role });
   };
 
   return (
@@ -32,13 +32,6 @@ const RoleSelectionScreen = () => {
 
       <View style={styles.cards}>
         <RoleCard
-          active={role === 'patient'}
-          title="Patient"
-          subtitle="Book appointments, chat with AI"
-          onPress={() => setRole('patient')}
-          icon={<UserRound size={22} color={role === 'patient' ? '#FFFFFF' : COLORS.primary} />}
-        />
-        <RoleCard
           active={role === 'doctor'}
           title="Doctor"
           subtitle="Manage patients and schedules"
@@ -51,13 +44,6 @@ const RoleSelectionScreen = () => {
           subtitle="Access patient health records"
           onPress={() => setRole('nurse')}
           icon={<BriefcaseMedical size={22} color={role === 'nurse' ? '#FFFFFF' : COLORS.primary} />}
-        />
-        <RoleCard
-          active={role === 'admin'}
-          title="Hospital Admin"
-          subtitle="Control and monitor operations"
-          onPress={() => setRole('admin')}
-          icon={<ShieldCheck size={22} color={role === 'admin' ? '#FFFFFF' : COLORS.primary} />}
         />
       </View>
 
@@ -195,7 +181,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   footer: {
-    marginTop: 'auto',
+    marginTop: 400,
     paddingBottom: 18,
   },
 });

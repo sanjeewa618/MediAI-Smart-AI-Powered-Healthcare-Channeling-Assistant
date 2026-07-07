@@ -17,14 +17,9 @@ type SignInRouteProp = RouteProp<RootStackParamList, 'SignIn'>;
 const SignInScreen = () => {
   const navigation = useNavigation<SignInScreenProp>();
   const route = useRoute<SignInRouteProp>();
-  const { role } = route.params;
+  const { role } = route.params || {};
   const { setRole } = useAuth();
-  const authRole = role === 'patient' || role === 'doctor' || role === 'lab' || role === 'nurse' || role === 'admin'
-    ? role
-    : null;
-
-  // Capitalize role for display
-  const displayRole = role ? role.charAt(0).toUpperCase() + role.slice(1) : '';
+  const [email, setEmail] = React.useState('');
 
   return (
     <SafeAreaView style={styles.container}>
@@ -34,8 +29,8 @@ const SignInScreen = () => {
             <ArrowLeft size={30} color={COLORS.primary} />
           </TouchableOpacity>
           <View style={styles.headerTextWrap}>
-            <Text style={styles.title}>{displayRole} Sign In</Text>
-            <Text style={styles.subtitle}>Sign in to continue as a {role}</Text>
+            <Text style={styles.title}>Sign In</Text>
+            <Text style={styles.subtitle}>Sign in to continue</Text>
           </View>
         </View>
 
@@ -51,6 +46,8 @@ const SignInScreen = () => {
           <CustomInput 
             label="Email or Phone Number"
             placeholder="Enter your email or phone"
+            value={email}
+            onChangeText={setEmail}
           />
           
           <View style={styles.passwordWrapper}>
@@ -71,11 +68,23 @@ const SignInScreen = () => {
           <CustomButton 
             title="Sign In" 
             onPress={() => {
-              setRole(authRole);
-              if (role === 'patient') navigation.replace('PatientDashboard');
-              else if (role === 'doctor') navigation.replace('DoctorDashboard');
-              else if (role === 'admin') navigation.replace('AdminDashboard');
-              else if (role === 'lab' || role === 'nurse') navigation.replace('LabDashboard');
+              let targetRole = 'patient';
+              const lowerEmail = email.toLowerCase();
+              if (lowerEmail.includes('doctor')) {
+                targetRole = 'doctor';
+              } else if (lowerEmail.includes('admin')) {
+                targetRole = 'admin';
+              } else if (lowerEmail.includes('lab') || lowerEmail.includes('nurse')) {
+                targetRole = 'lab';
+              } else if (role) {
+                targetRole = role;
+              }
+
+              setRole(targetRole as any);
+              if (targetRole === 'patient') navigation.replace('PatientDashboard');
+              else if (targetRole === 'doctor') navigation.replace('DoctorDashboard');
+              else if (targetRole === 'admin') navigation.replace('AdminDashboard');
+              else if (targetRole === 'lab' || targetRole === 'nurse') navigation.replace('LabDashboard');
             }}
             style={styles.signInButton}
           />
@@ -101,7 +110,7 @@ const SignInScreen = () => {
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>Don't have an account? </Text>
-          <TouchableOpacity onPress={() => navigation.navigate('SignUp', { role })}>
+          <TouchableOpacity onPress={() => navigation.navigate('SignUp')}>
             <Text style={styles.signUpText}>Sign Up</Text>
           </TouchableOpacity>
         </View>
@@ -113,11 +122,40 @@ const SignInScreen = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.white },
   scrollContent: { paddingHorizontal: 28, paddingBottom: 40 },
-  topHeaderRow: { flexDirection: 'row', alignItems: 'center', marginTop: 45, marginBottom: 20 },
-  backButton: { width: 48, height: 48, justifyContent: 'center', marginRight: 10 },
-  headerTextWrap: { flex: 1 },
-  title: { fontSize: 32, fontWeight: '800', color: '#1A1A4B' },
-  subtitle: { fontSize: 16, color: '#9CA3AF', marginTop: 8 },
+  topHeaderRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    marginTop: 45, 
+    marginBottom: 20,
+    position: 'relative',
+    width: '100%',
+  },
+  backButton: { 
+    position: 'absolute',
+    left: 0,
+    width: 48, 
+    height: 48, 
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  headerTextWrap: { 
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  title: { 
+    fontSize: 32, 
+    fontWeight: '800', 
+    color: '#1A1A4B',
+    textAlign: 'center',
+  },
+  subtitle: { 
+    fontSize: 16, 
+    color: '#9CA3AF', 
+    marginTop: 8,
+    textAlign: 'center',
+  },
   imageContainer: { 
     height: 300, 
     width: '100%', 

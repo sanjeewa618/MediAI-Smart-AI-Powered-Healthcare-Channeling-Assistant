@@ -54,7 +54,7 @@ const SplashScreen = () => {
 
         <TouchableOpacity 
           style={styles.getStartedButton} 
-          onPress={() => navigation.navigate('RoleSelection')}
+          onPress={() => navigation.navigate('SignIn')}
         >
           <Text style={styles.getStartedText}>Get Started</Text>
         </TouchableOpacity>

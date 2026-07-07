@@ -173,7 +173,7 @@ const DoctorProfileScreen = () => {
         </View>
 
         {/* Logout */}
-        <TouchableOpacity style={[styles.logoutBtn, SHADOWS.small]} onPress={() => navigation.navigate('RoleSelection')}>
+        <TouchableOpacity style={[styles.logoutBtn, SHADOWS.small]} onPress={() => navigation.navigate('SignIn')}>
           <LogOut size={18} color={COLORS.error} />
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>

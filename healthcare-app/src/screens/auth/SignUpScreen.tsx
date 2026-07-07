@@ -16,7 +16,7 @@ type SignUpRouteProp = RouteProp<RootStackParamList, 'SignUp'>;
 const SignUpScreen = () => {
   const navigation = useNavigation<SignUpScreenProp>();
   const route = useRoute<SignUpRouteProp>();
-  const { role } = route.params;
+  const { role } = route.params || {};
   const [agree, setAgree] = React.useState(true);
 
   return (
@@ -27,8 +27,14 @@ const SignUpScreen = () => {
             <ArrowLeft size={30} color={COLORS.primary} />
           </TouchableOpacity>
           <View style={styles.headerTextWrap}>
-            <Text style={styles.title}>Create Account</Text>
-            <Text style={styles.subtitle}>Sign up to get started</Text>
+            <Text style={styles.title}>
+              {role === 'doctor' ? 'Doctor Request' : role === 'nurse' ? 'Nurse Request' : 'Create Account'}
+            </Text>
+            <Text style={styles.subtitle}>
+              {role === 'doctor' || role === 'nurse' 
+                ? `Submit request to join as a ${role}`
+                : 'Sign up to get started'}
+            </Text>
           </View>
         </View>
 
@@ -45,6 +51,13 @@ const SignUpScreen = () => {
           <CustomInput label="Email" placeholder="Enter your email" keyboardType="email-address" />
           <CustomInput label="Phone Number" placeholder="Enter your phone number" keyboardType="phone-pad" />
           
+          {role === 'doctor' && (
+            <CustomInput label="Doctor ID" placeholder="Enter your Doctor ID" />
+          )}
+          {role === 'nurse' && (
+            <CustomInput label="Nurse ID" placeholder="Enter your Nurse ID" />
+          )}
+
           <View style={styles.passwordWrapper}>
             <CustomInput label="Password" placeholder="Create a password" secureTextEntry />
             <TouchableOpacity style={styles.eyeIcon}>
@@ -62,11 +75,35 @@ const SignUpScreen = () => {
             </Text>
           </View>
 
-          <CustomButton 
-            title="Sign Up" 
-            onPress={() => navigation.navigate('RoleSelection')}
-            style={styles.signUpButton}
-          />
+          {role === 'doctor' || role === 'nurse' ? (
+            <CustomButton 
+              title="Submit Request" 
+              onPress={() => {
+                alert('Staff registration request submitted successfully! Pending admin approval.');
+                navigation.navigate('SignIn');
+              }}
+              style={styles.signUpButton}
+            />
+          ) : (
+            <View style={styles.buttonRow}>
+              <CustomButton 
+                title="Sign Up as Patient" 
+                onPress={() => {
+                  alert('Registration successful! Please sign in.');
+                  navigation.navigate('SignIn');
+                }}
+                style={styles.patientButton}
+                textStyle={{ fontSize: 12 }}
+              />
+              <CustomButton 
+                title="Request for hospital staff" 
+                variant="outline"
+                onPress={() => navigation.navigate('RoleSelection')}
+                style={styles.staffButton}
+                textStyle={{ fontSize: 10.5 }}
+              />
+            </View>
+          )}
         </View>
 
         <View style={styles.dividerContainer}>
@@ -89,7 +126,7 @@ const SignUpScreen = () => {
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>Already have an account? </Text>
-          <TouchableOpacity onPress={() => navigation.navigate('SignIn', { role })}>
+          <TouchableOpacity onPress={() => navigation.navigate('SignIn')}>
             <Text style={styles.signInText}>Sign In</Text>
           </TouchableOpacity>
         </View>
@@ -125,6 +162,24 @@ const styles = StyleSheet.create({
   termsText: { fontSize: 14, color: '#9CA3AF', lineHeight: 22 },
   linkText: { color: COLORS.primary, fontWeight: '700' },
   signUpButton: { borderRadius: 14, marginTop: 10 },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+    width: '100%',
+  },
+  patientButton: {
+    flex: 1.25,
+    marginVertical: 0,
+    paddingHorizontal: 8,
+  },
+  staffButton: {
+    flex: 1,
+    marginVertical: 0,
+    paddingHorizontal: 6,
+  },
   dividerContainer: { flexDirection: 'row', alignItems: 'center', marginVertical: 20 },
   line: { flex: 1, height: 1, backgroundColor: '#F0F0F5' },
   dividerText: { marginHorizontal: 15, color: '#9CA3AF', fontSize: 13 },
