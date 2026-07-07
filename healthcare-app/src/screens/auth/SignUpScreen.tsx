@@ -1,14 +1,17 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Image, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Image, Dimensions, ActivityIndicator } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import { CustomInput } from '../../components/CustomInput';
 import { CustomButton } from '../../components/CustomButton';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/types';
-import { ArrowLeft, EyeOff, Circle, CheckCircle2 } from 'lucide-react-native';
+import { ArrowLeft, EyeOff, Eye, Circle, CheckCircle2 } from 'lucide-react-native';
 
 const { width, height } = Dimensions.get('window');
+
+// Uses the environment variable from your healthcare-app/.env file
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.33.69.5:4000';
 
 type SignUpScreenProp = StackNavigationProp<RootStackParamList, 'SignUp'>;
 type SignUpRouteProp = RouteProp<RootStackParamList, 'SignUp'>;
@@ -18,6 +21,96 @@ const SignUpScreen = () => {
   const route = useRoute<SignUpRouteProp>();
   const { role } = route.params || {};
   const [agree, setAgree] = React.useState(true);
+  const [name, setName] = React.useState('');
+  const [email, setEmail] = React.useState('');
+  const [phone, setPhone] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [confirmPassword, setConfirmPassword] = React.useState('');
+  const [otp, setOtp] = React.useState('');
+  const [isOtpSent, setIsOtpSent] = React.useState(false);
+  const [hidePassword, setHidePassword] = React.useState(true);
+  const [hideConfirmPassword, setHideConfirmPassword] = React.useState(true);
+  const [doctorId, setDoctorId] = React.useState('');
+  const [nurseId, setNurseId] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+  const [otpLoading, setOtpLoading] = React.useState(false);
+
+  const handleSendOtp = async () => {
+    if (!email) {
+      alert('Please enter your email first.');
+      return;
+    }
+    setOtpLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/send-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setIsOtpSent(true);
+        alert('OTP Sent to ' + email);
+      } else {
+        alert(data.message || 'Failed to send OTP.');
+      }
+    } catch (error) {
+      console.error('Send OTP Error:', error);
+      alert('Failed to connect to the server. Please check your network.');
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleSignUpPatient = async () => {
+    if (!name || !email || !phone || !password || !confirmPassword || (isOtpSent && !otp)) {
+      alert('Please fill in all fields.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      alert('Passwords do not match.');
+      return;
+    }
+    if (!agree) {
+      alert('You must agree to the terms and conditions.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name,
+          email,
+          phone,
+          password,
+          role: 'patient', // Enforce patient role
+          otp, // Send verification code to backend
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        alert('Registration successful! Please sign in.');
+        navigation.navigate('SignIn');
+      } else {
+        alert(data.message || 'Registration failed.');
+      }
+    } catch (error) {
+      console.error('Registration Error:', error);
+      alert('Failed to connect to the server. Please check your network.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -47,21 +140,49 @@ const SignUpScreen = () => {
         </View>
 
         <View style={styles.form}>
-          <CustomInput label="Full Name" placeholder="Enter your full name" />
-          <CustomInput label="Email" placeholder="Enter your email" keyboardType="email-address" />
-          <CustomInput label="Phone Number" placeholder="Enter your phone number" keyboardType="phone-pad" />
+          <CustomInput label="Full Name" placeholder="Enter your full name" value={name} onChangeText={setName} />
+          
+          <View style={styles.emailWrapper}>
+            <CustomInput label="Email" placeholder="Enter your email" keyboardType="email-address" value={email} onChangeText={setEmail} autoCapitalize="none" />
+            <TouchableOpacity style={styles.otpButton} onPress={handleSendOtp} disabled={otpLoading}>
+              {otpLoading ? (
+                <ActivityIndicator size="small" color={COLORS.white} />
+              ) : (
+                <Text style={styles.otpButtonText}>Send OTP</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+          
+          {isOtpSent && (
+            <CustomInput 
+              label="OTP Code" 
+              placeholder="Enter the OTP sent to your email" 
+              keyboardType="number-pad" 
+              value={otp} 
+              onChangeText={setOtp} 
+            />
+          )}
+          
+          <CustomInput label="Phone Number" placeholder="Enter your phone number" keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
           
           {role === 'doctor' && (
-            <CustomInput label="Doctor ID" placeholder="Enter your Doctor ID" />
+            <CustomInput label="Doctor ID" placeholder="Enter your Doctor ID" value={doctorId} onChangeText={setDoctorId} />
           )}
           {role === 'nurse' && (
-            <CustomInput label="Nurse ID" placeholder="Enter your Nurse ID" />
+            <CustomInput label="Nurse ID" placeholder="Enter your Nurse ID" value={nurseId} onChangeText={setNurseId} />
           )}
 
           <View style={styles.passwordWrapper}>
-            <CustomInput label="Password" placeholder="Create a password" secureTextEntry />
-            <TouchableOpacity style={styles.eyeIcon}>
-              <EyeOff size={20} color="#9CA3AF" />
+            <CustomInput label="Password" placeholder="Create a password" secureTextEntry={hidePassword} value={password} onChangeText={setPassword} />
+            <TouchableOpacity style={styles.eyeIcon} onPress={() => setHidePassword(!hidePassword)}>
+              {hidePassword ? <EyeOff size={20} color="#9CA3AF" /> : <Eye size={20} color="#9CA3AF" />}
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.passwordWrapper}>
+            <CustomInput label="Confirm Password" placeholder="Confirm your password" secureTextEntry={hideConfirmPassword} value={confirmPassword} onChangeText={setConfirmPassword} />
+            <TouchableOpacity style={styles.eyeIcon} onPress={() => setHideConfirmPassword(!hideConfirmPassword)}>
+              {hideConfirmPassword ? <EyeOff size={20} color="#9CA3AF" /> : <Eye size={20} color="#9CA3AF" />}
             </TouchableOpacity>
           </View>
 
@@ -88,12 +209,11 @@ const SignUpScreen = () => {
             <View style={styles.buttonRow}>
               <CustomButton 
                 title="Sign Up as Patient" 
-                onPress={() => {
-                  alert('Registration successful! Please sign in.');
-                  navigation.navigate('SignIn');
-                }}
+                onPress={handleSignUpPatient}
                 style={styles.patientButton}
                 textStyle={{ fontSize: 12 }}
+                loading={loading}
+                disabled={!isOtpSent || !otp}
               />
               <CustomButton 
                 title="Request for hospital staff" 
@@ -156,6 +276,21 @@ const styles = StyleSheet.create({
     height: 320 
   },
   form: { width: '100%' },
+  emailWrapper: { position: 'relative' },
+  otpButton: { 
+    position: 'absolute', 
+    right: 8, 
+    top: 34, 
+    backgroundColor: COLORS.primary, 
+    paddingHorizontal: 12, 
+    paddingVertical: 8, 
+    borderRadius: 8 
+  },
+  otpButtonText: { 
+    color: COLORS.white, 
+    fontSize: 12, 
+    fontWeight: '600' 
+  },
   passwordWrapper: { position: 'relative' },
   eyeIcon: { position: 'absolute', right: 16, top: 46 },
   termsRow: { flexDirection: 'row', alignItems: 'flex-start', marginVertical: 15, gap: 12 },
