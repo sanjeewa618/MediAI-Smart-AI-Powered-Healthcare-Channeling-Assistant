@@ -2,6 +2,8 @@ import mongoose from 'mongoose';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import User from '../model/User.js';
+import OTP from '../model/OTP.js';
+import sendEmail from '../config/emailService.js';
 
 // Generate JWT Token
 const generateToken = (id) => {
@@ -10,15 +12,82 @@ const generateToken = (id) => {
   });
 };
 
+// @desc    Send OTP to email
+// @route   POST /api/auth/send-otp
+// @access  Public
+export const sendOTP = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: 'Please provide an email' });
+    }
+
+    // Check if user already exists
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return res.status(400).json({ message: 'User with this email already exists' });
+    }
+
+    // Generate a random 6-digit OTP
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Save/Update OTP in DB (overwrite existing OTPs for the same email)
+    await OTP.findOneAndUpdate(
+      { email: email.toLowerCase() },
+      { otp: otpCode, createdAt: new Date() },
+      { upsert: true, new: true }
+    );
+
+    // Send email
+    await sendEmail({
+      email,
+      subject: 'MediAI Verification Code',
+      message: `Your verification code is ${otpCode}. It is valid for 5 minutes.`,
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 5px;">
+          <h2 style="color: #3b82f6;">MediAI Account Verification</h2>
+          <p>Thank you for signing up with MediAI. Please use the verification code below to complete your registration:</p>
+          <div style="background: #f3f4f6; padding: 15px; font-size: 24px; font-weight: bold; text-align: center; letter-spacing: 5px; border-radius: 5px; margin: 20px 0;">
+            ${otpCode}
+          </div>
+          <p>This code is valid for <strong>5 minutes</strong>. If you did not request this, please ignore this email.</p>
+        </div>
+      `,
+    });
+
+    res.status(200).json({ success: true, message: 'OTP sent successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error sending OTP', error: error.message });
+  }
+};
+
 // @desc    Register a new user
 // @route   POST /api/auth/register
 // @access  Public
 export const registerUser = async (req, res) => {
   try {
-    const { name, email, phone, password, role } = req.body;
+    const { name, email, phone, password, role, otp } = req.body;
 
     if (!name || !email || !phone || !password) {
       return res.status(400).json({ message: 'Please add all required fields' });
+    }
+
+    // If registering as a patient, require and verify OTP
+    const targetRole = role || 'patient';
+    if (targetRole === 'patient') {
+      if (!otp) {
+        return res.status(400).json({ message: 'Please provide the verification OTP' });
+      }
+
+      // Check OTP in DB
+      const otpRecord = await OTP.findOne({ email: email.toLowerCase() });
+      if (!otpRecord || otpRecord.otp !== otp) {
+        return res.status(400).json({ message: 'Invalid or expired OTP' });
+      }
+
+      // Delete the verified OTP record
+      await OTP.deleteOne({ _id: otpRecord._id });
     }
 
     // Check if user exists by email or phone
@@ -30,10 +99,10 @@ export const registerUser = async (req, res) => {
     // Create user (password hashing is handled by the pre-save hook in the User model)
     const user = await User.create({
       name,
-      email,
+      email: email.toLowerCase(),
       phone,
       password,
-      role: role || 'patient',
+      role: targetRole,
     });
 
     if (user) {
@@ -64,8 +133,13 @@ export const loginUser = async (req, res) => {
       return res.status(400).json({ message: 'Please provide an email and password' });
     }
 
-    // Since we set select: false for the password in the schema, we must explicitly select it to verify
-    const user = await User.findOne({ email }).select('+password');
+    // Find user by either email or phone number
+    const user = await User.findOne({ 
+      $or: [
+        { email: email.toLowerCase() }, 
+        { phone: email }
+      ] 
+    }).select('+password');
 
     if (user && (await bcrypt.compare(password, user.password))) {
       res.json({

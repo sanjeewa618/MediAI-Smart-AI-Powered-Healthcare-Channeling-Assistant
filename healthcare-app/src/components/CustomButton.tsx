@@ -7,6 +7,7 @@ interface CustomButtonProps {
   title: string;
   onPress: () => void;
   loading?: boolean;
+  disabled?: boolean;
   variant?: 'primary' | 'outline' | 'secondary';
   style?: ViewStyle;
   textStyle?: TextStyle;
@@ -16,20 +17,22 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
   title, 
   onPress, 
   loading, 
+  disabled,
   variant = 'primary', 
   style, 
   textStyle 
 }) => {
   const isPrimary = variant === 'primary';
   const isOutline = variant === 'outline';
+  const isDisabled = disabled || loading;
 
   if (isPrimary) {
     return (
       <TouchableOpacity 
         onPress={onPress} 
         activeOpacity={0.8}
-        disabled={loading}
-        style={[styles.wrapper, style]}
+        disabled={isDisabled}
+        style={[styles.wrapper, style, isDisabled && { opacity: 0.6 }]}
       >
         <LinearGradient
           colors={COLORS.gradientPrimary}
@@ -51,11 +54,12 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
     <TouchableOpacity 
       onPress={onPress} 
       activeOpacity={0.8}
-      disabled={loading}
+      disabled={isDisabled}
       style={[
         styles.container, 
         isOutline ? styles.outlineContainer : styles.secondaryContainer,
-        style
+        style,
+        isDisabled && { opacity: 0.6 }
       ]}
     >
       {loading ? (

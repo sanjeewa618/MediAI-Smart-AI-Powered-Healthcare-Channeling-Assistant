@@ -6,8 +6,11 @@ import { CustomButton } from '../../components/CustomButton';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/types';
-import { ArrowLeft, EyeOff } from 'lucide-react-native';
+import { ArrowLeft, EyeOff, Eye } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
+
+// Uses the environment variable from your healthcare-app/.env file
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.33.69.5:4000';
 
 const { width, height } = Dimensions.get('window');
 
@@ -20,6 +23,50 @@ const SignInScreen = () => {
   const { role } = route.params || {};
   const { setRole } = useAuth();
   const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [hidePassword, setHidePassword] = React.useState(true);
+  const [loading, setLoading] = React.useState(false);
+
+  const handleSignIn = async () => {
+    if (!email || !password) {
+      alert('Please enter your email and password.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email.toLowerCase(),
+          password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // data should contain { role, token, ... }
+        const targetRole = data.role || 'patient';
+        setRole(targetRole);
+
+        if (targetRole === 'patient') navigation.replace('PatientDashboard');
+        else if (targetRole === 'doctor') navigation.replace('DoctorDashboard');
+        else if (targetRole === 'admin') navigation.replace('AdminDashboard');
+        else if (targetRole === 'lab' || targetRole === 'nurse') navigation.replace('LabDashboard');
+      } else {
+        alert(data.message || 'Invalid credentials.');
+      }
+    } catch (error) {
+      console.error('Sign In Error:', error);
+      alert('Failed to connect to the server. Please check your network.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -54,10 +101,12 @@ const SignInScreen = () => {
             <CustomInput 
               label="Password"
               placeholder="Enter your password"
-              secureTextEntry
+              secureTextEntry={hidePassword}
+              value={password}
+              onChangeText={setPassword}
             />
-            <TouchableOpacity style={styles.eyeIcon}>
-              <EyeOff size={20} color="#9CA3AF" />
+            <TouchableOpacity style={styles.eyeIcon} onPress={() => setHidePassword(!hidePassword)}>
+              {hidePassword ? <EyeOff size={20} color="#9CA3AF" /> : <Eye size={20} color="#9CA3AF" />}
             </TouchableOpacity>
           </View>
 
@@ -67,26 +116,9 @@ const SignInScreen = () => {
 
           <CustomButton 
             title="Sign In" 
-            onPress={() => {
-              let targetRole = 'patient';
-              const lowerEmail = email.toLowerCase();
-              if (lowerEmail.includes('doctor')) {
-                targetRole = 'doctor';
-              } else if (lowerEmail.includes('admin')) {
-                targetRole = 'admin';
-              } else if (lowerEmail.includes('lab') || lowerEmail.includes('nurse')) {
-                targetRole = 'lab';
-              } else if (role) {
-                targetRole = role;
-              }
-
-              setRole(targetRole as any);
-              if (targetRole === 'patient') navigation.replace('PatientDashboard');
-              else if (targetRole === 'doctor') navigation.replace('DoctorDashboard');
-              else if (targetRole === 'admin') navigation.replace('AdminDashboard');
-              else if (targetRole === 'lab' || targetRole === 'nurse') navigation.replace('LabDashboard');
-            }}
+            onPress={handleSignIn}
             style={styles.signInButton}
+            loading={loading}
           />
         </View>
 
