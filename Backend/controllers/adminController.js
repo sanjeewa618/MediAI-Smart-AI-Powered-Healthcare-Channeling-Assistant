@@ -105,3 +105,49 @@ export const deleteUser = async (req, res) => {
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
+
+// @desc    Get all pending doctor/nurse requests
+// @route   GET /api/admin/requests
+// @access  Private (Admin only)
+export const getPendingRequests = async (req, res) => {
+  try {
+    const requests = await User.find({ status: 'pending' }).select('-password').sort({ createdAt: -1 });
+    res.json({ success: true, count: requests.length, data: requests });
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+// @desc    Approve a pending request
+// @route   PUT /api/admin/requests/:id/approve
+// @access  Private (Admin only)
+export const approveRequest = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    user.status = 'approved';
+    const updatedUser = await user.save();
+    res.json({ success: true, data: updatedUser });
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+// @desc    Reject a pending request
+// @route   PUT /api/admin/requests/:id/reject
+// @access  Private (Admin only)
+export const rejectRequest = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    user.status = 'rejected';
+    const updatedUser = await user.save();
+    res.json({ success: true, data: updatedUser });
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};

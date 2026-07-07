@@ -36,7 +36,7 @@ export type RootStackParamList = {
   AdminDashboard: undefined;
   AdminUserManagement: undefined;
   AdminDoctorVerification: undefined;
-  AdminActivityMonitoring: undefined;
+  AdminRequests: undefined;
   AdminAnalytics: undefined;
   AdminAIMonitoring: undefined;
   AdminReports: undefined;

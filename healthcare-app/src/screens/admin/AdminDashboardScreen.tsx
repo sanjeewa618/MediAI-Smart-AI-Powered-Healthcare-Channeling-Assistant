@@ -21,7 +21,7 @@ import {
   Menu, 
   Users, 
   CheckSquare, 
-  Activity, 
+  List, 
   BarChart2, 
   Brain, 
   FileText, 
@@ -205,11 +205,11 @@ const AdminDashboardScreen = () => {
                   <Text style={styles.menuItemText}>Doctors</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.menuItem} onPress={() => navigateTo('AdminActivityMonitoring')}>
+                <TouchableOpacity style={styles.menuItem} onPress={() => navigateTo('AdminRequests')}>
                   <View style={[styles.menuIconBox, { backgroundColor: '#FFFBEB' }]}>
-                    <Activity size={20} color="#F59E0B" />
+                    <List size={20} color="#F59E0B" />
                   </View>
-                  <Text style={styles.menuItemText}>Activities</Text>
+                  <Text style={styles.menuItemText}>Requests</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.menuItem} onPress={() => navigateTo('AdminLaboratories')}>

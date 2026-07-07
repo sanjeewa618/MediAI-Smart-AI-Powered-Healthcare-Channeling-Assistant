@@ -67,7 +67,7 @@ export const sendOTP = async (req, res) => {
 // @access  Public
 export const registerUser = async (req, res) => {
   try {
-    const { name, email, phone, password, role, otp } = req.body;
+    const { name, email, phone, password, role, otp, staffId } = req.body;
 
     if (!name || !email || !phone || !password) {
       return res.status(400).json({ message: 'Please add all required fields' });
@@ -96,6 +96,9 @@ export const registerUser = async (req, res) => {
       return res.status(400).json({ message: 'User already exists' });
     }
 
+    // Set initial status based on role
+    const initialStatus = (targetRole === 'doctor' || targetRole === 'nurse') ? 'pending' : 'approved';
+
     // Create user (password hashing is handled by the pre-save hook in the User model)
     const user = await User.create({
       name,
@@ -103,6 +106,8 @@ export const registerUser = async (req, res) => {
       phone,
       password,
       role: targetRole,
+      status: initialStatus,
+      staffId: staffId || undefined,
     });
 
     if (user) {
@@ -142,12 +147,20 @@ export const loginUser = async (req, res) => {
     }).select('+password');
 
     if (user && (await bcrypt.compare(password, user.password))) {
+      if (user.status === 'pending') {
+        return res.status(401).json({ message: 'Your account is pending admin approval' });
+      }
+      if (user.status === 'rejected') {
+        return res.status(401).json({ message: 'Your request was rejected' });
+      }
+
       res.json({
         _id: user.id,
         name: user.name,
         email: user.email,
         phone: user.phone,
         role: user.role,
+        status: user.status,
         token: generateToken(user._id),
       });
     } else {

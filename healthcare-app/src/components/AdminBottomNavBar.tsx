@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
-import { Home, Users, Stethoscope, Activity, FlaskConical, FileText } from 'lucide-react-native';
+import { Home, Users, Stethoscope, List, FlaskConical, FileText } from 'lucide-react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SHADOWS } from '../theme/theme';
@@ -28,9 +28,9 @@ const AdminBottomNavBar = () => {
         <Text style={[styles.label, { color: currentRouteName === 'AdminDoctorVerification' ? COLORS.primary : '#9CA3AF' }]}>Doctors</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('AdminActivityMonitoring')}>
-        <Activity size={20} color={currentRouteName === 'AdminActivityMonitoring' ? COLORS.primary : '#9CA3AF'} />
-        <Text style={[styles.label, { color: currentRouteName === 'AdminActivityMonitoring' ? COLORS.primary : '#9CA3AF' }]}>Activities</Text>
+      <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('AdminRequests')}>
+        <List size={20} color={currentRouteName === 'AdminRequests' ? COLORS.primary : '#9CA3AF'} />
+        <Text style={[styles.label, { color: currentRouteName === 'AdminRequests' ? COLORS.primary : '#9CA3AF' }]}>Requests</Text>
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('AdminLaboratories')}>
