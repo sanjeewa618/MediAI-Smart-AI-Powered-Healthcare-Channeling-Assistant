@@ -133,8 +133,13 @@ export const loginUser = async (req, res) => {
       return res.status(400).json({ message: 'Please provide an email and password' });
     }
 
-    // Since we set select: false for the password in the schema, we must explicitly select it to verify
-    const user = await User.findOne({ email }).select('+password');
+    // Find user by either email or phone number
+    const user = await User.findOne({ 
+      $or: [
+        { email: email.toLowerCase() }, 
+        { phone: email }
+      ] 
+    }).select('+password');
 
     if (user && (await bcrypt.compare(password, user.password))) {
       res.json({
