@@ -1,0 +1,43 @@
+import express from 'express';
+import dotenv from 'dotenv';
+import cors from 'cors';
+import connectDB from './config/db.js';
+import authRoutes from './routers/authRoutes.js';
+import patientRoutes from './routers/patientRoutes.js';
+import doctorRoutes from './routers/doctorRoutes.js';
+import nurseRoutes from './routers/nurseRoutes.js';
+import adminRoutes from './routers/adminRoutes.js';
+import appointmentRoutes from './routers/appointmentRoutes.js';
+
+// 1. Load environment variables FIRST
+dotenv.config();
+
+// 2. Connect to Database AFTER env is loaded
+connectDB();
+
+const app = express();
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// 3. Mount Route Paths
+app.use('/api/auth', authRoutes);
+app.use('/api/patient', patientRoutes);
+app.use('/api/doctor', doctorRoutes);
+app.use('/api/nurse', nurseRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/appointments', appointmentRoutes);
+
+// Base Route
+app.get('/', (req, res) => {
+  res.send('MediAI API is running...');
+});
+
+// Port configuration
+const PORT = process.env.PORT || 5000;
+
+// Start Server
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});

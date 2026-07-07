@@ -1,0 +1,19 @@
+import express from 'express';
+import { getTodayAppointments, updateAppointmentStatus, createMedicalRecord } from '../controllers/nurseController.js';
+import { protect } from '../middlewares/authMiddleware.js';
+import { nurseOnly } from '../middlewares/roleMiddleware.js';
+
+const router = express.Router();
+
+// Require login and Nurse role for all routes
+router.use(protect);
+router.use(nurseOnly);
+
+// Appointment Management (Queue tracking)
+router.get('/appointments/today', getTodayAppointments);
+router.put('/appointments/:id/status', updateAppointmentStatus);
+
+// Medical Records (Pre-consultation notes/vitals)
+router.post('/medical-records', createMedicalRecord);
+
+export default router;
