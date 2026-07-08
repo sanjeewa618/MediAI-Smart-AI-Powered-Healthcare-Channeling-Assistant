@@ -112,6 +112,61 @@ const SignUpScreen = () => {
     }
   };
 
+  const handleSignUpStaff = async () => {
+    if (!name || !email || !phone || !password || !confirmPassword) {
+      alert('Please fill in all fields.');
+      return;
+    }
+    if (role === 'doctor' && !doctorId) {
+      alert('Please enter your Doctor ID.');
+      return;
+    }
+    if (role === 'nurse' && !nurseId) {
+      alert('Please enter your Nurse ID.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      alert('Passwords do not match.');
+      return;
+    }
+    if (!agree) {
+      alert('You must agree to the terms and conditions.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name,
+          email,
+          phone,
+          password,
+          role: role,
+          staffId: role === 'doctor' ? doctorId : nurseId
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        alert('Staff registration request submitted successfully! Pending admin approval.');
+        navigation.navigate('SignIn');
+      } else {
+        alert(data.message || 'Registration request failed.');
+      }
+    } catch (error) {
+      console.error('Registration Error:', error);
+      alert('Failed to connect to the server. Please check your network.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -142,13 +197,20 @@ const SignUpScreen = () => {
         <View style={styles.form}>
           <CustomInput label="Full Name" placeholder="Enter your full name" value={name} onChangeText={setName} />
           
-          <View style={styles.emailWrapper}>
-            <CustomInput label="Email" placeholder="Enter your email" keyboardType="email-address" value={email} onChangeText={setEmail} autoCapitalize="none" />
-            <TouchableOpacity style={styles.otpButton} onPress={handleSendOtp} disabled={otpLoading}>
+          <CustomInput label="Email" placeholder="Enter your email" keyboardType="email-address" value={email} onChangeText={setEmail} autoCapitalize="none" />
+          
+          <View style={styles.otpButtonContainer}>
+            <TouchableOpacity 
+              style={styles.otpButtonNew} 
+              onPress={handleSendOtp} 
+              disabled={otpLoading}
+            >
               {otpLoading ? (
-                <ActivityIndicator size="small" color={COLORS.white} />
+                <ActivityIndicator size="small" color={COLORS.primary} />
               ) : (
-                <Text style={styles.otpButtonText}>Send OTP</Text>
+                <Text style={styles.otpButtonTextNew}>
+                  {isOtpSent ? 'Resend OTP' : 'Send OTP'}
+                </Text>
               )}
             </TouchableOpacity>
           </View>
@@ -199,10 +261,8 @@ const SignUpScreen = () => {
           {role === 'doctor' || role === 'nurse' ? (
             <CustomButton 
               title="Submit Request" 
-              onPress={() => {
-                alert('Staff registration request submitted successfully! Pending admin approval.');
-                navigation.navigate('SignIn');
-              }}
+              onPress={handleSignUpStaff}
+              loading={loading}
               style={styles.signUpButton}
             />
           ) : (
@@ -277,6 +337,22 @@ const styles = StyleSheet.create({
   },
   form: { width: '100%' },
   emailWrapper: { position: 'relative' },
+  otpButtonContainer: {
+    alignItems: 'flex-end',
+    marginBottom: 12,
+    marginTop: -8,
+  },
+  otpButtonNew: {
+    backgroundColor: '#F3E8FF',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  otpButtonTextNew: {
+    color: COLORS.primary,
+    fontSize: 12,
+    fontWeight: '700',
+  },
   otpButton: { 
     position: 'absolute', 
     right: 8, 

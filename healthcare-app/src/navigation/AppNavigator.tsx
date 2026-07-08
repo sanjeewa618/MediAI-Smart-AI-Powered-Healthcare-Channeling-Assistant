@@ -41,7 +41,7 @@ import SettingsScreen from '../screens/patient/SettingsScreen';
 import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
 import UserManagementScreen from '../screens/admin/UserManagementScreen';
 import DoctorVerificationScreen from '../screens/admin/DoctorVerificationScreen';
-import ActivityMonitoringScreen from '../screens/admin/ActivityMonitoringScreen';
+import AdminRequestsScreen from '../screens/admin/AdminRequestsScreen';
 import AnalyticsScreen from '../screens/admin/AnalyticsScreen';
 import AIMonitoringScreen from '../screens/admin/AIMonitoringScreen';
 import AdminReportsScreen from '../screens/admin/ReportsScreen';
@@ -94,7 +94,7 @@ const AppNavigator = () => {
       <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
       <Stack.Screen name="AdminUserManagement" component={UserManagementScreen} />
       <Stack.Screen name="AdminDoctorVerification" component={DoctorVerificationScreen} />
-      <Stack.Screen name="AdminActivityMonitoring" component={ActivityMonitoringScreen} />
+      <Stack.Screen name="AdminRequests" component={AdminRequestsScreen} />
       <Stack.Screen name="AdminAnalytics" component={AnalyticsScreen} />
       <Stack.Screen name="AdminAIMonitoring" component={AIMonitoringScreen} />
       <Stack.Screen name="AdminReports" component={AdminReportsScreen} />
