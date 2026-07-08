@@ -9,8 +9,7 @@ import { RootStackParamList } from '../../navigation/types';
 import { ArrowLeft, EyeOff, Eye } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 
-// Uses the environment variable from your healthcare-app/.env file
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.33.69.5:4000';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
 
 const { width, height } = Dimensions.get('window');
 
