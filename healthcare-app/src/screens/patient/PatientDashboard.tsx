@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, Dimensions, Animated, PanResponder, Pressable, StatusBar, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, Dimensions, Animated, PanResponder, Pressable, StatusBar, Modal, BackHandler } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import { Search, Calendar, User, FileText, Activity, MoreHorizontal, Home, Heart, Shield, MessageCircle, FileEdit, FlaskConical, ChevronRight, Baby, Droplets, Sparkles, Plus, Bell, LogOut, Pill, Truck, Settings, X, LifeBuoy, Stethoscope, Dna, Brain, Bone, Eye, Smile, Wallet, Clock, AlertCircle } from 'lucide-react-native';
 import BottomNavBar from '../../components/BottomNavBar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/types';
 
@@ -77,6 +77,33 @@ const StaggeredView = ({ children, delay = 0, style }: { children: React.ReactNo
 
 const PatientDashboard = () => {
   const navigation = useNavigation<PatientDashboardProp>();
+  const isLoggingOut = useRef(false);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (e.data.action.type === 'RESET') {
+        return;
+      }
+      if (isLoggingOut.current) {
+        return;
+      }
+      e.preventDefault();
+    });
+    return unsubscribe;
+  }, [navigation]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        return true;
+      };
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => {
+        subscription.remove();
+      };
+    }, [])
+  );
+
   const [moreModalVisible, setMoreModalVisible] = useState(false);
   const [menuModalVisible, setMenuModalVisible] = useState(false);
   const [appointmentModalVisible, setAppointmentModalVisible] = useState(false);
@@ -298,7 +325,13 @@ const PatientDashboard = () => {
                 </TouchableOpacity>
                 <TouchableOpacity 
                   style={[styles.headerActionButton, { marginLeft: 10 }]}
-                  onPress={() => navigation.navigate('SignIn', { role: 'patient' })}
+                  onPress={() => {
+                    isLoggingOut.current = true;
+                    navigation.reset({
+                      index: 0,
+                      routes: [{ name: 'SignIn', params: { role: 'patient' } }],
+                    });
+                  }}
                 >
                   <LogOut size={20} color="#FFFFFF" />
                 </TouchableOpacity>
@@ -695,13 +728,17 @@ const PatientDashboard = () => {
                   <Text style={styles.menuItemText}>Help & Support</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity 
-                  style={[styles.menuItem, { marginTop: 5 }]}
-                  onPress={() => {
-                    closeMenu();
-                    navigation.navigate('SignIn', { role: 'patient' });
-                  }}
-                >
+                  <TouchableOpacity 
+                   style={[styles.menuItem, { marginTop: 5 }]}
+                   onPress={() => {
+                     closeMenu();
+                     isLoggingOut.current = true;
+                     navigation.reset({
+                       index: 0,
+                       routes: [{ name: 'SignIn', params: { role: 'patient' } }],
+                     });
+                   }}
+                 >
                   <View style={[styles.menuIconBox, { backgroundColor: '#FEF2F2' }]}>
                     <LogOut size={20} color="#EF4444" />
                   </View>
@@ -847,7 +884,10 @@ const PatientDashboard = () => {
                 style={styles.modalGridItem}
                 onPress={() => {
                   setMoreModalVisible(false);
-                  navigation.navigate('SignIn', { role: 'patient' });
+                  navigation.reset({
+                    index: 0,
+                    routes: [{ name: 'SignIn', params: { role: 'patient' } }],
+                  });
                 }}
               >
                 <View style={[styles.modalIconWrap, { backgroundColor: '#FFF1F2' }]}>

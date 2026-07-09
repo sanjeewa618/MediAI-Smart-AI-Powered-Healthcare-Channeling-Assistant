@@ -1,12 +1,12 @@
-import React, { useEffect, useMemo, useState, useRef } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, Platform, TextInput, Modal, Animated, PanResponder, Dimensions } from 'react-native';
+import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, Platform, TextInput, Modal, Animated, PanResponder, Dimensions, BackHandler } from 'react-native';
 import { COLORS, SHADOWS, SIZES } from '../../theme/theme';
 import { Search, Bell, Video, User, FileText, Calendar, Activity, Phone, Clock, FileEdit, RefreshCw, AlertCircle, CheckCircle2, LogOut, X, Plus } from 'lucide-react-native';
 
 const { height } = Dimensions.get('window');
 import DoctorBottomNavBar from '../../components/DoctorBottomNavBar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
 const MOCK_APPOINTMENTS = [
   { id: '1', name: 'Sarah Johnson', age: 28, time: '09:00 AM', minutes: 540, type: 'Physical', status: 'Emergency', img: 'https://i.pravatar.cc/150?img=5' },
@@ -38,6 +38,33 @@ const greyShadow = {
 
 const DoctorDashboard = () => {
   const navigation = useNavigation<any>();
+  const isLoggingOut = useRef(false);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
+      if (e.data.action.type === 'RESET') {
+        return;
+      }
+      if (isLoggingOut.current) {
+        return;
+      }
+      e.preventDefault();
+    });
+    return unsubscribe;
+  }, [navigation]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        return true;
+      };
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => {
+        subscription.remove();
+      };
+    }, [])
+  );
+
   const [searchQuery, setSearchQuery] = useState('');
   const [currentMinutes, setCurrentMinutes] = useState(todayStartMinutes());
   const [timeSlotModalVisible, setTimeSlotModalVisible] = useState(false);
@@ -247,7 +274,13 @@ const DoctorDashboard = () => {
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.iconBtn}
-                onPress={() => navigation.navigate('SignIn', { role: 'doctor' })}
+                onPress={() => {
+                  isLoggingOut.current = true;
+                  navigation.reset({
+                    index: 0,
+                    routes: [{ name: 'SignIn', params: { role: 'doctor' } }],
+                  });
+                }}
               >
                 <LogOut size={20} color="#FFF" />
               </TouchableOpacity>

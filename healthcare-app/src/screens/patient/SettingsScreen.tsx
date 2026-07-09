@@ -245,7 +245,10 @@ const SettingsScreen = ({ navigation }: any) => {
               label="Logout"
               sub="Sign out of your account"
               danger
-              onPress={() => navigation.navigate('SignIn', { role: 'patient' })}
+              onPress={() => navigation.reset({
+                index: 0,
+                routes: [{ name: 'SignIn', params: { role: 'patient' } }],
+              })}
             />
           </View>
         </View>

@@ -190,7 +190,10 @@ const LabProfileScreen: React.FC = () => {
         {/* Logout Button */}
         <TouchableOpacity
           style={styles.logoutBtn}
-          onPress={() => navigation.replace('SignIn', { role: 'nurse' })}
+          onPress={() => navigation.reset({
+            index: 0,
+            routes: [{ name: 'SignIn', params: { role: 'nurse' } }],
+          })}
         >
           <LogOut size={18} color="#EF4444" />
           <Text style={styles.logoutText}>Sign Out</Text>

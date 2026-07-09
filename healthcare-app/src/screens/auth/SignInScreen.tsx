@@ -117,9 +117,11 @@ const SignInScreen = () => {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <StaggeredView delay={100}>
           <View style={styles.topHeaderRow}>
-            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-              <ArrowLeft size={30} color={COLORS.primary} />
-            </TouchableOpacity>
+            {navigation.canGoBack() && (
+              <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+                <ArrowLeft size={30} color={COLORS.primary} />
+              </TouchableOpacity>
+            )}
             <View style={styles.headerTextWrap}>
               <Text style={styles.title}>Sign In</Text>
               <Text style={styles.subtitle}>Sign in to continue</Text>

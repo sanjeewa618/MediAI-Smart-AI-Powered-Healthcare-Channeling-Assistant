@@ -666,7 +666,7 @@ const styles = StyleSheet.create({
   },
   bottomSection: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 70 : 55,
+    bottom: Platform.OS === 'ios' ? 35 : 20,
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -690,14 +690,14 @@ const styles = StyleSheet.create({
   },
   slide3DoctorImage: {
     position: 'absolute',
-    bottom: 0,
+    bottom: 40,
     right: -width * 0.12,
     width: width * 0.9,
     height: height * 0.68,
   },
   slide3CardsContainer: {
     position: 'absolute',
-    bottom: height * 0.03,
+    bottom: 70,
     left: 20,
     zIndex: 10,
     gap: 15,
