@@ -37,7 +37,7 @@ app.get('/', (req, res) => {
 // Port configuration
 const PORT = process.env.PORT || 5000;
 
-// Start Server
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+// Start Server - listen on 0.0.0.0 to be reachable from mobile devices on local network
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT} and accessible over local network`);
 });

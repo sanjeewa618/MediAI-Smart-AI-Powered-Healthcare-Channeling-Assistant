@@ -7,7 +7,27 @@ Key goals:
 - AI-driven symptom assistant and suggestions
 - Clean patient & doctor dashboards with reports and records
 
---
+---
+
+## ⚡ Quick Start (Any Computer — Single Command)
+
+> Just run **one command** from the project root. It will auto-detect your IP, configure the app, and launch both the backend and frontend automatically.
+
+```bash
+npm start
+```
+
+That's it! The script will:
+- ✅ Detect your local Wi-Fi IP address
+- ✅ Update `healthcare-app/.env` automatically
+- ✅ Start the **Backend** server on port 4000
+- ✅ Start the **Expo** frontend (with cache cleared)
+
+> 📱 Make sure your phone and PC are on the **same Wi-Fi network**, then scan the QR code in **Expo Go**.
+
+> ⛔ Press `Ctrl+C` to stop all servers.
+
+---
 
 ## Table of contents
 - [Demo / Preview](#demo--preview)

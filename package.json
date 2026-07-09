@@ -1,0 +1,10 @@
+{
+  "name": "mediai-smart-healthcare",
+  "version": "1.0.0",
+  "description": "MediAI - Smart AI-Powered Healthcare Channeling Assistant",
+  "type": "module",
+  "scripts": {
+    "start": "node setup.js"
+  },
+  "private": true
+}
