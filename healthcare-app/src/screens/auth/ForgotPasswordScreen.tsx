@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   imageContainer: { 
-    height: 260, 
+    height: 250, 
     width: '100%', 
     justifyContent: 'center', 
     alignItems: 'center', 
@@ -141,8 +141,8 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   illustration: { 
-    width: width * 0.9, 
-    height: 260,
+    width: width * 0.7, 
+    height: 180,
   },
   form: { width: '100%' },
   sendButton: { borderRadius: 14, marginTop: 15 },

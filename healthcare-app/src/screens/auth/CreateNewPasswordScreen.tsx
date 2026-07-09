@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Image, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Image, Dimensions, KeyboardAvoidingView, Platform } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import { CustomInput } from '../../components/CustomInput';
 import { CustomButton } from '../../components/CustomButton';
@@ -70,24 +70,28 @@ const CreateNewPasswordScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.topHeaderRow}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <ArrowLeft size={30} color={COLORS.primary} />
-          </TouchableOpacity>
-          <View style={styles.headerTextWrap}>
-            <Text style={styles.title}>New Password</Text>
-            <Text style={styles.subtitle}>Create a strong new password for your account</Text>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <View style={styles.topHeaderRow}>
+            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+              <ArrowLeft size={30} color={COLORS.primary} />
+            </TouchableOpacity>
+            <View style={styles.headerTextWrap}>
+              <Text style={styles.title}>New Password</Text>
+              <Text style={styles.subtitle}>Create a strong new password for your account</Text>
+            </View>
           </View>
-        </View>
 
-        <View style={styles.imageContainer}>
-          <Image 
-            source={require('../../../assets/signin-image.png')} 
-            style={[styles.illustration as any, { opacity: 0.88 }]}
-            resizeMode="contain"
-          />
-        </View>
+          <View style={styles.imageContainer}>
+            <Image 
+              source={require('../../../assets/signin-image.png')} 
+              style={[styles.illustration as any, { opacity: 0.88 }]}
+              resizeMode="contain"
+            />
+          </View>
 
         <View style={styles.form}>
           <View style={styles.passwordWrapper}>
@@ -123,7 +127,8 @@ const CreateNewPasswordScreen = () => {
             loading={loading}
           />
         </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -167,16 +172,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   imageContainer: { 
-    height: 260, 
+    height: 160, 
     width: '100%', 
     justifyContent: 'center', 
     alignItems: 'center', 
-    marginBottom: 20,
-    marginTop: 10,
+    marginBottom: 15,
+    marginTop: 5,
   },
   illustration: { 
-    width: width * 0.9, 
-    height: 260,
+    width: width * 0.6, 
+    height: 160,
   },
   form: { width: '100%' },
   passwordWrapper: { position: 'relative' },
