@@ -37,6 +37,8 @@ async function callGemini(apiKey, modelName, messages) {
   return data.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
 }
 
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 // ── Try each model name until one works ──────────────────────────────────────
 async function analyzeWithGemini(apiKey, symptoms) {
   const systemInstruction = `You are MediAI, an advanced medical assistant bot. You analyze patient symptoms and respond ONLY in strict JSON matching this structure exactly:
@@ -57,18 +59,34 @@ async function analyzeWithGemini(apiKey, symptoms) {
   ];
 
   let lastError = null;
+  const MAX_RETRIES = 3;
 
   for (const modelName of GEMINI_MODELS) {
-    try {
-      console.log(`Trying Gemini model: ${modelName}`);
-      const text = await callGemini(apiKey, modelName, messages);
-      if (!text) throw new Error('Empty response from model');
-      const parsed = JSON.parse(text.trim());
-      console.log(`✓ Gemini model "${modelName}" responded successfully.`);
-      return parsed;
-    } catch (err) {
-      console.warn(`✗ Model "${modelName}" failed: ${err.message.slice(0, 120)}`);
-      lastError = err;
+    let attempt = 0;
+    
+    while (attempt <= MAX_RETRIES) {
+      try {
+        console.log(`Trying Gemini model: ${modelName} (Attempt ${attempt + 1})`);
+        const text = await callGemini(apiKey, modelName, messages);
+        if (!text) throw new Error('Empty response from model');
+        const parsed = JSON.parse(text.trim());
+        console.log(`✓ Gemini model "${modelName}" responded successfully.`);
+        return parsed;
+      } catch (err) {
+        lastError = err;
+        const errMsg = err.message || '';
+        
+        // If it's a 429 (Quota) or 503 (Overload), wait and retry
+        if (errMsg.includes('429') || errMsg.includes('503')) {
+          console.warn(`[${modelName}] Rate limit / Overload (429/503). Retrying in ${Math.pow(2, attempt)}s...`);
+          await sleep(Math.pow(2, attempt) * 1000);
+          attempt++;
+        } else {
+          // If it's a 404 or other error, break the retry loop and try the next model
+          console.warn(`✗ Model "${modelName}" failed: ${errMsg.slice(0, 120)}`);
+          break;
+        }
+      }
     }
   }
 
