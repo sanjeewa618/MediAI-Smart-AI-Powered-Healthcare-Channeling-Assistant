@@ -8,6 +8,9 @@ import OnboardingScreen from '../screens/auth/OnboardingScreen';
 import SignInScreen from '../screens/auth/SignInScreen';
 import SignUpScreen from '../screens/auth/SignUpScreen';
 import RoleSelectionScreen from '../screens/auth/RoleSelectionScreen';
+import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
+import OTPVerificationScreen from '../screens/auth/OTPVerificationScreen';
+import CreateNewPasswordScreen from '../screens/auth/CreateNewPasswordScreen';
 
 // Dashboard Screens
 import PatientDashboard from '../screens/patient/PatientDashboard';
@@ -67,6 +70,9 @@ const AppNavigator = () => {
       <Stack.Screen name="SignIn" component={SignInScreen} />
       <Stack.Screen name="SignUp" component={SignUpScreen} />
       <Stack.Screen name="RoleSelection" component={RoleSelectionScreen} />
+      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+      <Stack.Screen name="OTPVerification" component={OTPVerificationScreen} />
+      <Stack.Screen name="CreateNewPassword" component={CreateNewPasswordScreen} />
       <Stack.Screen name="PatientDashboard" component={PatientDashboard} />
       <Stack.Screen name="DoctorDashboard" component={DoctorDashboard} />
       <Stack.Screen name="DoctorAppointments" component={DoctorAppointmentsScreen} />
