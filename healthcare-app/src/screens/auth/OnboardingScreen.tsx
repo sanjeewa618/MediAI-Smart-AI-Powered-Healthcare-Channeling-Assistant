@@ -307,7 +307,7 @@ const OnboardingScreen = () => {
           <View style={styles.slide3ContentContainer}>
             {/* Doctor Image (gemini1.png is the female doctor in lab coat) */}
             <Image
-              source={require('../../../assets/gemini1.png')}
+              source={require('../../../assets/doctor1.png')}
               style={styles.slide3DoctorImage}
               resizeMode="contain"
             />
@@ -684,16 +684,16 @@ const styles = StyleSheet.create({
   },
   slide3ContentContainer: {
     width: '100%',
-    height: height * 0.58,
+    height: height * 0.68,
     position: 'relative',
-    marginTop: 15,
+    marginTop: -10,
   },
   slide3DoctorImage: {
     position: 'absolute',
-    bottom: height * 0.01,
-    right: -width * 0.08,
-    width: width * 0.8,
-    height: height * 0.58,
+    bottom: 0,
+    right: -width * 0.12,
+    width: width * 0.9,
+    height: height * 0.68,
   },
   slide3CardsContainer: {
     position: 'absolute',
@@ -703,8 +703,8 @@ const styles = StyleSheet.create({
     gap: 15,
   },
   slide3Card: {
-    width: width * 0.58,
-    minHeight: 185,
+    width: width * 0.48,
+    minHeight: 196,
     justifyContent: 'space-between',
     padding: 18,
     borderRadius: 24,
