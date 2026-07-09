@@ -1,5 +1,5 @@
 import express from 'express';
-import { getSystemStats, getAllUsers, updateUserRole, deleteUser, getPendingRequests, approveRequest, rejectRequest } from '../controllers/adminController.js';
+import { getSystemStats, getAllUsers, updateUserRole, deleteUser, getPendingRequests, approveRequest, rejectRequest, addUser, updateUserDetails, updateUserStatus } from '../controllers/adminController.js';
 import { protect } from '../middlewares/authMiddleware.js';
 import { adminOnly } from '../middlewares/roleMiddleware.js';
 
@@ -14,6 +14,9 @@ router.get('/stats', getSystemStats);
 
 // User Management
 router.get('/users', getAllUsers);
+router.post('/users', addUser);
+router.put('/users/:id', updateUserDetails);
+router.patch('/users/:id/status', updateUserStatus);
 router.put('/users/:id/role', updateUserRole);
 router.delete('/users/:id', deleteUser);
 
