@@ -1,7 +1,6 @@
-const mongoose = require('mongoose');
-
-const Notification = require('../models/Notification');
-const NotificationSetting = require('../models/NotificationSetting');
+import mongoose from 'mongoose';
+import Notification from '../model/Notification.js';
+import NotificationSetting from '../model/NotificationSetting.js';
 
 const listNotifications = async (req, res, next) => {
   try {
@@ -199,7 +198,7 @@ const updateNotificationSettings = async (req, res, next) => {
   }
 };
 
-module.exports = {
+export {
   listNotifications,
   markAsRead,
   markAllAsRead,

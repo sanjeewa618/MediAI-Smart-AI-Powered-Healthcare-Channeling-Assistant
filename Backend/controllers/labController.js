@@ -1,10 +1,10 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
-const Lab = require('../models/Lab');
-const LabCategory = require('../models/LabCategory');
-const LabBooking = require('../models/LabBooking');
-const LabSchedule = require('../models/LabSchedule');
-const LabReport = require('../models/LabReport');
+import Lab from '../model/Lab.js';
+import LabCategory from '../model/LabCategory.js';
+import LabBooking from '../model/LabBooking.js';
+import LabSchedule from '../model/LabSchedule.js';
+import LabReport from '../model/LabReport.js';
 
 const generateBookingRef = async () => {
   const year = new Date().getFullYear();
@@ -755,7 +755,7 @@ const updateReport = async (req, res, next) => {
   }
 };
 
-module.exports = {
+export {
   getCategories,
   getLabs,
   getLabById,
