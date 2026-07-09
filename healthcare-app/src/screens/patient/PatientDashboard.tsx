@@ -31,6 +31,50 @@ const calcCountdown = (target: Date): string => {
   return `${hh}h ${mm}m ${ss}s`;
 };
 
+// Staggered Entrance Animation Wrapper
+const StaggeredView = ({ children, delay = 0, style }: { children: React.ReactNode; delay: number; style?: any }) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const translateYAnim = useRef(new Animated.Value(-30)).current;
+  const scaleAnim = useRef(new Animated.Value(0.95)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        delay: delay,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateYAnim, {
+        toValue: 0,
+        duration: 500,
+        delay: delay,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 500,
+        delay: delay,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  return (
+    <Animated.View
+      style={[
+        style,
+        {
+          opacity: fadeAnim,
+          transform: [{ translateY: translateYAnim }, { scale: scaleAnim }],
+        },
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
+};
+
 const PatientDashboard = () => {
   const navigation = useNavigation<PatientDashboardProp>();
   const [moreModalVisible, setMoreModalVisible] = useState(false);
@@ -226,45 +270,49 @@ const PatientDashboard = () => {
           style={styles.topPurpleBackground}
         >
           {/* Header */}
-          <View style={styles.header}>
-            <TouchableOpacity 
-              style={styles.menuIconBtn}
-              onPress={openMenu}
-            >
-              <View style={styles.hamburgerLine} />
-              <View style={[styles.hamburgerLine, { width: 18 }]} />
-              <View style={styles.hamburgerLine} />
-            </TouchableOpacity>
-
-            <View style={styles.headerTextContainer}>
-              <Text style={styles.greeting}>Hello, Sarah 👋</Text>
-              <Text style={styles.subGreeting}>Take care of your health</Text>
-            </View>
-
-            <View style={styles.headerActions}>
+          <StaggeredView delay={100}>
+            <View style={styles.header}>
               <TouchableOpacity 
-                style={styles.headerActionButton}
-                onPress={() => setAppointmentModalVisible(true)}
+                style={styles.menuIconBtn}
+                onPress={openMenu}
               >
-                <Calendar size={20} color="#FFFFFF" />
+                <View style={styles.hamburgerLine} />
+                <View style={[styles.hamburgerLine, { width: 18 }]} />
+                <View style={styles.hamburgerLine} />
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.headerActionButton, { marginLeft: 10 }]}>
-                <Bell size={20} color="#FFFFFF" />
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.headerActionButton, { marginLeft: 10 }]}
-                onPress={() => navigation.navigate('SignIn', { role: 'patient' })}
-              >
-                <LogOut size={20} color="#FFFFFF" />
-              </TouchableOpacity>
+
+              <View style={styles.headerTextContainer}>
+                <Text style={styles.greeting}>Hello, Sarah 👋</Text>
+                <Text style={styles.subGreeting}>Take care of your health</Text>
+              </View>
+
+              <View style={styles.headerActions}>
+                <TouchableOpacity 
+                  style={styles.headerActionButton}
+                  onPress={() => setAppointmentModalVisible(true)}
+                >
+                  <Calendar size={20} color="#FFFFFF" />
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.headerActionButton, { marginLeft: 10 }]}>
+                  <Bell size={20} color="#FFFFFF" />
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.headerActionButton, { marginLeft: 10 }]}
+                  onPress={() => navigation.navigate('SignIn', { role: 'patient' })}
+                >
+                  <LogOut size={20} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
+          </StaggeredView>
 
           {/* Search Bar */}
-          <View style={styles.searchContainer}>
-            <Search size={20} color="#9CA3AF" />
-            <Text style={styles.searchPlaceholder}>Search doctors, hospitals, tests...</Text>
-          </View>
+          <StaggeredView delay={200}>
+            <View style={styles.searchContainer}>
+              <Search size={20} color="#9CA3AF" />
+              <Text style={styles.searchPlaceholder}>Search doctors, hospitals, tests...</Text>
+            </View>
+          </StaggeredView>
 
           {/* Appointment Reminder Alert */}
           {reminderVisible && (
@@ -279,63 +327,65 @@ const PatientDashboard = () => {
           )}
 
           {/* AI Health Assistant Card */}
-          <Pressable
-            onPressIn={handleAiCardPressIn}
-            onPressOut={handleAiCardPressOut}
-          >
-            <Animated.View
-              style={[
-                {
-                  transform: [{ scale: aiCardScale }, { translateY: aiCardLift }],
-                },
-              ]}
+          <StaggeredView delay={300}>
+            <Pressable
+              onPressIn={handleAiCardPressIn}
+              onPressOut={handleAiCardPressOut}
             >
-              <LinearGradient
-                colors={['#FFFFFF', '#F7F2FF']}
+              <Animated.View
                 style={[
-                  styles.aiCard, 
-                  aiCardPressed ? styles.aiCardPressed : null, 
-                  aiCardHovered ? styles.aiCardHovered : null
+                  {
+                    transform: [{ scale: aiCardScale }, { translateY: aiCardLift }],
+                  },
                 ]}
               >
-                <View style={styles.aiCardContent}>
-                  <Text style={styles.aiCardTitle}>AI Health Assistant</Text>
-                  <Text style={styles.aiCardText}>Check your symptoms and get{'\n'}AI health suggestions</Text>
-                  <TouchableOpacity 
-                    style={styles.aiCardBtn}
-                    onPress={() => navigation.navigate('AIHealthAssistant')}
-                  >
-                    <Text style={styles.aiCardBtnText}>Check Now</Text>
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.aiCardImageContainer}>
-                  <Animated.View style={[styles.aiCardGlowWrap, { opacity: aiGlowPulse }]}>
-                    <LinearGradient
-                      colors={['rgba(89, 58, 202, 0.56)', 'rgba(126, 69, 232, 0.14)']}
-                      style={styles.aiCardImageGlow}
+                <LinearGradient
+                  colors={['#FFFFFF', '#F7F2FF']}
+                  style={[
+                    styles.aiCard, 
+                    aiCardPressed ? styles.aiCardPressed : null, 
+                    aiCardHovered ? styles.aiCardHovered : null
+                  ]}
+                >
+                  <View style={styles.aiCardContent}>
+                    <Text style={styles.aiCardTitle}>AI Health Assistant</Text>
+                    <Text style={styles.aiCardText}>Check your symptoms and get{'\n'}AI health suggestions</Text>
+                    <TouchableOpacity 
+                      style={styles.aiCardBtn}
+                      onPress={() => navigation.navigate('AIHealthAssistant')}
+                    >
+                      <Text style={styles.aiCardBtnText}>Check Now</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.aiCardImageContainer}>
+                    <Animated.View style={[styles.aiCardGlowWrap, { opacity: aiGlowPulse }]}>
+                      <LinearGradient
+                        colors={['rgba(89, 58, 202, 0.56)', 'rgba(126, 69, 232, 0.14)']}
+                        style={styles.aiCardImageGlow}
+                      />
+                    </Animated.View>
+                    <Image 
+                      source={require('../../../assets/bot2.jpg')} 
+                      style={styles.aiCardImage} 
+                      resizeMode="contain"
                     />
-                  </Animated.View>
-                  <Image 
-                    source={require('../../../assets/bot2.jpg')} 
-                    style={styles.aiCardImage} 
-                    resizeMode="contain"
-                  />
-                </View>
-              </LinearGradient>
-            </Animated.View>
-          </Pressable>
+                  </View>
+                </LinearGradient>
+              </Animated.View>
+            </Pressable>
+          </StaggeredView>
         </LinearGradient>
 
         {/* Bottom White Section */}
         <View style={styles.whiteCurveContainer}>
           
           {/* Specialties Categories */}
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false} 
-            contentContainerStyle={styles.categoriesContainer}
-            
-          >
+          <StaggeredView delay={400}>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false} 
+              contentContainerStyle={styles.categoriesContainer}
+            >
             <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('SpecialtyDoctors', { specialty: 'Cardiology' })}>
               <View style={[styles.categoryIconWrap, { backgroundColor: '#FFF1F2' }]}>
                 <Heart size={28} color="#E11D48" fill="#E11D48" />
@@ -393,6 +443,7 @@ const PatientDashboard = () => {
             </TouchableOpacity>
 
           </ScrollView>
+        </StaggeredView>
 
           {/* Upcoming Appointments Main Section */}
           <View style={[styles.sectionHeader, { marginTop: 5, marginBottom: 15 }]}>

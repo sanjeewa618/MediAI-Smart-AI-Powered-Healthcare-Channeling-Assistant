@@ -50,8 +50,7 @@ import AIMonitoringScreen from '../screens/admin/AIMonitoringScreen';
 import AdminReportsScreen from '../screens/admin/ReportsScreen';
 import AdminSettingsScreen from '../screens/admin/SettingsScreen';
 import AdminLaboratoriesScreen from '../screens/admin/AdminLaboratoriesScreen';
-
-
+import AdminAppointmentsScreen from '../screens/admin/AdminAppointmentsScreen'; // Admin Appointments Screen
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -62,7 +61,7 @@ const AppNavigator = () => {
       screenOptions={{
         headerShown: false,
         cardStyle: { backgroundColor: '#FFFFFF' },
-        ...TransitionPresets.FadeFromBottomAndroid,
+        ...TransitionPresets.SlideFromRightIOS,
       }}
     >
       <Stack.Screen name="Splash" component={SplashScreen} />
@@ -106,6 +105,7 @@ const AppNavigator = () => {
       <Stack.Screen name="AdminReports" component={AdminReportsScreen} />
       <Stack.Screen name="AdminSettings" component={AdminSettingsScreen} />
       <Stack.Screen name="AdminLaboratories" component={AdminLaboratoriesScreen} />
+      <Stack.Screen name="AdminAppointments" component={AdminAppointmentsScreen} />
     </Stack.Navigator>
   );
 };
