@@ -1,6 +1,99 @@
 import AIAnalysisLog from '../model/AIAnalysisLog.js';
 
-// @desc    Analyze symptoms using AI rule-engine and log the analysis
+// ── Current Gemini model names to try in order (most recent first) ────────────
+const GEMINI_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-2.0-flash',
+  'gemini-2.0-flash-lite',
+  'gemini-1.5-pro',
+  'gemini-1.5-flash',
+  'gemini-pro',
+];
+
+// ── Call Gemini REST API directly (avoids SDK model-name caching issues) ──────
+async function callGemini(apiKey, modelName, messages) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+
+  const body = {
+    contents: messages,
+    generationConfig: {
+      responseMimeType: 'application/json',
+    },
+  };
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`[${response.status} ${response.statusText}] ${errText}`);
+  }
+
+  const data = await response.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
+}
+
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// ── Try each model name until one works ──────────────────────────────────────
+async function analyzeWithGemini(apiKey, symptoms) {
+  const systemInstruction = `You are MediAI, an advanced medical assistant bot. You analyze patient symptoms and respond ONLY in strict JSON matching this structure exactly:
+{
+  "aiResponse": "A friendly, detailed analysis of the symptoms including general advice and safety warnings.",
+  "predictedConditions": ["Condition 1", "Condition 2"],
+  "recommendedSpecialist": "One doctor specialty (e.g. Cardiologist, Neurologist, General Practitioner, Dermatologist, Orthopedic, Pediatrician, Gynecologist)"
+}`;
+
+  const messages = [
+    {
+      role: 'user',
+      parts: [
+        { text: systemInstruction },
+        { text: `Analyze the following patient symptoms: "${symptoms}"` },
+      ],
+    },
+  ];
+
+  let lastError = null;
+  const MAX_RETRIES = 3;
+
+  for (const modelName of GEMINI_MODELS) {
+    let attempt = 0;
+    
+    while (attempt <= MAX_RETRIES) {
+      try {
+        console.log(`Trying Gemini model: ${modelName} (Attempt ${attempt + 1})`);
+        const text = await callGemini(apiKey, modelName, messages);
+        if (!text) throw new Error('Empty response from model');
+        const parsed = JSON.parse(text.trim());
+        console.log(`✓ Gemini model "${modelName}" responded successfully.`);
+        return parsed;
+      } catch (err) {
+        lastError = err;
+        const errMsg = err.message || '';
+        
+        // If it's a 429 (Quota) or 503 (Overload), wait and retry
+        if (errMsg.includes('429') || errMsg.includes('503')) {
+          console.warn(`[${modelName}] Rate limit / Overload (429/503). Retrying in ${Math.pow(2, attempt)}s...`);
+          await sleep(Math.pow(2, attempt) * 1000);
+          attempt++;
+        } else {
+          // If it's a 404 or other error, break the retry loop and try the next model
+          console.warn(`✗ Model "${modelName}" failed: ${errMsg.slice(0, 120)}`);
+          break;
+        }
+      }
+    }
+  }
+
+  throw new Error(`All Gemini models failed. Last error: ${lastError?.message}`);
+}
+
+// @desc    Analyze symptoms using Gemini AI and log the analysis
 // @route   POST /api/ai/analyze
 // @access  Private
 export const analyzeSymptoms = async (req, res) => {
@@ -12,48 +105,26 @@ export const analyzeSymptoms = async (req, res) => {
       return res.status(400).json({ message: 'Symptoms description is required' });
     }
 
-    const lowerSymptoms = symptoms.toLowerCase();
-    let aiResponse = '';
-    let predictedConditions = [];
-    let recommendedSpecialist = 'General Practitioner';
-
-    // Simple rule-based medical parsing engine
-    if (lowerSymptoms.includes('fever') || lowerSymptoms.includes('temperature') || lowerSymptoms.includes('flu')) {
-      aiResponse = "A fever can indicate an infection. Stay hydrated, rest, and monitor your temperature. If the fever exceeds 103°F / 39.4°C or lasts more than 3 days, please consult a doctor.";
-      predictedConditions = ['Viral Fever', 'Influenza', 'Systemic Infection'];
-      recommendedSpecialist = 'General Practitioner';
-    } else if (lowerSymptoms.includes('chest') || lowerSymptoms.includes('heart') || lowerSymptoms.includes('breathing')) {
-      aiResponse = "Chest pain or breathing difficulty should never be ignored. It could range from muscle strain to a serious cardiovascular issue. If severe, accompanied by shortness of breath or radiating pain, seek emergency services immediately.";
-      predictedConditions = ['Angina', 'Cardiovascular Strain', 'Asthma/Bronchitis'];
-      recommendedSpecialist = 'Cardiologist';
-    } else if (lowerSymptoms.includes('head') || lowerSymptoms.includes('migraine') || lowerSymptoms.includes('dizzy')) {
-      aiResponse = "Headaches lasting more than a couple of days or accompanied by dizziness may be tension headaches or migraines. Ensure you are well-hydrated, rested, and reduce screen time.";
-      predictedConditions = ['Migraine', 'Tension Headache', 'Dehydration-induced Headache'];
-      recommendedSpecialist = 'Neurologist';
-    } else if (lowerSymptoms.includes('stomach') || lowerSymptoms.includes('nausea') || lowerSymptoms.includes('vomit') || lowerSymptoms.includes('belly')) {
-      aiResponse = "Stomach pain or nausea can stem from dietary issues, gastritis, or infections. Stay hydrated and eat bland foods. If pain is severe or localized to the lower right abdomen, consult a doctor promptly.";
-      predictedConditions = ['Gastritis', 'Gastroenteritis', 'Acid Reflux'];
-      recommendedSpecialist = 'Gastroenterologist';
-    } else {
-      aiResponse = "Thank you for sharing your symptoms. Based on your description, I recommend monitoring your symptoms closely and taking ample rest. If symptoms persist or worsen, please schedule a consultation.";
-      predictedConditions = ['Undetermined Symptomatic Presentation'];
-      recommendedSpecialist = 'General Practitioner';
+    const apiKey = process.env.Gemini_API_KEY || process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ message: 'Gemini API Key is missing on the server' });
     }
 
-    // Save log to DB
+    // Try all available Gemini models until one succeeds
+    const parsedData = await analyzeWithGemini(apiKey, symptoms);
+
+    // Save the successful analysis to DB
     const log = await AIAnalysisLog.create({
       patient: patientId,
       symptomsProvided: symptoms,
-      aiResponse,
-      predictedConditions,
-      recommendedSpecialist,
+      aiResponse: parsedData.aiResponse,
+      predictedConditions: parsedData.predictedConditions || [],
+      recommendedSpecialist: parsedData.recommendedSpecialist || 'General Practitioner',
     });
 
-    res.status(200).json({
-      success: true,
-      data: log,
-    });
+    res.status(200).json({ success: true, data: log });
   } catch (error) {
+    console.error('Gemini AI Integration Error:', error.message);
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };

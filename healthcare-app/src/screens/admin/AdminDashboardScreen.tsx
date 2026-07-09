@@ -198,11 +198,11 @@ const AdminDashboardScreen = () => {
                   <Text style={styles.menuItemText}>Users</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.menuItem} onPress={() => navigateTo('AdminDoctorVerification')}>
-                  <View style={[styles.menuIconBox, { backgroundColor: '#ECFDF5' }]}>
-                    <Stethoscope size={20} color="#10B981" />
+                <TouchableOpacity style={styles.menuItem} onPress={() => navigateTo('AdminAppointments')}>
+                  <View style={[styles.menuIconBox, { backgroundColor: '#FEE2E2' }]}>
+                    <Calendar size={20} color="#EF4444" />
                   </View>
-                  <Text style={styles.menuItemText}>Doctors</Text>
+                  <Text style={styles.menuItemText}>Appointments</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.menuItem} onPress={() => navigateTo('AdminRequests')}>

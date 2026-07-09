@@ -151,3 +151,96 @@ export const rejectRequest = async (req, res) => {
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
+
+// @desc    Add a new user manually (admin creates patient/doctor/nurse)
+// @route   POST /api/admin/users
+// @access  Private (Admin only)
+export const addUser = async (req, res) => {
+  try {
+    const { name, email, phone, password, role, specialization, department } = req.body;
+
+    const userExists = await User.findOne({ $or: [{ email }, { phone }] });
+    if (userExists) {
+      return res.status(400).json({ message: 'User with this email or phone already exists' });
+    }
+
+    const user = await User.create({
+      name,
+      email,
+      phone,
+      password,
+      role,
+      specialization,
+      department,
+      status: 'active'
+    });
+
+    res.status(201).json({
+      success: true,
+      data: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+// @desc    Update user profile details (name, email, specialization, department)
+// @route   PUT /api/admin/users/:id
+// @access  Private (Admin only)
+export const updateUserDetails = async (req, res) => {
+  try {
+    const { name, email, specialization, department } = req.body;
+
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (name) user.name = name;
+    if (email) user.email = email;
+    if (specialization && user.role === 'doctor') user.specialization = specialization;
+    if (department && user.role === 'nurse') user.department = department;
+
+    const updatedUser = await user.save();
+
+    res.json({
+      success: true,
+      data: updatedUser
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+// @desc    Update user status (active, suspended, disabled, verified)
+// @route   PATCH /api/admin/users/:id/status
+// @access  Private (Admin only)
+export const updateUserStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+
+    if (!['pending', 'approved', 'rejected', 'active', 'suspended', 'disabled', 'verified'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status provided' });
+    }
+
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.status = status;
+    const updatedUser = await user.save();
+
+    res.json({
+      success: true,
+      data: updatedUser
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};

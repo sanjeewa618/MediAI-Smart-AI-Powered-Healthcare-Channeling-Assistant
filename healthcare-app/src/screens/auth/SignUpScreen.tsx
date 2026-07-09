@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Image, Dimensions, ActivityIndicator } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Image, Dimensions, ActivityIndicator, Animated } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import { CustomInput } from '../../components/CustomInput';
 import { CustomButton } from '../../components/CustomButton';
@@ -14,6 +14,50 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:40
 
 type SignUpScreenProp = StackNavigationProp<RootStackParamList, 'SignUp'>;
 type SignUpRouteProp = RouteProp<RootStackParamList, 'SignUp'>;
+
+// Staggered Entrance Animation Wrapper
+const StaggeredView = ({ children, delay = 0, style }: { children: React.ReactNode; delay: number; style?: any }) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const translateYAnim = useRef(new Animated.Value(-30)).current;
+  const scaleAnim = useRef(new Animated.Value(0.95)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        delay: delay,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateYAnim, {
+        toValue: 0,
+        duration: 500,
+        delay: delay,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 500,
+        delay: delay,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  return (
+    <Animated.View
+      style={[
+        style,
+        {
+          opacity: fadeAnim,
+          transform: [{ translateY: translateYAnim }, { scale: scaleAnim }],
+        },
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
+};
 
 const SignUpScreen = () => {
   const navigation = useNavigation<SignUpScreenProp>();
@@ -135,7 +179,7 @@ const SignUpScreen = () => {
 
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/register-staff`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -169,146 +213,158 @@ const SignUpScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.topHeaderRow}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <ArrowLeft size={30} color={COLORS.primary} />
-          </TouchableOpacity>
-          <View style={styles.headerTextWrap}>
-            <Text style={styles.title}>
-              {role === 'doctor' ? 'Doctor Request' : role === 'nurse' ? 'Nurse Request' : 'Create Account'}
-            </Text>
-            <Text style={styles.subtitle}>
-              {role === 'doctor' || role === 'nurse' 
-                ? `Submit request to join as a ${role}`
-                : 'Sign up to get started'}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.imageContainer}>
-          <Image 
-            source={require('../../../assets/signup-image2.png')} 
-            style={[styles.illustration as any, { opacity: 0.90 }]}
-            resizeMode="contain"
-          />
-        </View>
-
-        <View style={styles.form}>
-          <CustomInput label="Full Name" placeholder="Enter your full name" value={name} onChangeText={setName} />
-          
-          <CustomInput label="Email" placeholder="Enter your email" keyboardType="email-address" value={email} onChangeText={setEmail} autoCapitalize="none" />
-          
-          <View style={styles.otpButtonContainer}>
-            <TouchableOpacity 
-              style={styles.otpButtonNew} 
-              onPress={handleSendOtp} 
-              disabled={otpLoading}
-            >
-              {otpLoading ? (
-                <ActivityIndicator size="small" color={COLORS.primary} />
-              ) : (
-                <Text style={styles.otpButtonTextNew}>
-                  {isOtpSent ? 'Resend OTP' : 'Send OTP'}
-                </Text>
-              )}
+        <StaggeredView delay={100}>
+          <View style={styles.topHeaderRow}>
+            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+              <ArrowLeft size={30} color={COLORS.primary} />
             </TouchableOpacity>
-          </View>
-          
-          {isOtpSent && (
-            <CustomInput 
-              label="OTP Code" 
-              placeholder="Enter the OTP sent to your email" 
-              keyboardType="number-pad" 
-              value={otp} 
-              onChangeText={setOtp} 
-            />
-          )}
-          
-          <CustomInput label="Phone Number" placeholder="Enter your phone number" keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
-          
-          {role === 'doctor' && (
-            <CustomInput label="Doctor ID" placeholder="Enter your Doctor ID" value={doctorId} onChangeText={setDoctorId} />
-          )}
-          {role === 'nurse' && (
-            <CustomInput label="Nurse ID" placeholder="Enter your Nurse ID" value={nurseId} onChangeText={setNurseId} />
-          )}
-
-          <View style={styles.passwordWrapper}>
-            <CustomInput label="Password" placeholder="Create a password" secureTextEntry={hidePassword} value={password} onChangeText={setPassword} />
-            <TouchableOpacity style={styles.eyeIcon} onPress={() => setHidePassword(!hidePassword)}>
-              {hidePassword ? <EyeOff size={20} color="#9CA3AF" /> : <Eye size={20} color="#9CA3AF" />}
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.passwordWrapper}>
-            <CustomInput label="Confirm Password" placeholder="Confirm your password" secureTextEntry={hideConfirmPassword} value={confirmPassword} onChangeText={setConfirmPassword} />
-            <TouchableOpacity style={styles.eyeIcon} onPress={() => setHideConfirmPassword(!hideConfirmPassword)}>
-              {hideConfirmPassword ? <EyeOff size={20} color="#9CA3AF" /> : <Eye size={20} color="#9CA3AF" />}
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.termsRow}>
-            <TouchableOpacity onPress={() => setAgree(!agree)}>
-              {agree ? <CheckCircle2 size={22} color={COLORS.primary} /> : <Circle size={22} color="#D1D1D6" />}
-            </TouchableOpacity>
-            <Text style={styles.termsText}>
-              I agree to the <Text style={styles.linkText}>Terms & Conditions</Text>{"\n"}
-              <Text style={styles.linkText}>Privacy Policy</Text>
-            </Text>
-          </View>
-
-          {role === 'doctor' || role === 'nurse' ? (
-            <CustomButton 
-              title="Submit Request" 
-              onPress={handleSignUpStaff}
-              loading={loading}
-              style={styles.signUpButton}
-            />
-          ) : (
-            <View style={styles.buttonRow}>
-              <CustomButton 
-                title="Sign Up as Patient" 
-                onPress={handleSignUpPatient}
-                style={styles.patientButton}
-                textStyle={{ fontSize: 12 }}
-                loading={loading}
-                disabled={!isOtpSent || !otp}
-              />
-              <CustomButton 
-                title="Request for hospital staff" 
-                variant="outline"
-                onPress={() => navigation.navigate('RoleSelection')}
-                style={styles.staffButton}
-                textStyle={{ fontSize: 10.5 }}
-              />
+            <View style={styles.headerTextWrap}>
+              <Text style={styles.title}>
+                {role === 'doctor' ? 'Doctor Request' : role === 'nurse' ? 'Nurse Request' : 'Create Account'}
+              </Text>
+              <Text style={styles.subtitle}>
+                {role === 'doctor' || role === 'nurse' 
+                  ? `Submit request to join as a ${role}`
+                  : 'Sign up to get started'}
+              </Text>
             </View>
-          )}
-        </View>
+          </View>
+        </StaggeredView>
 
-        <View style={styles.dividerContainer}>
-          <View style={styles.line} />
-          <Text style={styles.dividerText}>Or continue with</Text>
-          <View style={styles.line} />
-        </View>
+        <StaggeredView delay={250}>
+          <View style={styles.imageContainer}>
+            <Image 
+              source={require('../../../assets/signup-image2.png')} 
+              style={[styles.illustration as any, { opacity: 0.90 }]}
+              resizeMode="contain"
+            />
+          </View>
+        </StaggeredView>
 
-        <View style={styles.socialContainer}>
-          <TouchableOpacity style={[styles.socialButton, SHADOWS.light]}>
-            <Image source={{ uri: 'https://cdn-icons-png.flaticon.com/512/2991/2991148.png' }} style={styles.socialIcon} />
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.socialButton, SHADOWS.light]}>
-            <Image source={{ uri: 'https://cdn-icons-png.flaticon.com/512/0/747.png' }} style={styles.socialIcon} />
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.socialButton, SHADOWS.light]}>
-            <Image source={{ uri: 'https://cdn-icons-png.flaticon.com/512/124/124010.png' }} style={styles.socialIcon} />
-          </TouchableOpacity>
-        </View>
+        <StaggeredView delay={400}>
+          <View style={styles.form}>
+            <CustomInput label="Full Name" placeholder="Enter your full name" value={name} onChangeText={setName} />
+            
+            <CustomInput label="Email" placeholder="Enter your email" keyboardType="email-address" value={email} onChangeText={setEmail} autoCapitalize="none" />
+            
+            <View style={styles.otpButtonContainer}>
+              <TouchableOpacity 
+                style={styles.otpButtonNew} 
+                onPress={handleSendOtp} 
+                disabled={otpLoading}
+              >
+                {otpLoading ? (
+                  <ActivityIndicator size="small" color={COLORS.primary} />
+                ) : (
+                  <Text style={styles.otpButtonTextNew}>
+                    {isOtpSent ? 'Resend OTP' : 'Send OTP'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+            
+            {isOtpSent && (
+              <CustomInput 
+                label="OTP Code" 
+                placeholder="Enter the OTP sent to your email" 
+                keyboardType="number-pad" 
+                value={otp} 
+                onChangeText={setOtp} 
+              />
+            )}
+            
+            <CustomInput label="Phone Number" placeholder="Enter your phone number" keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
+            
+            {role === 'doctor' && (
+              <CustomInput label="Doctor ID" placeholder="Enter your Doctor ID" value={doctorId} onChangeText={setDoctorId} />
+            )}
+            {role === 'nurse' && (
+              <CustomInput label="Nurse ID" placeholder="Enter your Nurse ID" value={nurseId} onChangeText={setNurseId} />
+            )}
 
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Already have an account? </Text>
-          <TouchableOpacity onPress={() => navigation.navigate('SignIn')}>
-            <Text style={styles.signInText}>Sign In</Text>
-          </TouchableOpacity>
-        </View>
+            <View style={styles.passwordWrapper}>
+              <CustomInput label="Password" placeholder="Create a password" secureTextEntry={hidePassword} value={password} onChangeText={setPassword} />
+              <TouchableOpacity style={styles.eyeIcon} onPress={() => setHidePassword(!hidePassword)}>
+                {hidePassword ? <EyeOff size={20} color="#9CA3AF" /> : <Eye size={20} color="#9CA3AF" />}
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.passwordWrapper}>
+              <CustomInput label="Confirm Password" placeholder="Confirm your password" secureTextEntry={hideConfirmPassword} value={confirmPassword} onChangeText={setConfirmPassword} />
+              <TouchableOpacity style={styles.eyeIcon} onPress={() => setHideConfirmPassword(!hideConfirmPassword)}>
+                {hideConfirmPassword ? <EyeOff size={20} color="#9CA3AF" /> : <Eye size={20} color="#9CA3AF" />}
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.termsRow}>
+              <TouchableOpacity onPress={() => setAgree(!agree)}>
+                {agree ? <CheckCircle2 size={22} color={COLORS.primary} /> : <Circle size={22} color="#D1D1D6" />}
+              </TouchableOpacity>
+              <Text style={styles.termsText}>
+                I agree to the <Text style={styles.linkText}>Terms & Conditions</Text>{"\n"}
+                <Text style={styles.linkText}>Privacy Policy</Text>
+              </Text>
+            </View>
+
+            {role === 'doctor' || role === 'nurse' ? (
+              <CustomButton 
+                title="Submit Request" 
+                onPress={handleSignUpStaff}
+                loading={loading}
+                style={styles.signUpButton}
+              />
+            ) : (
+              <View style={styles.buttonRow}>
+                <CustomButton 
+                  title="Sign Up as Patient" 
+                  onPress={handleSignUpPatient}
+                  style={styles.patientButton}
+                  textStyle={{ fontSize: 12 }}
+                  loading={loading}
+                  disabled={!isOtpSent || !otp}
+                />
+                <CustomButton 
+                  title="Request for hospital staff" 
+                  variant="outline"
+                  onPress={() => navigation.navigate('RoleSelection')}
+                  style={styles.staffButton}
+                  textStyle={{ fontSize: 10.5 }}
+                />
+              </View>
+            )}
+          </View>
+        </StaggeredView>
+
+        <StaggeredView delay={550}>
+          <View style={styles.dividerContainer}>
+            <View style={styles.line} />
+            <Text style={styles.dividerText}>Or continue with</Text>
+            <View style={styles.line} />
+          </View>
+        </StaggeredView>
+
+        <StaggeredView delay={650}>
+          <View style={styles.socialContainer}>
+            <TouchableOpacity style={[styles.socialButton, SHADOWS.light]}>
+              <Image source={{ uri: 'https://cdn-icons-png.flaticon.com/512/2991/2991148.png' }} style={styles.socialIcon} />
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.socialButton, SHADOWS.light]}>
+              <Image source={{ uri: 'https://cdn-icons-png.flaticon.com/512/0/747.png' }} style={styles.socialIcon} />
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.socialButton, SHADOWS.light]}>
+              <Image source={{ uri: 'https://cdn-icons-png.flaticon.com/512/124/124010.png' }} style={styles.socialIcon} />
+            </TouchableOpacity>
+          </View>
+        </StaggeredView>
+
+        <StaggeredView delay={750}>
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Already have an account? </Text>
+            <TouchableOpacity onPress={() => navigation.navigate('SignIn')}>
+              <Text style={styles.signInText}>Sign In</Text>
+            </TouchableOpacity>
+          </View>
+        </StaggeredView>
       </ScrollView>
     </SafeAreaView>
   );
