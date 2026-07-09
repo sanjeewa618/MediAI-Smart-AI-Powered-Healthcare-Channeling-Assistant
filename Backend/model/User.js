@@ -8,11 +8,12 @@ const userSchema = new mongoose.Schema(
     phone: { type: String, required: true, unique: true },
     password: { type: String, required: true, select: false },
     role: { type: String, enum: ['patient', 'doctor', 'nurse', 'admin'], default: 'patient' },
-    status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'approved' },
+    status: { type: String, enum: ['pending', 'approved', 'rejected', 'active', 'suspended', 'disabled', 'verified'], default: 'approved' },
     staffId: { type: String }, // Store Doctor ID or Nurse ID
     
     // Doctor Specific Profile
     specialization: { type: String },
+    department: { type: String }, // For Nurses (e.g. ICU, OPD)
     hospital: { type: String },
     bio: { type: String },
     experienceYears: { type: Number },

@@ -17,6 +17,15 @@ expo-env.d.ts
 
 # Backend local env
 Backend/.env
+backend/.env
+backend/env
+healthcare-app/env
+
+# Lock files (auto-generated, causes conflicts)
+package-lock.json
+Backend/package-lock.json
+backend/package-lock.json
+healthcare-app/package-lock.json
 
 # Logs
 npm-debug.log*
