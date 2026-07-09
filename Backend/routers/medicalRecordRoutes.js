@@ -1,53 +1,21 @@
-const express = require('express');
+import express from 'express';
+import {
+  listMedicalRecords, getMedicalRecordById, createMedicalRecord,
+  updateMedicalRecord, deleteMedicalRecord, getPatientStats
+} from '../controllers/medicalRecordController.js';
+
+import { protect } from '../middlewares/authMiddleware.js';
+import { authorizeRoles } from '../middlewares/roleMiddleware.js';
+
 const router = express.Router();
 
-const {
-  listMedicalRecords,
-  getMedicalRecordById,
-  createMedicalRecord,
-  updateMedicalRecord,
-  deleteMedicalRecord,
-  getPatientStats
-} = require('../controllers/medicalRecordController');
+router.use(protect);
 
-const { authenticate, authorize } = require('../middleware/auth');
+router.get('/patient/stats', authorizeRoles('patient', 'doctor', 'nurse', 'lab', 'admin'), getPatientStats);
+router.get('/', authorizeRoles('patient', 'doctor', 'nurse', 'lab', 'admin'), listMedicalRecords);
+router.get('/:id', authorizeRoles('patient', 'doctor', 'nurse', 'lab', 'admin'), getMedicalRecordById);
+router.post('/', authorizeRoles('patient', 'doctor', 'nurse', 'lab', 'admin'), createMedicalRecord);
+router.patch('/:id', authorizeRoles('patient', 'doctor', 'nurse', 'lab', 'admin'), updateMedicalRecord);
+router.delete('/:id', authorizeRoles('patient', 'doctor', 'nurse', 'lab', 'admin'), deleteMedicalRecord);
 
-router.use(authenticate);
-
-router.get(
-  '/patient/stats',
-  authorize('patient', 'doctor', 'nurse', 'lab', 'admin'),
-  getPatientStats
-);
-
-router.get(
-  '/',
-  authorize('patient', 'doctor', 'nurse', 'lab', 'admin'),
-  listMedicalRecords
-);
-
-router.get(
-  '/:id',
-  authorize('patient', 'doctor', 'nurse', 'lab', 'admin'),
-  getMedicalRecordById
-);
-
-router.post(
-  '/',
-  authorize('patient', 'doctor', 'nurse', 'lab', 'admin'),
-  createMedicalRecord
-);
-
-router.patch(
-  '/:id',
-  authorize('patient', 'doctor', 'nurse', 'lab', 'admin'),
-  updateMedicalRecord
-);
-
-router.delete(
-  '/:id',
-  authorize('patient', 'doctor', 'nurse', 'lab', 'admin'),
-  deleteMedicalRecord
-);
-
-module.exports = router;
+export default router;

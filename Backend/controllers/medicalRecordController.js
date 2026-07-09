@@ -1,6 +1,5 @@
-const mongoose = require('mongoose');
-
-const MedicalRecord = require('../models/MedicalRecord');
+import mongoose from 'mongoose';
+import MedicalRecord from '../model/MedicalRecord.js';
 
 const listMedicalRecords = async (req, res, next) => {
   try {
@@ -282,7 +281,7 @@ const getPatientStats = async (req, res, next) => {
   }
 };
 
-module.exports = {
+export {
   listMedicalRecords,
   getMedicalRecordById,
   createMedicalRecord,
