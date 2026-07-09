@@ -357,10 +357,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB'
   },
   headerGradient: {
-    paddingTop: Platform.OS === 'ios' ? 30 : 40,
+    paddingTop: Platform.OS === 'ios' ? 25 : 32,
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
-    paddingBottom: 55,
+    paddingBottom: 40,
   },
   header: {
     flexDirection: 'row',
