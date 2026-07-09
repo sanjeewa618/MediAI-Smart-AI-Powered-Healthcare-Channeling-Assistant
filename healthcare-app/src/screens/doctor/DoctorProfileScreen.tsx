@@ -173,7 +173,13 @@ const DoctorProfileScreen = () => {
         </View>
 
         {/* Logout */}
-        <TouchableOpacity style={[styles.logoutBtn, SHADOWS.small]} onPress={() => navigation.navigate('SignIn')}>
+        <TouchableOpacity 
+          style={[styles.logoutBtn, SHADOWS.small]} 
+          onPress={() => navigation.reset({
+            index: 0,
+            routes: [{ name: 'SignIn', params: { role: 'doctor' } }],
+          })}
+        >
           <LogOut size={18} color={COLORS.error} />
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>

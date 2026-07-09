@@ -1,16 +1,43 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, Platform, StatusBar, Modal, Pressable, Animated, PanResponder, Dimensions } from 'react-native';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, Platform, StatusBar, Modal, Pressable, Animated, PanResponder, Dimensions, BackHandler } from 'react-native';
 import { COLORS, SHADOWS, SIZES } from '../../theme/theme';
 import { Microscope, FileText, Bell, Plus, CheckCircle, Clock, ChevronLeft, LogOut, Calendar, Activity, AlertCircle, FlaskConical, ClipboardList, TrendingUp, Users, Heart, Droplets, Baby, Dna, Sparkles, X, ChevronRight, MapPin } from 'lucide-react-native';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 import NurseBottomNavBar from '../../components/NurseBottomNavBar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 
 const LabDashboard = () => {
   const navigation = useNavigation<any>();
+  const isLoggingOut = useRef(false);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
+      if (e.data.action.type === 'RESET') {
+        return;
+      }
+      if (isLoggingOut.current) {
+        return;
+      }
+      e.preventDefault();
+    });
+    return unsubscribe;
+  }, [navigation]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        return true;
+      };
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => {
+        subscription.remove();
+      };
+    }, [])
+  );
+
   const { role } = useAuth();
   const [selectedLab, setSelectedLab] = useState<any>(null);
   const panY = useRef(new Animated.Value(0)).current;
@@ -131,7 +158,13 @@ const LabDashboard = () => {
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.iconBtn} 
-                onPress={() => navigation.navigate('SignIn', { role: role || 'lab' })}
+                onPress={() => {
+                  isLoggingOut.current = true;
+                  navigation.reset({
+                    index: 0,
+                    routes: [{ name: 'SignIn', params: { role: role || 'lab' } }],
+                  });
+                }}
               >
                 <LogOut size={20} color="#FFF" />
               </TouchableOpacity>

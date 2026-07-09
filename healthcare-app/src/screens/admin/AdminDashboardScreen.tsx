@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -12,9 +12,10 @@ import {
   Modal,
   Animated,
   PanResponder,
-  Pressable
+  Pressable,
+  BackHandler
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SHADOWS, SIZES } from '../../theme/theme';
 import { 
@@ -58,6 +59,33 @@ const STATS = {
 
 const AdminDashboardScreen = () => {
   const navigation = useNavigation<any>();
+  const isLoggingOut = useRef(false);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
+      if (e.data.action.type === 'RESET') {
+        return;
+      }
+      if (isLoggingOut.current) {
+        return;
+      }
+      e.preventDefault();
+    });
+    return unsubscribe;
+  }, [navigation]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        return true; // Prevents back navigation
+      };
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => {
+        subscription.remove();
+      };
+    }, [])
+  );
+
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   
   // Left-to-Right Drawer animation configuration:
@@ -198,6 +226,7 @@ const AdminDashboardScreen = () => {
                   <Text style={styles.menuItemText}>Users</Text>
                 </TouchableOpacity>
 
+
                 <TouchableOpacity style={styles.menuItem} onPress={() => navigateTo('AdminAppointments')}>
                   <View style={[styles.menuIconBox, { backgroundColor: '#FEE2E2' }]}>
                     <Calendar size={20} color="#EF4444" />
@@ -239,7 +268,11 @@ const AdminDashboardScreen = () => {
                   style={[styles.menuItem, { marginBottom: 30 }]} 
                   onPress={() => {
                     closeDrawer();
-                    navigation.replace('SignIn', { role: 'admin' });
+                    isLoggingOut.current = true;
+                    navigation.reset({
+                      index: 0,
+                      routes: [{ name: 'SignIn', params: { role: 'admin' } }],
+                    });
                   }}
                 >
                   <View style={[styles.menuIconBox, { backgroundColor: '#FEF2F2' }]}>
@@ -275,7 +308,13 @@ const AdminDashboardScreen = () => {
               </TouchableOpacity>
               <TouchableOpacity 
                 style={[styles.headerActionBtn, { marginLeft: 10 }]} 
-                onPress={() => navigation.replace('SignIn', { role: 'admin' })}
+                onPress={() => {
+                  isLoggingOut.current = true;
+                  navigation.reset({
+                    index: 0,
+                    routes: [{ name: 'SignIn', params: { role: 'admin' } }],
+                  });
+                }}
               >
                 <LogOut size={20} color="#FFF" />
               </TouchableOpacity>
