@@ -62,7 +62,7 @@ const AppNavigator = () => {
       screenOptions={{
         headerShown: false,
         cardStyle: { backgroundColor: '#FFFFFF' },
-        ...TransitionPresets.FadeFromBottomAndroid,
+        ...TransitionPresets.SlideFromRightIOS,
       }}
     >
       <Stack.Screen name="Splash" component={SplashScreen} />

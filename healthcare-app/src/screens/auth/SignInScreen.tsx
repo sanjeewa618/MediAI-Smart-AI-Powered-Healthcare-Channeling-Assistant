@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Image, Dimensions } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Image, Dimensions, Animated } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import { CustomInput } from '../../components/CustomInput';
 import { CustomButton } from '../../components/CustomButton';
@@ -15,6 +15,50 @@ const { width, height } = Dimensions.get('window');
 
 type SignInScreenProp = StackNavigationProp<RootStackParamList, 'SignIn'>;
 type SignInRouteProp = RouteProp<RootStackParamList, 'SignIn'>;
+
+// Staggered Entrance Animation Wrapper
+const StaggeredView = ({ children, delay = 0, style }: { children: React.ReactNode; delay: number; style?: any }) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const translateYAnim = useRef(new Animated.Value(-30)).current;
+  const scaleAnim = useRef(new Animated.Value(0.95)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        delay: delay,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateYAnim, {
+        toValue: 0,
+        duration: 500,
+        delay: delay,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 500,
+        delay: delay,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  return (
+    <Animated.View
+      style={[
+        style,
+        {
+          opacity: fadeAnim,
+          transform: [{ translateY: translateYAnim }, { scale: scaleAnim }],
+        },
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
+};
 
 const SignInScreen = () => {
   const navigation = useNavigation<SignInScreenProp>();
@@ -71,81 +115,93 @@ const SignInScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.topHeaderRow}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <ArrowLeft size={30} color={COLORS.primary} />
-          </TouchableOpacity>
-          <View style={styles.headerTextWrap}>
-            <Text style={styles.title}>Sign In</Text>
-            <Text style={styles.subtitle}>Sign in to continue</Text>
+        <StaggeredView delay={100}>
+          <View style={styles.topHeaderRow}>
+            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+              <ArrowLeft size={30} color={COLORS.primary} />
+            </TouchableOpacity>
+            <View style={styles.headerTextWrap}>
+              <Text style={styles.title}>Sign In</Text>
+              <Text style={styles.subtitle}>Sign in to continue</Text>
+            </View>
           </View>
-        </View>
+        </StaggeredView>
 
-        <View style={styles.imageContainer}>
-          <Image 
-            source={require('../../../assets/signin-image.png')} 
-            style={[styles.illustration as any, { opacity: 0.88 }]}
-            resizeMode="contain"
-          />
-        </View>
-
-        <View style={styles.form}>
-          <CustomInput 
-            label="Email or Phone Number"
-            placeholder="Enter your email or phone"
-            value={email}
-            onChangeText={setEmail}
-          />
-          
-          <View style={styles.passwordWrapper}>
-            <CustomInput 
-              label="Password"
-              placeholder="Enter your password"
-              secureTextEntry={hidePassword}
-              value={password}
-              onChangeText={setPassword}
+        <StaggeredView delay={250}>
+          <View style={styles.imageContainer}>
+            <Image 
+              source={require('../../../assets/signin-image.png')} 
+              style={[styles.illustration as any, { opacity: 0.88 }]}
+              resizeMode="contain"
             />
-            <TouchableOpacity style={styles.eyeIcon} onPress={() => setHidePassword(!hidePassword)}>
-              {hidePassword ? <EyeOff size={20} color="#9CA3AF" /> : <Eye size={20} color="#9CA3AF" />}
+          </View>
+        </StaggeredView>
+
+        <StaggeredView delay={400}>
+          <View style={styles.form}>
+            <CustomInput 
+              label="Email or Phone Number"
+              placeholder="Enter your email or phone"
+              value={email}
+              onChangeText={setEmail}
+            />
+            
+            <View style={styles.passwordWrapper}>
+              <CustomInput 
+                label="Password"
+                placeholder="Enter your password"
+                secureTextEntry={hidePassword}
+                value={password}
+                onChangeText={setPassword}
+              />
+              <TouchableOpacity style={styles.eyeIcon} onPress={() => setHidePassword(!hidePassword)}>
+                {hidePassword ? <EyeOff size={20} color="#9CA3AF" /> : <Eye size={20} color="#9CA3AF" />}
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity style={styles.forgotPassword} onPress={() => navigation.navigate('ForgotPassword')}>
+              <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+            </TouchableOpacity>
+
+            <CustomButton 
+              title="Sign In" 
+              onPress={handleSignIn}
+              style={styles.signInButton}
+              loading={loading}
+            />
+          </View>
+        </StaggeredView>
+
+        <StaggeredView delay={550}>
+          <View style={styles.dividerContainer}>
+            <View style={styles.line} />
+            <Text style={styles.dividerText}>Or continue with</Text>
+            <View style={styles.line} />
+          </View>
+        </StaggeredView>
+
+        <StaggeredView delay={650}>
+          <View style={styles.socialContainer}>
+            <TouchableOpacity style={[styles.socialButton, SHADOWS.light]}>
+              <Image source={{ uri: 'https://cdn-icons-png.flaticon.com/512/2991/2991148.png' }} style={styles.socialIcon} />
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.socialButton, SHADOWS.light]}>
+              <Image source={{ uri: 'https://cdn-icons-png.flaticon.com/512/0/747.png' }} style={styles.socialIcon} />
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.socialButton, SHADOWS.light]}>
+              <Image source={{ uri: 'https://cdn-icons-png.flaticon.com/512/124/124010.png' }} style={styles.socialIcon} />
             </TouchableOpacity>
           </View>
+        </StaggeredView>
 
-          <TouchableOpacity style={styles.forgotPassword} onPress={() => navigation.navigate('ForgotPassword')}>
-            <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-          </TouchableOpacity>
-
-          <CustomButton 
-            title="Sign In" 
-            onPress={handleSignIn}
-            style={styles.signInButton}
-            loading={loading}
-          />
-        </View>
-
-        <View style={styles.dividerContainer}>
-          <View style={styles.line} />
-          <Text style={styles.dividerText}>Or continue with</Text>
-          <View style={styles.line} />
-        </View>
-
-        <View style={styles.socialContainer}>
-          <TouchableOpacity style={[styles.socialButton, SHADOWS.light]}>
-            <Image source={{ uri: 'https://cdn-icons-png.flaticon.com/512/2991/2991148.png' }} style={styles.socialIcon} />
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.socialButton, SHADOWS.light]}>
-            <Image source={{ uri: 'https://cdn-icons-png.flaticon.com/512/0/747.png' }} style={styles.socialIcon} />
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.socialButton, SHADOWS.light]}>
-            <Image source={{ uri: 'https://cdn-icons-png.flaticon.com/512/124/124010.png' }} style={styles.socialIcon} />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Don't have an account? </Text>
-          <TouchableOpacity onPress={() => navigation.navigate('SignUp')}>
-            <Text style={styles.signUpText}>Sign Up</Text>
-          </TouchableOpacity>
-        </View>
+        <StaggeredView delay={750}>
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Don't have an account? </Text>
+            <TouchableOpacity onPress={() => navigation.navigate('SignUp')}>
+              <Text style={styles.signUpText}>Sign Up</Text>
+            </TouchableOpacity>
+          </View>
+        </StaggeredView>
       </ScrollView>
     </SafeAreaView>
   );
