@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
-  Dimensions
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -23,14 +22,10 @@ import {
   Check, 
   X, 
   Clock, 
-  CheckCircle,
-  FileText,
-  Activity,
-  Heart
+  CheckCircle
 } from 'lucide-react-native';
 import AdminBottomNavBar from '../../components/AdminBottomNavBar';
 
-const { width } = Dimensions.get('window');
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
 
 const MOCK_APPOINTMENTS = [
@@ -494,7 +489,7 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: 85 // Account for bottom navbar space
+    paddingBottom: 85
   },
   appointmentCard: {
     backgroundColor: '#FFF',

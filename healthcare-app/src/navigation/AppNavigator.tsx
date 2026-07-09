@@ -50,7 +50,7 @@ import AIMonitoringScreen from '../screens/admin/AIMonitoringScreen';
 import AdminReportsScreen from '../screens/admin/ReportsScreen';
 import AdminSettingsScreen from '../screens/admin/SettingsScreen';
 import AdminLaboratoriesScreen from '../screens/admin/AdminLaboratoriesScreen';
-import AdminAppointmentsScreen from '../screens/admin/AdminAppointmentsScreen'; // Admin Appointments Screen
+import AdminAppointmentsScreen from '../screens/admin/AdminAppointmentsScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
