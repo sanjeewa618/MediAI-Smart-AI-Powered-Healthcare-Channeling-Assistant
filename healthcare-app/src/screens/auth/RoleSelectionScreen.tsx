@@ -15,8 +15,10 @@ const RoleSelectionScreen = () => {
   const navigation = useNavigation<RoleNav>();
   const [role, setRole] = React.useState<RoleKey>('doctor');
 
-  const onContinue = () => {
-    navigation.navigate('SignUp', { role });
+  const handleRoleSelect = (selectedRole: RoleKey) => {
+    setRole(selectedRole);
+    // Navigate immediately to SignUp screen with the selected role
+    navigation.navigate('SignUp', { role: selectedRole });
   };
 
   return (
@@ -35,20 +37,16 @@ const RoleSelectionScreen = () => {
           active={role === 'doctor'}
           title="Doctor"
           subtitle="Manage patients and schedules"
-          onPress={() => setRole('doctor')}
+          onPress={() => handleRoleSelect('doctor')}
           icon={<Stethoscope size={22} color={role === 'doctor' ? '#FFFFFF' : COLORS.primary} />}
         />
         <RoleCard
           active={role === 'nurse'}
           title="Nurse"
           subtitle="Access patient health records"
-          onPress={() => setRole('nurse')}
+          onPress={() => handleRoleSelect('nurse')}
           icon={<BriefcaseMedical size={22} color={role === 'nurse' ? '#FFFFFF' : COLORS.primary} />}
         />
-      </View>
-
-      <View style={styles.footer}>
-        <CustomButton title="Continue" onPress={onContinue} />
       </View>
     </SafeAreaView>
   );
@@ -181,7 +179,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   footer: {
-    marginTop: 400,
+    marginTop: 'auto',
     paddingBottom: 18,
   },
 });

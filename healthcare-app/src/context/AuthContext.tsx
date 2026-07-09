@@ -5,14 +5,17 @@ type UserRole = 'patient' | 'doctor' | 'lab' | 'nurse' | 'admin' | null;
 type AuthContextValue = {
   role: UserRole;
   setRole: (role: UserRole) => void;
+  token: string | null;
+  setToken: (token: string | null) => void;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [role, setRole] = useState<UserRole>(null);
+  const [token, setToken] = useState<string | null>(null);
 
-  const value = useMemo(() => ({ role, setRole }), [role]);
+  const value = useMemo(() => ({ role, setRole, token, setToken }), [role, token]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

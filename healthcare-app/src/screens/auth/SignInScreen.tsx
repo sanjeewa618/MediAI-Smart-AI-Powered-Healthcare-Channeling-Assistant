@@ -20,7 +20,7 @@ const SignInScreen = () => {
   const navigation = useNavigation<SignInScreenProp>();
   const route = useRoute<SignInRouteProp>();
   const { role } = route.params || {};
-  const { setRole } = useAuth();
+  const { setRole, setToken } = useAuth();
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [hidePassword, setHidePassword] = React.useState(true);
@@ -51,6 +51,7 @@ const SignInScreen = () => {
         // data should contain { role, token, ... }
         const targetRole = data.role || 'patient';
         setRole(targetRole);
+        setToken(data.token);
 
         if (targetRole === 'patient') navigation.replace('PatientDashboard');
         else if (targetRole === 'doctor') navigation.replace('DoctorDashboard');

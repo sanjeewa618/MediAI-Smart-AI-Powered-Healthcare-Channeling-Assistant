@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useAuth } from '../../context/AuthContext';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import { 
   ArrowLeft, 
@@ -22,10 +23,11 @@ import {
 } from 'lucide-react-native';
 import AdminBottomNavBar from '../../components/AdminBottomNavBar';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.33.69.5:4000';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
 
 const AdminRequestsScreen = () => {
   const navigation = useNavigation<any>();
+  const { token } = useAuth();
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'doctor' | 'nurse'>('doctor');
@@ -35,10 +37,9 @@ const AdminRequestsScreen = () => {
   const fetchRequests = async () => {
     setLoading(true);
     try {
-      // In a real app, you would pass the admin token here
       const response = await fetch(`${API_BASE_URL}/api/admin/requests`, {
         headers: {
-          // 'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`
         }
       });
       const data = await response.json();
@@ -61,6 +62,9 @@ const AdminRequestsScreen = () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/admin/requests/${id}/approve`, {
         method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
       if (response.ok) {
         Alert.alert('Success', 'Request approved successfully.');
@@ -87,6 +91,9 @@ const AdminRequestsScreen = () => {
             try {
               const response = await fetch(`${API_BASE_URL}/api/admin/requests/${id}/reject`, {
                 method: 'PUT',
+                headers: {
+                  'Authorization': `Bearer ${token}`
+                }
               });
               if (response.ok) {
                 Alert.alert('Success', 'Request rejected.');
