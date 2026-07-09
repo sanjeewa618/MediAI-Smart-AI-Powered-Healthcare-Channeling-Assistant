@@ -3,7 +3,7 @@ export type RootStackParamList = {
   Onboarding: undefined;
   SignIn: { role?: string } | undefined;
   SignUp: { role?: string } | undefined;
-  ForgotPassword: { email?: string };
+  ForgotPassword: { email?: string } | undefined;
   OTPVerification: { email: string };
   CreateNewPassword: { email: string };
   RoleSelection: undefined;
