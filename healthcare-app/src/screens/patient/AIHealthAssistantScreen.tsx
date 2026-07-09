@@ -11,6 +11,9 @@ import {
 } from 'lucide-react-native';
 import BottomNavBar from '../../components/BottomNavBar';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useAuth } from '../../context/AuthContext';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 type Message = { id: number; text: string; sender: 'ai' | 'user' };
@@ -58,6 +61,7 @@ const getAiResponse = (text: string): string => {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 const AIHealthAssistantScreen = ({ navigation }: any) => {
+  const { token } = useAuth();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 1,
@@ -100,7 +104,7 @@ const AIHealthAssistantScreen = ({ navigation }: any) => {
     return () => loop.stop();
   }, [isTyping]);
 
-  const sendMessage = (text: string) => {
+  const sendMessage = async (text: string) => {
     if (!text.trim()) return;
     const userMsg: Message = { id: Date.now(), text: text.trim(), sender: 'user' };
     setMessages(prev => [...prev, userMsg]);
@@ -108,14 +112,38 @@ const AIHealthAssistantScreen = ({ navigation }: any) => {
     setIsTyping(true);
     setShowFeatures(false);
 
-    setTimeout(() => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/ai/analyze`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ symptoms: text }),
+      });
+
+      const data = await response.json();
       setIsTyping(false);
+
+      if (response.ok && data.success) {
+        setMessages(prev => [
+          ...prev,
+          { id: Date.now() + 1, text: data.data.aiResponse, sender: 'ai' },
+        ]);
+      } else {
+        setMessages(prev => [
+          ...prev,
+          { id: Date.now() + 1, text: data.message || "Failed to analyze symptoms. Please try again.", sender: 'ai' },
+        ]);
+      }
+    } catch (error) {
+      setIsTyping(false);
+      console.error('AI Analysis API Error:', error);
       setMessages(prev => [
         ...prev,
-        { id: Date.now() + 1, text: getAiResponse(text), sender: 'ai' },
+        { id: Date.now() + 1, text: "Sorry, I am having trouble connecting to the medical server. Please check your network connection.", sender: 'ai' },
       ]);
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
-    }, 1400);
+    }
 
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
   };
