@@ -36,7 +36,7 @@ export const sendOTP = async (req, res) => {
     await OTP.findOneAndUpdate(
       { email: email.toLowerCase() },
       { otp: otpCode, createdAt: new Date() },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     );
 
     // Send email
@@ -211,7 +211,7 @@ export const forgotPassword = async (req, res) => {
     await OTP.findOneAndUpdate(
       { email: email.toLowerCase() },
       { otp: otpCode, createdAt: new Date() },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     );
 
     // Send email
