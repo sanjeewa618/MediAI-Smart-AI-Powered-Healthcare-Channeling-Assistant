@@ -67,7 +67,7 @@ export const sendOTP = async (req, res) => {
 // @access  Public
 export const registerUser = async (req, res) => {
   try {
-    const { name, email, phone, password, role, otp, staffId } = req.body;
+    const { name, email, phone, password, role, otp, staffId, specialty, specialization, department } = req.body;
 
     if (!name || !email || !phone || !password) {
       return res.status(400).json({ message: 'Please add all required fields' });
@@ -108,6 +108,8 @@ export const registerUser = async (req, res) => {
       role: targetRole,
       status: initialStatus,
       staffId: staffId || undefined,
+      specialization: specialty || specialization || undefined,
+      department: department || undefined,
     });
 
     if (user) {
