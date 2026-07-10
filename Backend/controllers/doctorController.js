@@ -136,7 +136,7 @@ export const getDoctorSchedule = async (req, res) => {
 // @access  Private (Doctor only)
 export const createDoctorSchedule = async (req, res) => {
   try {
-    const { day, startTime, endTime, type, consultType, maxPatients, notes } = req.body;
+    const { day, startTime, endTime, type, consultType, maxPatients, notes, repeat } = req.body;
     
     const newSlot = await DoctorAvailability.create({
       doctor: req.user._id,
@@ -146,7 +146,8 @@ export const createDoctorSchedule = async (req, res) => {
       type: type || 'available',
       consultType: consultType || 'Physical',
       maxPatients: maxPatients || 1,
-      notes: notes || ''
+      notes: notes || '',
+      repeat: repeat || 'none'
     });
 
     res.status(201).json({ success: true, data: newSlot });

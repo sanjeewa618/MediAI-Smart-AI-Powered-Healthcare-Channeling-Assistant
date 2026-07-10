@@ -18,6 +18,11 @@ const doctorAvailabilitySchema = new mongoose.Schema(
     },
     maxPatients: { type: Number, default: 1 },
     notes: { type: String, default: '' },
+    repeat: { 
+      type: String, 
+      enum: ['none', 'daily', 'weekly'], 
+      default: 'none' 
+    },
   },
   { timestamps: true }
 );
