@@ -35,8 +35,10 @@ import {
   Ruler,
   Activity,
   CheckCircle2,
+  Camera,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
 import BottomNavBar from '../../components/BottomNavBar';
 import { COLORS, SHADOWS } from '../../theme/theme';
@@ -65,6 +67,11 @@ const PatientProfileScreen = () => {
   const [newEmergencyPhone, setNewEmergencyPhone] = useState('');
   const [newAllergy, setNewAllergy] = useState('');
   const [newCondition, setNewCondition] = useState('');
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const fetchedRef = useRef(false);
 
   const [profileData, setProfileData] = useState({
@@ -90,8 +97,44 @@ const PatientProfileScreen = () => {
       coverageType: 'Full Coverage',
       expiryDate: '15 Dec 2025',
       documentUrl: ''
+    },
+    createdAt: '',
+    stats: {
+      totalAppointments: 0,
+      completedAppointments: 0,
     }
   });
+
+  const calculateAge = (dobString: string) => {
+    if (!dobString) return 'N/A';
+    let dob = new Date(dobString);
+    
+    // Fallback parsing for "DD Month YYYY" format on certain JS engines (like Hermes)
+    if (isNaN(dob.getTime())) {
+      const parts = dobString.split(' ');
+      if (parts.length === 3) {
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        const monthIndex = monthNames.findIndex(m => dobString.includes(m));
+        if (monthIndex !== -1) {
+          const year = parseInt(parts[2]);
+          const day = parseInt(parts[0]);
+          dob = new Date(year, monthIndex, day);
+        }
+      }
+    }
+
+    if (isNaN(dob.getTime())) return 'N/A';
+    const ageDifMs = Date.now() - dob.getTime();
+    const ageDate = new Date(ageDifMs);
+    return Math.abs(ageDate.getUTCFullYear() - 1970);
+  };
+
+  const getMemberSince = (dateString: string) => {
+    if (!dateString) return 'N/A';
+    const d = new Date(dateString);
+    if (isNaN(d.getTime())) return 'N/A';
+    return d.toLocaleString('default', { month: 'short', year: 'numeric' });
+  };
 
   const calculateBMI = (weightKg: string, heightCm: string) => {
     const w = parseFloat(weightKg);
@@ -116,16 +159,33 @@ const PatientProfileScreen = () => {
     });
   };
 
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(Platform.OS === 'ios');
+    if (selectedDate) {
+      const year = selectedDate.getFullYear();
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const day = String(selectedDate.getDate()).padStart(2, '0');
+      const formattedDate = `${year}-${month}-${day}`;
+      setProfileData(p => ({ ...p, dob: formattedDate }));
+    }
+  };
+
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-        const data = await response.json();
-        if (response.ok && data) {
+        const [meRes, statsRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/auth/me`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+          }),
+          fetch(`${API_BASE_URL}/api/patient/stats`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+          })
+        ]);
+
+        const data = await meRes.json();
+        const statsData = statsRes.ok ? await statsRes.json() : null;
+
+        if (meRes.ok && data) {
           setProfileData(prev => ({
             ...prev,
             name: data.name || prev.name,
@@ -143,6 +203,8 @@ const PatientProfileScreen = () => {
             chronicConditions: Array.isArray(data.chronicConditions) ? data.chronicConditions : prev.chronicConditions,
             emergencyContacts: Array.isArray(data.emergencyContacts) && data.emergencyContacts.length > 0 ? data.emergencyContacts : prev.emergencyContacts,
             insurance: data.insurance || prev.insurance,
+            createdAt: data.createdAt || prev.createdAt,
+            stats: statsData?.success ? statsData.data : prev.stats,
           }));
         }
       } catch (err) {
@@ -224,12 +286,42 @@ const PatientProfileScreen = () => {
   const handleAddCondition = () => {
     const txt = newCondition.trim();
     if (!txt) return;
-    if ((profileData.chronicConditions || []).includes(txt)) {
-      setNewCondition('');
+    setProfileData(p => ({ ...p, chronicConditions: [...p.chronicConditions, txt] }));
+    setNewCondition('');
+  };
+
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      Alert.alert('Error', 'Please fill all password fields');
       return;
     }
-    setProfileData(p => ({ ...p, chronicConditions: [...(p.chronicConditions || []), txt] }));
-    setNewCondition('');
+    if (newPassword !== confirmPassword) {
+      Alert.alert('Error', 'New passwords do not match');
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ currentPassword, newPassword })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        Alert.alert('Success', 'Password changed successfully');
+        setShowPasswordModal(false);
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+      } else {
+        Alert.alert('Error', data.message || 'Failed to change password');
+      }
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Error', 'An error occurred while changing password');
+    }
   };
 
   const handleSaveProfile = async () => {
@@ -316,13 +408,13 @@ const PatientProfileScreen = () => {
                 <Text style={styles.patientId}>ID: MH-2024-08542</Text>
                 <View style={styles.badgesRow}>
                   <View style={styles.ageBadge}>
-                    <Text style={styles.badgeText}>28 y/o</Text>
+                    <Text style={styles.badgeText}>{calculateAge(profileData.dob)} y/o</Text>
                   </View>
                   <View style={styles.genderBadge}>
-                    <Text style={styles.badgeText}>Female</Text>
+                    <Text style={styles.badgeText}>{profileData.gender}</Text>
                   </View>
                   <View style={styles.bloodBadge}>
-                    <Text style={styles.bloodBadgeText}>O+</Text>
+                    <Text style={styles.bloodBadgeText}>{profileData.bloodGroup}</Text>
                   </View>
                 </View>
               </View>
@@ -331,15 +423,15 @@ const PatientProfileScreen = () => {
             <View style={styles.profileMeta}>
               <View style={styles.metaItem}>
                 <Text style={styles.metaLabel}>Member Since</Text>
-                <Text style={styles.metaValue}>Jan 2023</Text>
+                <Text style={styles.metaValue}>{getMemberSince(profileData.createdAt)}</Text>
               </View>
               <View style={styles.metaItem}>
                 <Text style={styles.metaLabel}>Completed</Text>
-                <Text style={styles.metaValue}>85%</Text>
+                <Text style={styles.metaValue}>{profileData.stats.completedAppointments}</Text>
               </View>
               <View style={styles.metaItem}>
                 <Text style={styles.metaLabel}>Appointments</Text>
-                <Text style={styles.metaValue}>12</Text>
+                <Text style={styles.metaValue}>{profileData.stats.totalAppointments}</Text>
               </View>
             </View>
           </View>
@@ -363,7 +455,18 @@ const PatientProfileScreen = () => {
               <View style={styles.infoDivider} />
               <InfoRow label="NIC / Passport" value={profileData.nic} isEditing={isEditing} onChangeText={(t) => setProfileData(p => ({ ...p, nic: t }))} />
               <View style={styles.infoDivider} />
-              <InfoRow label="Date of Birth" value={profileData.dob} isEditing={isEditing} onChangeText={(t) => setProfileData(p => ({ ...p, dob: t }))} />
+              <InfoRow label="Date of Birth" value={profileData.dob} isEditing={isEditing} onPress={() => setShowDatePicker(true)} />
+              {showDatePicker && (
+                <DateTimePicker
+                  value={profileData.dob ? new Date(profileData.dob) : new Date()}
+                  mode="date"
+                  display="default"
+                  onChange={handleDateChange}
+                  maximumDate={new Date()}
+                />
+              )}
+              <View style={styles.infoDivider} />
+              <InfoRow label="Age" value={`${calculateAge(profileData.dob)} Years`} isEditing={false} onChangeText={() => {}} editable={false} />
               <View style={styles.infoDivider} />
               <InfoRow label="Gender" value={profileData.gender} isEditing={isEditing} onChangeText={(t) => setProfileData(p => ({ ...p, gender: t }))} options={['Male', 'Female', 'Rather not to say']} />
               <View style={styles.infoDivider} />
@@ -682,7 +785,7 @@ const PatientProfileScreen = () => {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Security & Privacy</Text>
             <View style={[styles.securityCard, SHADOWS.small]}>
-              <TouchableOpacity style={styles.securityOption}>
+              <TouchableOpacity style={styles.securityOption} onPress={() => setShowPasswordModal(true)}>
                 <Lock size={20} color={COLORS.primary} />
                 <Text style={styles.securityLabel}>Change Password</Text>
                 <ChevronRight size={20} color="#D1D5DB" />
@@ -723,6 +826,54 @@ const PatientProfileScreen = () => {
 
         <BottomNavBar />
       </View>
+
+      {/* Password Modal */}
+      <Modal
+        visible={showPasswordModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowPasswordModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Change Password</Text>
+            
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Current Password"
+              placeholderTextColor="#9CA3AF"
+              secureTextEntry
+              value={currentPassword}
+              onChangeText={setCurrentPassword}
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="New Password"
+              placeholderTextColor="#9CA3AF"
+              secureTextEntry
+              value={newPassword}
+              onChangeText={setNewPassword}
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Confirm New Password"
+              placeholderTextColor="#9CA3AF"
+              secureTextEntry
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+            />
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowPasswordModal(false)}>
+                <Text style={styles.modalCancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalSaveBtn} onPress={handleChangePassword}>
+                <Text style={styles.modalSaveBtnText}>Update</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={isBloodGroupModalVisible}
@@ -819,7 +970,7 @@ const PatientProfileScreen = () => {
 };
 
 // Info Row Component
-const InfoRow = ({ label, value, isEditing, onChangeText, editable = true, options }: { label: string; value: string; isEditing?: boolean; onChangeText?: (text: string) => void; editable?: boolean; options?: string[] }) => (
+const InfoRow = ({ label, value, isEditing, onChangeText, editable = true, options, onPress }: { label: string; value: string; isEditing?: boolean; onChangeText?: (text: string) => void; editable?: boolean; options?: string[]; onPress?: () => void }) => (
   <View style={styles.infoRow}>
     <Text style={styles.infoLabel}>{label}</Text>
     {isEditing && editable ? (
@@ -831,6 +982,17 @@ const InfoRow = ({ label, value, isEditing, onChangeText, editable = true, optio
             </TouchableOpacity>
           ))}
         </View>
+      ) : onPress ? (
+        <TouchableOpacity onPress={onPress}>
+          <TextInput
+            style={[styles.infoValue, styles.infoInput]}
+            value={value}
+            editable={false}
+            pointerEvents="none"
+            placeholder={label}
+            placeholderTextColor="#9CA3AF"
+          />
+        </TouchableOpacity>
       ) : (
         <TextInput
           style={[styles.infoValue, styles.infoInput]}

@@ -1,5 +1,5 @@
 import express from 'express';
-import { getDashboardData, updateProfile, uploadInsuranceDocument } from '../controllers/patientController.js';
+import { getDashboardData, updateProfile, uploadInsuranceDocument, getPatientStats } from '../controllers/patientController.js';
 import { protect } from '../middlewares/authMiddleware.js';
 import { patientOnly } from '../middlewares/roleMiddleware.js';
 import upload from '../middlewares/uploadMiddleware.js';
@@ -11,6 +11,7 @@ router.use(protect);
 router.use(patientOnly);
 
 router.get('/dashboard', getDashboardData);
+router.get('/stats', getPatientStats);
 router.put('/profile', updateProfile);
 router.post('/upload-insurance', upload.single('insuranceCard'), uploadInsuranceDocument);
 

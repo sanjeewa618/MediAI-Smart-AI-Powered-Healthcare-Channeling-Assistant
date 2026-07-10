@@ -111,3 +111,23 @@ export const uploadInsuranceDocument = async (req, res) => {
   }
 };
 
+// @desc    Get patient profile stats (total & completed appointments)
+// @route   GET /api/patient/stats
+// @access  Private (Patient only)
+export const getPatientStats = async (req, res) => {
+  try {
+    const totalAppointments = await Appointment.countDocuments({ patient: req.user._id });
+    const completedAppointments = await Appointment.countDocuments({ patient: req.user._id, status: 'completed' });
+
+    res.json({
+      success: true,
+      data: {
+        totalAppointments,
+        completedAppointments
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
