@@ -1,68 +1,200 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, TextInput, Modal, FlatList, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, TextInput, Modal, Platform, ActivityIndicator, Alert, Image, Linking } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
-import { FileText, Search, Filter, Bell, ArrowLeft, Download, Share2, Eye, Upload, AlertCircle, CheckCircle2, Clock } from 'lucide-react-native';
+import { FileText, Search, Filter, Bell, ArrowLeft, Download, Share2, Eye, Upload, CheckCircle2, Clock, Plus, Calendar, ChevronDown } from 'lucide-react-native';
 import BottomNavBar from '../../components/BottomNavBar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
+import * as ImagePicker from 'expo-image-picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { useAuth } from '../../context/AuthContext';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 
-const reportCategories = ['All', 'Lab Reports', 'Scan Reports', 'Prescriptions', 'ECG', 'Vaccination'];
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
 
-const mockReports = [
-  {
-    id: '1',
-    title: 'Complete Blood Count (CBC)',
-    hospital: 'Asiri Hospital',
-    doctor: 'Dr. Emma Watson',
-    date: '12 May 2026',
-    status: 'Ready',
-    type: 'Lab Reports',
-    values: { hemoglobin: '14.5', glucose: '95', cholesterol: '180' },
-    appointment: { date: '15 May 2026', doctor: 'Dr. Emma Watson', dept: 'Cardiology' }
-  },
-  {
-    id: '2',
-    title: 'Chest X-Ray Report',
-    hospital: 'City Hospital',
-    doctor: 'Dr. John Doe',
-    date: '10 May 2026',
-    status: 'Reviewed',
-    type: 'Scan Reports',
-    appointment: { date: '20 May 2026', doctor: 'Dr. John Doe', dept: 'Pulmonology' }
-  },
-  {
-    id: '3',
-    title: 'Blood Pressure Monitoring',
-    hospital: 'Home Care',
-    doctor: 'Dr. Sarah Miller',
-    date: '08 May 2026',
-    status: 'Pending',
-    type: 'Lab Reports',
-    values: { systolic: '120', diastolic: '80' }
-  },
-  {
-    id: '4',
-    title: 'ECG Report',
-    hospital: 'Asiri Hospital',
-    doctor: 'Dr. Emma Watson',
-    date: '05 May 2026',
-    status: 'Ready',
-    type: 'ECG',
-    appointment: { date: '25 May 2026', doctor: 'Dr. Emma Watson', dept: 'Cardiology' }
-  }
-];
+const reportCategories = ['All', 'Lab Reports', 'Scan Reports', 'Prescriptions', 'ECG', 'Vaccination', 'Other'];
+  // No more mock reports
 
 const ReportsScreen = () => {
   const navigation = useNavigation();
+  const { token } = useAuth();
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchText, setSearchText] = useState('');
   const [selectedReport, setSelectedReport] = useState<any>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  
+  // New States
+  const [reports, setReports] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  const [uploadModalVisible, setUploadModalVisible] = useState(false);
+  const [uploadTitle, setUploadTitle] = useState('');
+  const [uploadCategory, setUploadCategory] = useState('Lab Reports');
+  const [uploadDate, setUploadDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [uploadFile, setUploadFile] = useState<any>(null);
+  const [uploading, setUploading] = useState(false);
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
 
-  const filteredReports = mockReports.filter(report => 
-    (activeCategory === 'All' || report.type === activeCategory) &&
+  useEffect(() => {
+    fetchReports();
+  }, []);
+
+  const fetchReports = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/patient/reports`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setReports(data.data);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePickDocument = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert('Permission Required', 'Permission to access gallery is required!');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        setUploadFile({
+          uri: asset.uri,
+          name: asset.fileName || asset.uri.split('/').pop() || 'report.jpg',
+          mimeType: asset.mimeType || 'image/jpeg',
+        });
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to pick image');
+    }
+  };
+
+  const handleViewReport = (report: any) => {
+    if (report.attachments && report.attachments.length > 0) {
+      Linking.openURL(`${API_BASE_URL}${report.attachments[0]}`);
+    } else {
+      Alert.alert('No file', 'This report does not have an attached file.');
+    }
+  };
+
+  const handleDownloadReport = async (report: any) => {
+    if (!report.attachments || report.attachments.length === 0) {
+      Alert.alert('No file', 'This report does not have an attached file.');
+      return;
+    }
+
+    try {
+      const fileUrl = `${API_BASE_URL}${report.attachments[0]}`;
+      const fileName = fileUrl.split('/').pop() || 'report_file';
+      const fileUri = FileSystem.documentDirectory + fileName;
+
+      const downloadResumable = FileSystem.createDownloadResumable(fileUrl, fileUri);
+      const result = await downloadResumable.downloadAsync();
+      
+      if (result) {
+        Alert.alert('Success', `File successfully downloaded!`);
+      }
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Error', 'Failed to download report.');
+    }
+  };
+
+  const handleShareReport = async (report: any) => {
+    if (!report.attachments || report.attachments.length === 0) {
+      Alert.alert('No file', 'This report does not have an attached file to share.');
+      return;
+    }
+
+    try {
+      const fileUrl = `${API_BASE_URL}${report.attachments[0]}`;
+      const fileName = fileUrl.split('/').pop() || 'report_file';
+      const fileUri = FileSystem.documentDirectory + fileName;
+
+      const downloadResumable = FileSystem.createDownloadResumable(fileUrl, fileUri);
+      const result = await downloadResumable.downloadAsync();
+      
+      if (result) {
+        const isAvailable = await Sharing.isAvailableAsync();
+        if (isAvailable) {
+          await Sharing.shareAsync(result.uri);
+        } else {
+          Alert.alert('Sharing not available', 'Sharing is not supported on this device.');
+        }
+      }
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Error', 'Failed to share report.');
+    }
+  };
+
+  const handleUploadReport = async () => {
+    if (!uploadTitle.trim() || !uploadFile) {
+      Alert.alert('Error', 'Please provide a title and select a file');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('title', uploadTitle);
+      formData.append('category', uploadCategory);
+      formData.append('recordDate', uploadDate.toISOString());
+      
+      const fileExt = uploadFile.name.split('.').pop();
+      formData.append('reportFile', {
+        uri: uploadFile.uri,
+        name: uploadFile.name || `report.${fileExt}`,
+        type: uploadFile.mimeType || 'application/octet-stream',
+      } as any);
+
+      const res = await fetch(`${API_BASE_URL}/api/patient/reports/upload`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          // Don't set Content-Type for FormData
+        },
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        Alert.alert('Success', 'Report uploaded successfully');
+        setUploadModalVisible(false);
+        setUploadTitle('');
+        setUploadFile(null);
+        setUploadDate(new Date());
+        fetchReports(); // Refresh list
+      } else {
+        Alert.alert('Error', data.message || 'Upload failed');
+      }
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Error', 'An error occurred during upload');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const filteredReports = reports.filter((report: any) => 
+    (activeCategory === 'All' || report.category === activeCategory) &&
     (report.title.toLowerCase().includes(searchText.toLowerCase()) || 
-     report.hospital.toLowerCase().includes(searchText.toLowerCase()))
+     (report.doctor && report.doctor.toLowerCase().includes(searchText.toLowerCase())))
   );
 
   const getStatusColor = (status: string): string => {
@@ -120,31 +252,6 @@ const ReportsScreen = () => {
         </LinearGradient>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-          {/* Patient Summary Card */}
-          <View style={[styles.patientCard, SHADOWS.medium]}>
-            <View style={styles.patientCardContent}>
-              <Image 
-                source={require('../../../assets/robot-avatar.png')}
-                style={styles.patientAvatar}
-              />
-              <View style={styles.patientInfo}>
-                <Text style={styles.patientName}>Sarah Johnson</Text>
-                <Text style={styles.patientId}>ID: #MED-2024-0821</Text>
-                <View style={styles.patientMeta}>
-                  <Text style={styles.patientMetaText}>25 yrs</Text>
-                  <Text style={styles.patientMetaDot}>•</Text>
-                  <Text style={styles.patientMetaText}>O+</Text>
-                  <Text style={styles.patientMetaDot}>•</Text>
-                  <Text style={styles.patientMetaText}>Female</Text>
-                </View>
-              </View>
-            </View>
-            <View style={styles.allergyBadge}>
-              <AlertCircle size={16} color="#EF4444" />
-              <Text style={styles.allergyText}>Allergies</Text>
-            </View>
-          </View>
-
           {/* Report Categories */}
           <View style={styles.categoriesSection}>
             <Text style={styles.sectionTitle}>Report Categories</Text>
@@ -163,44 +270,13 @@ const ReportsScreen = () => {
             </ScrollView>
           </View>
 
-          {/* Medical Values Section */}
-          <View style={styles.valuesSection}>
-            <Text style={styles.sectionTitle}>Important Medical Values</Text>
-            <View style={styles.valuesGrid}>
-              <View style={[styles.valueCard, SHADOWS.small]}>
-                <Text style={styles.valueLabel}>Blood Sugar</Text>
-                <Text style={styles.valueNumber}>95</Text>
-                <Text style={styles.valueUnit}>mg/dL</Text>
-                <View style={[styles.valueStatus, { backgroundColor: '#DCFCE7' }]}>
-                  <Text style={[styles.valueStatusText, { color: '#166534' }]}>Normal</Text>
-                </View>
-              </View>
-              <View style={[styles.valueCard, SHADOWS.small]}>
-                <Text style={styles.valueLabel}>Cholesterol</Text>
-                <Text style={styles.valueNumber}>180</Text>
-                <Text style={styles.valueUnit}>mg/dL</Text>
-                <View style={[styles.valueStatus, { backgroundColor: '#FEF3C7' }]}>
-                  <Text style={[styles.valueStatusText, { color: '#92400E' }]}>Borderline</Text>
-                </View>
-              </View>
-              <View style={[styles.valueCard, SHADOWS.small]}>
-                <Text style={styles.valueLabel}>Blood Pressure</Text>
-                <Text style={styles.valueNumber}>120/80</Text>
-                <Text style={styles.valueUnit}>mmHg</Text>
-                <View style={[styles.valueStatus, { backgroundColor: '#DCFCE7' }]}>
-                  <Text style={[styles.valueStatusText, { color: '#166534' }]}>Normal</Text>
-                </View>
-              </View>
-            </View>
-          </View>
-
           {/* Reports List */}
           <View style={styles.reportsSection}>
             <Text style={styles.sectionTitle}>Your Reports</Text>
             {filteredReports.length > 0 ? (
-              filteredReports.map((report) => (
+              filteredReports.map((report, index) => (
                 <TouchableOpacity 
-                  key={report.id}
+                  key={report._id || index.toString()}
                   style={[styles.reportCard, SHADOWS.small]}
                   onPress={() => { setSelectedReport(report); setModalVisible(true); }}
                 >
@@ -211,11 +287,15 @@ const ReportsScreen = () => {
                   </View>
                   <View style={styles.reportCardCenter}>
                     <Text style={styles.reportTitle}>{report.title}</Text>
-                    <Text style={styles.reportHospital}>{report.hospital}</Text>
+                    <Text style={styles.reportHospital}>{report.hospital || 'Patient Upload'}</Text>
                     <View style={styles.reportMeta}>
-                      <Text style={styles.reportMetaText}>Dr. {report.doctor.split(' ')[1]}</Text>
+                      <Text style={styles.reportMetaText}>
+                        {report.doctor ? `Dr. ${report.doctor.split(' ')[1] || report.doctor}` : 'Self Uploaded'}
+                      </Text>
                       <Text style={styles.reportMetaDot}>•</Text>
-                      <Text style={styles.reportMetaText}>{report.date}</Text>
+                      <Text style={styles.reportMetaText}>
+                        {report.date ? report.date : report.recordDate ? new Date(report.recordDate).toLocaleDateString() : 'No Date'}
+                      </Text>
                     </View>
                   </View>
                   <View style={styles.reportCardRight}>
@@ -235,17 +315,101 @@ const ReportsScreen = () => {
               </View>
             )}
           </View>
-
-          {/* Upload Section */}
-          <View style={styles.uploadSection}>
-            <Text style={styles.sectionTitle}>Add New Report</Text>
-            <TouchableOpacity style={[styles.uploadCard, SHADOWS.small]}>
-              <Upload size={28} color={COLORS.primary} />
-              <Text style={styles.uploadText}>Upload Report</Text>
-              <Text style={styles.uploadSubtext}>PDF, JPG, PNG</Text>
-            </TouchableOpacity>
-          </View>
         </ScrollView>
+
+        {/* Floating Action Button */}
+        <TouchableOpacity style={styles.fab} onPress={() => setUploadModalVisible(true)}>
+          <Plus size={24} color="#FFF" />
+        </TouchableOpacity>
+
+        {/* Upload Modal */}
+        <Modal visible={uploadModalVisible} transparent animationType="slide">
+          <View style={styles.uploadModalOverlay}>
+            <View style={styles.uploadModalContent}>
+              <View style={styles.uploadModalHeader}>
+                <Text style={styles.uploadModalTitle}>Add New Report</Text>
+                <TouchableOpacity onPress={() => setUploadModalVisible(false)}>
+                  <Text style={styles.closeText}>Close</Text>
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView>
+                <Text style={styles.inputLabel}>Report Title</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="e.g. Complete Blood Count"
+                  value={uploadTitle}
+                  onChangeText={setUploadTitle}
+                />
+
+                <Text style={styles.inputLabel}>Category</Text>
+                <TouchableOpacity 
+                  style={styles.pickerButton}
+                  onPress={() => setShowCategoryPicker(!showCategoryPicker)}
+                >
+                  <Text>{uploadCategory}</Text>
+                  <ChevronDown size={20} color="#6B7280" />
+                </TouchableOpacity>
+
+                {showCategoryPicker && (
+                  <View style={styles.categoryDropdown}>
+                    {reportCategories.filter(c => c !== 'All').map(cat => (
+                      <TouchableOpacity 
+                        key={cat} 
+                        style={styles.categoryDropdownItem}
+                        onPress={() => { setUploadCategory(cat); setShowCategoryPicker(false); }}
+                      >
+                        <Text style={styles.categoryDropdownText}>{cat}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+
+                <Text style={styles.inputLabel}>Record Date</Text>
+                <TouchableOpacity 
+                  style={styles.pickerButton}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Text>{uploadDate.toLocaleDateString()}</Text>
+                  <Calendar size={20} color="#6B7280" />
+                </TouchableOpacity>
+
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={uploadDate}
+                    mode="date"
+                    display="default"
+                    maximumDate={new Date()}
+                    onChange={(event, selectedDate) => {
+                      setShowDatePicker(Platform.OS === 'ios');
+                      if (selectedDate) setUploadDate(selectedDate);
+                    }}
+                  />
+                )}
+
+                <Text style={styles.inputLabel}>Attachment</Text>
+                <TouchableOpacity style={styles.filePickerButton} onPress={handlePickDocument}>
+                  <Upload size={24} color={COLORS.primary} />
+                  <Text style={styles.filePickerText}>
+                    {uploadFile ? uploadFile.name : 'Select Image from Gallery'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={[styles.submitButton, (!uploadTitle.trim() || !uploadFile) && styles.submitButtonDisabled]} 
+                  onPress={handleUploadReport}
+                  disabled={uploading || !uploadTitle.trim() || !uploadFile}
+                >
+                  {uploading ? (
+                    <ActivityIndicator color="#FFF" />
+                  ) : (
+                    <Text style={styles.submitButtonText}>Upload Report</Text>
+                  )}
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
 
         {/* Report Preview Modal */}
         <Modal visible={modalVisible} transparent animationType="slide">
@@ -265,13 +429,24 @@ const ReportsScreen = () => {
                     <FileText size={32} color={COLORS.primary} />
                   </View>
                   <Text style={styles.modalReportTitle}>{(selectedReport as any).title}</Text>
-                  <Text style={styles.modalHospital}>{(selectedReport as any).hospital}</Text>
+                  <Text style={styles.modalHospital}>{(selectedReport as any).hospital || 'Patient Upload'}</Text>
+
+                  {/* Attachment Preview */}
+                  {(selectedReport as any).attachments && (selectedReport as any).attachments.length > 0 && (
+                    <View style={{ marginTop: 20, width: '100%', alignItems: 'center' }}>
+                      <Text style={styles.doctorNotesTitle}>Report Preview</Text>
+                      <Image 
+                        source={{ uri: `${API_BASE_URL}${(selectedReport as any).attachments[0]}` }} 
+                        style={{ width: '100%', height: 300, borderRadius: 12, marginTop: 8, resizeMode: 'contain' }} 
+                      />
+                    </View>
+                  )}
 
                   {/* Doctor Notes */}
                   <View style={styles.doctorNotesSection}>
                     <Text style={styles.doctorNotesTitle}>Doctor's Notes</Text>
                     <Text style={styles.doctorNotesText}>
-                      Patient shows normal vital signs. Continue current medication routine. Follow-up appointment scheduled for comprehensive evaluation.
+                      {(selectedReport as any).description || 'No notes added by doctor yet.'}
                     </Text>
                   </View>
 
@@ -280,22 +455,24 @@ const ReportsScreen = () => {
                     <View style={[styles.appointmentCard, { backgroundColor: '#F3F0FF' }]}>
                       <Text style={styles.appointmentTitle}>Related Appointment</Text>
                       <Text style={styles.appointmentDate}>{(selectedReport as any).appointment.date}</Text>
-                      <Text style={styles.appointmentDoctor}>Dr. {(selectedReport as any).appointment.doctor.split(' ')[1]}</Text>
+                      <Text style={styles.appointmentDoctor}>
+                        {(selectedReport as any).appointment.doctor ? `Dr. ${(selectedReport as any).appointment.doctor.split(' ')[1] || (selectedReport as any).appointment.doctor}` : ''}
+                      </Text>
                       <Text style={styles.appointmentDept}>{(selectedReport as any).appointment.dept}</Text>
                     </View>
                   )}
 
                   {/* Action Buttons */}
                   <View style={styles.actionButtons}>
-                    <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#F3F0FF' }]}>
+                    <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#F3F0FF' }]} onPress={() => handleViewReport(selectedReport)}>
                       <Eye size={20} color={COLORS.primary} />
                       <Text style={[styles.actionBtnText, { color: COLORS.primary }]}>View</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#F3F0FF' }]}>
+                    <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#F3F0FF' }]} onPress={() => handleDownloadReport(selectedReport)}>
                       <Download size={20} color={COLORS.primary} />
                       <Text style={[styles.actionBtnText, { color: COLORS.primary }]}>Download</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#F3F0FF' }]}>
+                    <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#F3F0FF' }]} onPress={() => handleShareReport(selectedReport)}>
                       <Share2 size={20} color={COLORS.primary} />
                       <Text style={[styles.actionBtnText, { color: COLORS.primary }]}>Share</Text>
                     </TouchableOpacity>
@@ -390,67 +567,6 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 100,
   },
-  patientCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 24,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  patientCardContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  patientAvatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    marginRight: 12,
-  },
-  patientInfo: {
-    flex: 1,
-  },
-  patientName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.textHeader,
-  },
-  patientId: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-  patientMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 6,
-  },
-  patientMetaText: {
-    fontSize: 11,
-    color: COLORS.textSecondary,
-    fontWeight: '600',
-  },
-  patientMetaDot: {
-    marginHorizontal: 4,
-    color: COLORS.border,
-  },
-  allergyBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FEE2E2',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    gap: 4,
-  },
-  allergyText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#DC2626',
-  },
   categoriesSection: {
     marginBottom: 24,
   },
@@ -482,46 +598,6 @@ const styles = StyleSheet.create({
   },
   categoryTextActive: {
     color: '#FFFFFF',
-  },
-  valuesSection: {
-    marginBottom: 24,
-  },
-  valuesGrid: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  valueCard: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 12,
-    alignItems: 'center',
-  },
-  valueLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
-  },
-  valueNumber: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: COLORS.textHeader,
-    marginTop: 4,
-  },
-  valueUnit: {
-    fontSize: 10,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-  valueStatus: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    marginTop: 8,
-  },
-  valueStatusText: {
-    fontSize: 9,
-    fontWeight: '700',
   },
   reportsSection: {
     marginBottom: 24,
@@ -737,6 +813,126 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#1E40AF',
     marginTop: 4,
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 80,
+    right: 24,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 10,
+  },
+  uploadModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  uploadModalContent: {
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    maxHeight: '80%',
+  },
+  uploadModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  uploadModalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: COLORS.textHeader,
+  },
+  closeText: {
+    fontSize: 16,
+    color: COLORS.primary,
+    fontWeight: '600',
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.textHeader,
+    marginBottom: 8,
+    marginTop: 16,
+  },
+  modalInput: {
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    color: COLORS.textHeader,
+  },
+  pickerButton: {
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  categoryDropdown: {
+    backgroundColor: '#FFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    marginTop: 8,
+    overflow: 'hidden',
+  },
+  categoryDropdownItem: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  categoryDropdownText: {
+    fontSize: 16,
+    color: COLORS.textHeader,
+  },
+  filePickerButton: {
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F5F3FF',
+  },
+  filePickerText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: COLORS.primary,
+    fontWeight: '500',
+  },
+  submitButton: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    marginTop: 32,
+    marginBottom: 24,
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#9CA3AF',
+  },
+  submitButtonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });
 
