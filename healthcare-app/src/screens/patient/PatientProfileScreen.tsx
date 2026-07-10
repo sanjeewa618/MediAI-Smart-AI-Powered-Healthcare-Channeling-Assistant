@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -20,14 +20,12 @@ import {
   ChevronLeft,
   Edit3,
   FileText,
-  Calendar,
   Clock,
   Heart,
   Shield,
   Bell,
   Lock,
   Phone,
-  Users,
   LogOut,
   ChevronRight,
   VerifiedIcon,
@@ -36,9 +34,7 @@ import {
   Pill,
   Ruler,
   Activity,
-  TrendingUp,
   CheckCircle2,
-  Camera,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -69,6 +65,8 @@ const PatientProfileScreen = () => {
   const [newEmergencyPhone, setNewEmergencyPhone] = useState('');
   const [newAllergy, setNewAllergy] = useState('');
   const [newCondition, setNewCondition] = useState('');
+  const fetchedRef = useRef(false);
+
   const [profileData, setProfileData] = useState({
     name: 'Sarah Johnson',
     nic: 'XX****-****-1234',
@@ -344,26 +342,6 @@ const PatientProfileScreen = () => {
                 <Text style={styles.metaValue}>12</Text>
               </View>
             </View>
-          </View>
-
-          {/* Quick Action Buttons */}
-          <View style={styles.quickActionsContainer}>
-            <TouchableOpacity style={[styles.quickActionBtn, SHADOWS.small]}>
-              <Edit3 size={24} color={COLORS.primary} />
-              <Text style={styles.quickActionLabel}>Edit Profile</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.quickActionBtn, SHADOWS.small]}>
-              <FileText size={24} color={COLORS.primary} />
-              <Text style={styles.quickActionLabel}>Medical Records</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.quickActionBtn, SHADOWS.small]}>
-              <Pill size={24} color={COLORS.primary} />
-              <Text style={styles.quickActionLabel}>Medications</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.quickActionBtn, SHADOWS.small]}>
-              <Activity size={24} color={COLORS.primary} />
-              <Text style={styles.quickActionLabel}>Health Score</Text>
-            </TouchableOpacity>
           </View>
 
           {/* Personal Information Section */}
@@ -671,100 +649,6 @@ const PatientProfileScreen = () => {
                 </TouchableOpacity>
               )}
             </View>
-          </View>
-
-          {/* Upcoming Appointments Shortcut */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Upcoming Appointments</Text>
-              <TouchableOpacity>
-                <ChevronRight size={20} color={COLORS.primary} />
-              </TouchableOpacity>
-            </View>
-            {[
-              {
-                doctor: 'Dr. Emma Watson',
-                hospital: 'City Hospital',
-                date: '20 May 2024',
-                time: '10:30 AM',
-              },
-            ].map((apt, idx) => (
-              <View key={idx} style={[styles.appointmentShortcut, SHADOWS.small]}>
-                <View style={styles.appointmentIcon}>
-                  <Calendar size={24} color={COLORS.primary} />
-                </View>
-                <View style={styles.appointmentDetails}>
-                  <Text style={styles.appointmentDoctor}>{apt.doctor}</Text>
-                  <Text style={styles.appointmentHospital}>{apt.hospital}</Text>
-                  <View style={styles.appointmentMeta}>
-                    <Clock size={14} color="#9CA3AF" />
-                    <Text style={styles.appointmentTime}>
-                      {apt.date} at {apt.time}
-                    </Text>
-                  </View>
-                </View>
-                <TouchableOpacity style={styles.appointmentViewBtn}>
-                  <Text style={styles.appointmentViewBtnText}>View</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
-          </View>
-
-          {/* Medical Reports Shortcut */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Recent Reports</Text>
-              <TouchableOpacity>
-                <ChevronRight size={20} color={COLORS.primary} />
-              </TouchableOpacity>
-            </View>
-            {[
-              { title: 'Complete Blood Count', date: '12 May 2024', status: 'Ready' },
-              { title: 'Chest X-Ray', date: '08 May 2024', status: 'Reviewed' },
-            ].map((report, idx) => (
-              <View key={idx} style={[styles.reportShortcut, SHADOWS.small]}>
-                <View style={styles.reportIcon}>
-                  <FileText size={24} color={COLORS.primary} />
-                </View>
-                <View style={styles.reportDetails}>
-                  <Text style={styles.reportTitle}>{report.title}</Text>
-                  <Text style={styles.reportDate}>{report.date}</Text>
-                </View>
-                <View style={[styles.statusBadge, { backgroundColor: report.status === 'Ready' ? '#DCFCE7' : '#E9D5FF' }]}>
-                  <Text style={[styles.statusBadgeText, { color: report.status === 'Ready' ? '#166534' : '#6B21A8' }]}>
-                    {report.status}
-                  </Text>
-                </View>
-              </View>
-            ))}
-          </View>
-
-          {/* AI Health Assistant Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>AI Health Insights</Text>
-            <LinearGradient colors={['#815CFB', '#6737EA']} style={[styles.aiCard, SHADOWS.medium]}>
-              <View style={styles.aiContent}>
-                <View style={styles.healthScoreContainer}>
-                  <Text style={styles.healthScoreLabel}>Overall Health Score</Text>
-                  <Text style={styles.healthScore}>82/100</Text>
-                  <View style={styles.scoreBar}>
-                    <View style={[styles.scoreBarFill, { width: '82%' }]} />
-                  </View>
-                </View>
-                <View style={styles.aiDivider} />
-                <View style={styles.aiRecommendations}>
-                  <Text style={styles.aiRecTitle}>Daily Recommendations</Text>
-                  <View style={styles.aiRecItem}>
-                    <CheckCircle2 size={16} color="#10B981" />
-                    <Text style={styles.aiRecText}>Stay hydrated - Drink 8 glasses of water</Text>
-                  </View>
-                  <View style={styles.aiRecItem}>
-                    <CheckCircle2 size={16} color="#10B981" />
-                    <Text style={styles.aiRecText}>30-minute walk daily for better health</Text>
-                  </View>
-                </View>
-              </View>
-            </LinearGradient>
           </View>
 
           {/* Notifications & Preferences */}
@@ -1134,40 +1018,6 @@ const styles = StyleSheet.create({
   insuranceCard: { backgroundColor: '#FFF', borderRadius: 16, padding: 16 },
   uploadInsuranceBtn: { marginTop: 12, paddingVertical: 10, paddingHorizontal: 16, backgroundColor: COLORS.primary, borderRadius: 12, alignItems: 'center' },
   uploadInsuranceBtnText: { color: '#FFF', fontWeight: '700', fontSize: 13 },
-
-  // Appointment Shortcut
-  appointmentShortcut: { backgroundColor: '#FFF', borderRadius: 16, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
-  appointmentIcon: { width: 48, height: 48, borderRadius: 12, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
-  appointmentDetails: { flex: 1 },
-  appointmentDoctor: { fontSize: 14, fontWeight: '700', color: COLORS.textHeader },
-  appointmentHospital: { fontSize: 12, color: COLORS.textSecondary },
-  appointmentMeta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  appointmentTime: { fontSize: 11, color: '#9CA3AF' },
-  appointmentViewBtn: { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#F3F4F6', borderRadius: 8 },
-  appointmentViewBtnText: { fontSize: 12, fontWeight: '600', color: COLORS.primary },
-
-  // Report Shortcut
-  reportShortcut: { backgroundColor: '#FFF', borderRadius: 16, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
-  reportIcon: { width: 48, height: 48, borderRadius: 12, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
-  reportDetails: { flex: 1 },
-  reportTitle: { fontSize: 14, fontWeight: '700', color: COLORS.textHeader },
-  reportDate: { fontSize: 12, color: COLORS.textSecondary, marginTop: 2 },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  statusBadgeText: { fontSize: 11, fontWeight: '600' },
-
-  // AI Card
-  aiCard: { borderRadius: 16, padding: 16, marginBottom: 24 },
-  aiContent: { gap: 0 },
-  healthScoreContainer: { marginBottom: 16 },
-  healthScoreLabel: { fontSize: 12, color: 'rgba(255,255,255,0.8)', marginBottom: 4 },
-  healthScore: { fontSize: 32, fontWeight: '800', color: '#FFF', marginBottom: 8 },
-  scoreBar: { height: 6, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 3, overflow: 'hidden' },
-  scoreBarFill: { height: '100%', backgroundColor: '#10B981', borderRadius: 3 },
-  aiDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.2)', marginVertical: 12 },
-  aiRecommendations: { marginTop: 12 },
-  aiRecTitle: { fontSize: 13, fontWeight: '700', color: '#FFF', marginBottom: 8 },
-  aiRecItem: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
-  aiRecText: { fontSize: 12, color: 'rgba(255,255,255,0.9)', flex: 1 },
 
   // Settings Card
   settingsCard: { backgroundColor: '#FFF', borderRadius: 16, padding: 16 },
