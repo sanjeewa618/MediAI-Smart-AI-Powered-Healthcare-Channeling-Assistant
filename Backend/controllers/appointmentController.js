@@ -1,5 +1,6 @@
 import Appointment from '../model/Appointment.js';
 import User from '../model/User.js';
+import DoctorAvailability from '../model/DoctorAvailability.js';
 
 // @desc    Create a new appointment
 // @route   POST /api/appointments
@@ -14,16 +15,32 @@ export const createAppointment = async (req, res) => {
       return res.status(400).json({ message: 'Invalid doctor selected' });
     }
 
-    // Prevent double booking: Check if the doctor already has a non-cancelled appointment at this date/time
-    const existingAppointment = await Appointment.findOne({ 
+    // Find the corresponding slot to check maxPatients
+    // The timeSlot string is typically something like "09:00 AM - 09:30 AM"
+    // We match the exact slot from DoctorAvailability using doctor, startTime, endTime
+    const [startPart, endPart] = timeSlot.split(' - ');
+    const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(date).getDay()];
+    
+    // Find slot (either specific to this day or repeating daily)
+    const slot = await DoctorAvailability.findOne({
+      doctor,
+      startTime: startPart,
+      endTime: endPart,
+      $or: [{ day: dayOfWeek }, { repeat: 'daily' }]
+    });
+
+    const maxLimit = slot ? slot.maxPatients : 1;
+
+    // Count existing non-cancelled appointments for this specific slot instance
+    const existingCount = await Appointment.countDocuments({
       doctor, 
       date, 
       timeSlot, 
       status: { $ne: 'cancelled' } 
     });
 
-    if (existingAppointment) {
-      return res.status(400).json({ message: 'This time slot is already booked. Please choose another.' });
+    if (existingCount >= maxLimit) {
+      return res.status(400).json({ message: 'This time slot is fully booked. Please choose another.' });
     }
 
     const appointment = await Appointment.create({

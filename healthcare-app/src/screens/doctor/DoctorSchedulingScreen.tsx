@@ -1,17 +1,41 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Modal, TextInput, Platform, Switch } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Plus, Clock, Trash2, Edit3, X, CheckCircle, AlertCircle, ChevronRight } from 'lucide-react-native';
+import { Plus, Clock, Trash2, Edit3, X, CheckCircle, AlertCircle, ChevronRight, Calendar } from 'lucide-react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import DoctorBottomNavBar from '../../components/DoctorBottomNavBar';
 import NurseBottomNavBar from '../../components/NurseBottomNavBar';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
 
-const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const DATES = ['19', '20', '21', '22', '23', '24', '25'];
+const generateCurrentMonth = () => {
+  const days = [];
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth();
+  
+  // Get number of days in the current month
+  const numDays = new Date(year, month + 1, 0).getDate();
+
+  for (let i = 1; i <= numDays; i++) {
+    const date = new Date(year, month, i);
+    days.push({
+      dayName: dayNames[date.getDay()],
+      dateStr: date.getDate().toString(),
+      isPast: i < today.getDate()
+    });
+  }
+  return days;
+};
+
+const WEEK_DAYS = generateCurrentMonth();
+const DAYS = WEEK_DAYS.map(d => d.dayName);
+const DATES = WEEK_DAYS.map(d => d.dateStr);
+const CURRENT_MONTH = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
 
 type SlotType = 'available' | 'booked' | 'break' | 'blocked';
 
@@ -24,6 +48,7 @@ interface Slot {
   consultType: string;
   maxPatients: number;
   notes?: string;
+  repeat?: string;
 }
 
 const INITIAL_SLOTS: Slot[] = [];
@@ -38,12 +63,43 @@ const SLOT_COLORS: Record<SlotType, { bg: string; border: string; label: string 
 const DoctorSchedulingScreen = () => {
   const navigation = useNavigation<any>();
   const { token } = useAuth();
-  const [selectedDay, setSelectedDay] = useState('Mon');
+  const scrollRef = useRef<ScrollView>(null);
+  const [selectedDay, setSelectedDay] = useState(WEEK_DAYS.find(wd => !wd.isPast)?.dayName || 'Mon');
   const [slots, setSlots] = useState<Slot[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
   const [form, setForm] = useState({ startTime: '', endTime: '', consultType: 'Physical', maxPatients: '10', notes: '', repeat: 'none', physical: true, video: false });
   const [conflict, setConflict] = useState('');
+  
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
+  const [startDateTime, setStartDateTime] = useState(new Date());
+  const [endDateTime, setEndDateTime] = useState(new Date());
+
+  const formatTime = (date: Date) => {
+    let hours = date.getHours();
+    const minutes = date.getMinutes();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    return hours.toString().padStart(2, '0') + ':' + minutes.toString().padStart(2, '0') + ' ' + ampm;
+  };
+
+  const onStartTimeChange = (event: any, selectedDate?: Date) => {
+    setShowStartPicker(Platform.OS === 'ios');
+    if (selectedDate) {
+      setStartDateTime(selectedDate);
+      setForm(f => ({ ...f, startTime: formatTime(selectedDate) }));
+    }
+  };
+
+  const onEndTimeChange = (event: any, selectedDate?: Date) => {
+    setShowEndPicker(Platform.OS === 'ios');
+    if (selectedDate) {
+      setEndDateTime(selectedDate);
+      setForm(f => ({ ...f, endTime: formatTime(selectedDate) }));
+    }
+  };
 
   const fetchSlots = async () => {
     try {
@@ -61,9 +117,17 @@ const DoctorSchedulingScreen = () => {
 
   useEffect(() => {
     if (token) fetchSlots();
+    
+    // Auto-scroll to today
+    const todayIndex = WEEK_DAYS.findIndex(wd => !wd.isPast);
+    if (todayIndex > 0) {
+      setTimeout(() => {
+        scrollRef.current?.scrollTo({ x: todayIndex * 70, animated: true });
+      }, 100);
+    }
   }, [token]);
 
-  const daySlots = slots.filter(s => s.day === selectedDay);
+  const daySlots = slots.filter(s => s.repeat === 'daily' || s.day === selectedDay);
 
   const openAddModal = () => {
     setSelectedSlot(null);
@@ -99,16 +163,16 @@ const DoctorSchedulingScreen = () => {
       setConflict('⚠ This slot already has an appointment or overlaps with another slot.');
       return;
     }
-    const cType = form.video && !form.physical ? 'Video' : form.physical && form.video ? 'Both' : 'Physical';
     
     const payload = {
       day: selectedDay,
       startTime: form.startTime,
       endTime: form.endTime,
       type: 'available',
-      consultType: cType,
+      consultType: 'Physical',
       maxPatients: parseInt(form.maxPatients) || 1,
-      notes: form.notes
+      notes: form.notes,
+      repeat: form.repeat
     };
 
     try {
@@ -187,15 +251,21 @@ const DoctorSchedulingScreen = () => {
         ))}
       </View>
 
+      {/* Month Header */}
+      <View style={styles.monthHeader}>
+        <Calendar size={18} color={COLORS.primary} />
+        <Text style={styles.monthText}>{CURRENT_MONTH}</Text>
+      </View>
+
       {/* Day Selector */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dayScroll} contentContainerStyle={styles.dayScrollContent}>
-        {DAYS.map((day, i) => {
-          const isActive = selectedDay === day;
-          const hasSlots = slots.some(s => s.day === day);
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dayScroll} contentContainerStyle={styles.dayScrollContent} ref={scrollRef}>
+        {WEEK_DAYS.map((wd, i) => {
+          const isActive = selectedDay === wd.dayName;
+          const hasSlots = slots.some(s => s.day === wd.dayName || s.repeat === 'daily');
           return (
-            <TouchableOpacity key={day} onPress={() => setSelectedDay(day)} style={[styles.dayBtn, isActive && styles.dayBtnActive]}>
-              <Text style={[styles.dayName, isActive && styles.dayNameActive]}>{day}</Text>
-              <Text style={[styles.dayDate, isActive && styles.dayDateActive]}>{DATES[i]}</Text>
+            <TouchableOpacity key={i + '-' + wd.dayName} onPress={() => setSelectedDay(wd.dayName)} style={[styles.dayBtn, wd.isPast && styles.dayBtnPast, isActive && styles.dayBtnActive]}>
+              <Text style={[styles.dayName, isActive && styles.dayNameActive]}>{wd.dayName}</Text>
+              <Text style={[styles.dayDate, isActive && styles.dayDateActive]}>{wd.dateStr}</Text>
               {hasSlots && <View style={[styles.dayDot, isActive && { backgroundColor: '#FFF' }]} />}
             </TouchableOpacity>
           );
@@ -219,8 +289,8 @@ const DoctorSchedulingScreen = () => {
                   <View style={[styles.slotTypeDot, { backgroundColor: colors.border }]} />
                   <View>
                     <Text style={styles.slotTime}>{slot.startTime} – {slot.endTime}</Text>
-                    {slot.consultType ? (
-                      <Text style={styles.slotMeta}>{slot.consultType} · Max {slot.maxPatients} patients</Text>
+                    {slot.maxPatients ? (
+                      <Text style={styles.slotMeta}>Max {slot.maxPatients} patients</Text>
                     ) : (
                       <Text style={styles.slotMeta}>{slot.notes || colors.label}</Text>
                     )}
@@ -266,20 +336,36 @@ const DoctorSchedulingScreen = () => {
 
             <ScrollView showsVerticalScrollIndicator={false}>
               <Text style={styles.fieldLabel}>Start Time</Text>
-              <TextInput style={styles.input} placeholder="e.g. 09:00 AM" placeholderTextColor="#9CA3AF" value={form.startTime} onChangeText={v => setForm(f => ({ ...f, startTime: v }))} />
+              <TouchableOpacity style={styles.input} onPress={() => setShowStartPicker(true)}>
+                <Text style={{ color: form.startTime ? '#1F2937' : '#9CA3AF', fontSize: 15 }}>
+                  {form.startTime || 'Select Start Time (e.g. 09:00 AM)'}
+                </Text>
+              </TouchableOpacity>
+              {showStartPicker && (
+                <DateTimePicker
+                  value={startDateTime}
+                  mode="time"
+                  is24Hour={false}
+                  display="default"
+                  onChange={onStartTimeChange}
+                />
+              )}
 
               <Text style={styles.fieldLabel}>End Time</Text>
-              <TextInput style={styles.input} placeholder="e.g. 09:30 AM" placeholderTextColor="#9CA3AF" value={form.endTime} onChangeText={v => setForm(f => ({ ...f, endTime: v }))} />
-
-              <Text style={styles.fieldLabel}>Consultation Type</Text>
-              <View style={styles.checkRow}>
-                <TouchableOpacity style={[styles.checkBox, form.physical && styles.checkBoxActive]} onPress={() => setForm(f => ({ ...f, physical: !f.physical }))}>
-                  <Text style={[styles.checkText, form.physical && styles.checkTextActive]}>Physical</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.checkBox, form.video && styles.checkBoxActive]} onPress={() => setForm(f => ({ ...f, video: !f.video }))}>
-                  <Text style={[styles.checkText, form.video && styles.checkTextActive]}>Video</Text>
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity style={styles.input} onPress={() => setShowEndPicker(true)}>
+                <Text style={{ color: form.endTime ? '#1F2937' : '#9CA3AF', fontSize: 15 }}>
+                  {form.endTime || 'Select End Time (e.g. 09:30 AM)'}
+                </Text>
+              </TouchableOpacity>
+              {showEndPicker && (
+                <DateTimePicker
+                  value={endDateTime}
+                  mode="time"
+                  is24Hour={false}
+                  display="default"
+                  onChange={onEndTimeChange}
+                />
+              )}
 
               <Text style={styles.fieldLabel}>Max Patients</Text>
               <TextInput style={styles.input} placeholder="10" placeholderTextColor="#9CA3AF" keyboardType="numeric" value={form.maxPatients} onChangeText={v => setForm(f => ({ ...f, maxPatients: v }))} />
@@ -338,10 +424,13 @@ const styles = StyleSheet.create({
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendText: { fontSize: 11, color: '#4B5563', fontWeight: '600' },
+  monthHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 4, gap: 8 },
+  monthText: { fontSize: 16, fontWeight: '700', color: '#1F2937' },
   dayScroll: { maxHeight: 90 },
   dayScrollContent: { paddingHorizontal: 16, paddingVertical: 10, gap: 10 },
   dayBtn: { alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#E5E7EB', minWidth: 56 },
   dayBtnActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  dayBtnPast: { opacity: 0.4, backgroundColor: '#F9FAFB' },
   dayName: { fontSize: 12, fontWeight: '700', color: '#6B7280' },
   dayNameActive: { color: '#FFF' },
   dayDate: { fontSize: 18, fontWeight: '800', color: '#1F2937', marginTop: 2 },

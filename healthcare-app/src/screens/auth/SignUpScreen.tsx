@@ -15,28 +15,6 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:40
 type SignUpScreenProp = StackNavigationProp<RootStackParamList, 'SignUp'>;
 type SignUpRouteProp = RouteProp<RootStackParamList, 'SignUp'>;
 
-// Doctor Specialties (matches PatientDashboard categories)
-const DOCTOR_SPECIALTIES = [
-  { name: 'Cardiology', bg: '#FFF1F2', text: '#E11D48' },
-  { name: 'Paediatrics', bg: '#E0F2FE', text: '#0EA5E9' },
-  { name: 'Urology', bg: '#F0FDF4', text: '#22C55E' },
-  { name: 'Oncology', bg: '#FFF7ED', text: '#F97316' },
-  { name: 'Dermatology', bg: '#F5F3FF', text: '#724CF9' },
-  { name: 'Neurology', bg: '#FDF2F8', text: '#DB2777' },
-  { name: 'Orthopedics', bg: '#F1F5F9', text: '#475569' },
-  { name: 'Ophthalmology', bg: '#FFF7ED', text: '#EA580C' },
-];
-
-// Nurse/Lab Departments / Categories
-const NURSE_DEPARTMENTS = [
-  { name: 'Blood Test', bg: '#FEE2E2', text: '#EF4444' },
-  { name: 'Urine Test', bg: '#FEF3C7', text: '#D97706' },
-  { name: 'Diabetes', bg: '#E0F2FE', text: '#0EA5E9' },
-  { name: 'Heart', bg: '#FCE7F3', text: '#DB2777' },
-  { name: 'Liver', bg: '#F0FDF4', text: '#16A34A' },
-  { name: 'Pregnancy', bg: '#FFF1F2', text: '#E11D48' },
-];
-
 // Staggered Entrance Animation Wrapper
 const StaggeredView = ({ children, delay = 0, style }: { children: React.ReactNode; delay: number; style?: any }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -101,6 +79,38 @@ const SignUpScreen = () => {
   const [otpLoading, setOtpLoading] = React.useState(false);
   const [selectedSpecialty, setSelectedSpecialty] = React.useState('');
   const [selectedDepartment, setSelectedDepartment] = React.useState('');
+  const [doctorSpecialties, setDoctorSpecialties] = React.useState<any[]>([]);
+  const [labDepartments, setLabDepartments] = React.useState<any[]>([]);
+
+  React.useEffect(() => {
+    if (role === 'doctor') {
+      const fetchSpecialties = async () => {
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/doctor/specialties`);
+          const data = await res.json();
+          if (data.success && data.data) {
+            setDoctorSpecialties(data.data);
+          }
+        } catch (error) {
+          console.log('Failed to fetch doctor specialties:', error);
+        }
+      };
+      fetchSpecialties();
+    } else if (role === 'nurse') {
+      const fetchDepartments = async () => {
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/nurse/departments`);
+          const data = await res.json();
+          if (data.success && data.data) {
+            setLabDepartments(data.data);
+          }
+        } catch (error) {
+          console.log('Failed to fetch lab departments:', error);
+        }
+      };
+      fetchDepartments();
+    }
+  }, [role]);
 
   const handleSendOtp = async () => {
     if (!email) {
@@ -334,7 +344,7 @@ const SignUpScreen = () => {
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.chipsContainer}
                 >
-                  {DOCTOR_SPECIALTIES.map((item) => (
+                  {doctorSpecialties.map((item) => (
                     <TouchableOpacity
                       key={item.name}
                       style={[
@@ -359,7 +369,7 @@ const SignUpScreen = () => {
                 </ScrollView>
                 {selectedSpecialty ? (
                   (() => {
-                    const matched = DOCTOR_SPECIALTIES.find(d => d.name === selectedSpecialty);
+                    const matched = doctorSpecialties.find(d => d.name === selectedSpecialty);
                     return (
                       <View style={[styles.selectedBadge, matched ? { backgroundColor: matched.bg } : {}]}>
                         <Text style={[styles.selectedBadgeText, matched ? { color: matched.text } : {}]}>✓ {selectedSpecialty}</Text>
@@ -379,7 +389,7 @@ const SignUpScreen = () => {
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.chipsContainer}
                 >
-                  {NURSE_DEPARTMENTS.map((item) => (
+                  {labDepartments.map((item) => (
                     <TouchableOpacity
                       key={item.name}
                       style={[
@@ -404,7 +414,7 @@ const SignUpScreen = () => {
                 </ScrollView>
                 {selectedDepartment ? (
                   (() => {
-                    const matched = NURSE_DEPARTMENTS.find(n => n.name === selectedDepartment);
+                    const matched = labDepartments.find(n => n.name === selectedDepartment);
                     return (
                       <View style={[styles.selectedBadge, matched ? { backgroundColor: matched.bg } : {}]}>
                         <Text style={[styles.selectedBadgeText, matched ? { color: matched.text } : {}]}>✓ {selectedDepartment}</Text>

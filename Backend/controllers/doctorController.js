@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import User from '../model/User.js';
 import Appointment from '../model/Appointment.js';
 import DoctorAvailability from '../model/DoctorAvailability.js';
+import Specialty from '../model/Specialty.js';
 
 // @desc    Get doctor dashboard data (Stats & Upcoming appointments)
 // @route   GET /api/doctor/dashboard
@@ -135,7 +136,7 @@ export const getDoctorSchedule = async (req, res) => {
 // @access  Private (Doctor only)
 export const createDoctorSchedule = async (req, res) => {
   try {
-    const { day, startTime, endTime, type, consultType, maxPatients, notes } = req.body;
+    const { day, startTime, endTime, type, consultType, maxPatients, notes, repeat } = req.body;
     
     const newSlot = await DoctorAvailability.create({
       doctor: req.user._id,
@@ -145,7 +146,8 @@ export const createDoctorSchedule = async (req, res) => {
       type: type || 'available',
       consultType: consultType || 'Physical',
       maxPatients: maxPatients || 1,
-      notes: notes || ''
+      notes: notes || '',
+      repeat: repeat || 'none'
     });
 
     res.status(201).json({ success: true, data: newSlot });
@@ -201,4 +203,31 @@ export const deleteDoctorSchedule = async (req, res) => {
   }
 };
 
+// @desc    Get all doctor specialties
+// @route   GET /api/doctor/specialties
+// @access  Public
+export const getSpecialties = async (req, res) => {
+  try {
+    let specialties = await Specialty.find().sort({ name: 1 });
+    
+    // Auto-seed if empty for convenience
+    if (specialties.length === 0) {
+      const defaultSpecialties = [
+        { name: 'Cardiology', bg: '#FFF1F2', text: '#E11D48' },
+        { name: 'Paediatrics', bg: '#E0F2FE', text: '#0EA5E9' },
+        { name: 'Urology', bg: '#F0FDF4', text: '#22C55E' },
+        { name: 'Oncology', bg: '#FFF7ED', text: '#F97316' },
+        { name: 'Dermatology', bg: '#F5F3FF', text: '#724CF9' },
+        { name: 'Neurology', bg: '#FDF2F8', text: '#DB2777' },
+        { name: 'Orthopedics', bg: '#F1F5F9', text: '#475569' },
+        { name: 'Ophthalmology', bg: '#FFF7ED', text: '#EA580C' }
+      ];
+      await Specialty.insertMany(defaultSpecialties);
+      specialties = await Specialty.find().sort({ name: 1 });
+    }
 
+    res.json({ success: true, data: specialties });
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};

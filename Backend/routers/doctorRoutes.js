@@ -6,14 +6,18 @@ import {
   getDoctorSchedule,
   createDoctorSchedule,
   updateDoctorSchedule,
-  deleteDoctorSchedule
+  deleteDoctorSchedule,
+  getSpecialties
 } from '../controllers/doctorController.js';
 import { protect } from '../middlewares/authMiddleware.js';
 import { doctorOnly } from '../middlewares/roleMiddleware.js';
 
 const router = express.Router();
 
-// Require login for all routes
+// Public route for fetching doctor specialties
+router.get('/specialties', getSpecialties);
+
+// Require login for all routes below
 router.use(protect);
 
 // Doctor Dashboard Data & Profile update (Only accessible by doctors)
