@@ -1,5 +1,7 @@
 import express from 'express';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import cors from 'cors';
 import connectDB from './config/db.js';
 import authRoutes from './routers/authRoutes.js';
@@ -25,6 +27,10 @@ const app = express();
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // 3. Mount Route Paths
 app.use('/api/auth', authRoutes);

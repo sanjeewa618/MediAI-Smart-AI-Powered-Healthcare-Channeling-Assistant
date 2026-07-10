@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   Platform,
   Switch,
   Alert,
+  TextInput,
+  Modal,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -18,14 +20,12 @@ import {
   ChevronLeft,
   Edit3,
   FileText,
-  Calendar,
   Clock,
   Heart,
   Shield,
   Bell,
   Lock,
   Phone,
-  Users,
   LogOut,
   ChevronRight,
   VerifiedIcon,
@@ -34,20 +34,334 @@ import {
   Pill,
   Ruler,
   Activity,
-  TrendingUp,
   CheckCircle2,
+  Camera,
 } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
 import BottomNavBar from '../../components/BottomNavBar';
 import { COLORS, SHADOWS } from '../../theme/theme';
+import { useAuth } from '../../context/AuthContext';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
 
 type PatientProfileNavProp = StackNavigationProp<RootStackParamList, 'PatientDashboard'>;
 
 const PatientProfileScreen = () => {
   const navigation = useNavigation<PatientProfileNavProp>();
+  const { token } = useAuth();
+
   const [appointmentReminder, setAppointmentReminder] = useState(true);
   const [smsAlerts, setSmsAlerts] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(false);
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [isMedicalEditing, setIsMedicalEditing] = useState(false);
+  const [isInsuranceEditing, setIsInsuranceEditing] = useState(false);
+  const [isBloodGroupModalVisible, setIsBloodGroupModalVisible] = useState(false);
+  const [isEmergencyEditing, setIsEmergencyEditing] = useState(false);
+  const [isEmergencyModalVisible, setIsEmergencyModalVisible] = useState(false);
+  const [newEmergencyName, setNewEmergencyName] = useState('');
+  const [newEmergencyRelation, setNewEmergencyRelation] = useState('');
+  const [newEmergencyPhone, setNewEmergencyPhone] = useState('');
+  const [newAllergy, setNewAllergy] = useState('');
+  const [newCondition, setNewCondition] = useState('');
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const fetchedRef = useRef(false);
+
+  const [profileData, setProfileData] = useState({
+    name: 'Sarah Johnson',
+    nic: 'XX****-****-1234',
+    dob: '15 March 1996',
+    gender: 'Female',
+    phone: '+94 71 234 5678',
+    email: 'sarah@email.com',
+    address: '123 Medical Lane, City',
+    bloodGroup: 'O+',
+    height: '165',
+    weight: '62',
+    bmi: '22.8',
+    allergies: ['Penicillin', 'Peanuts'] as string[],
+    chronicConditions: [] as string[],
+    emergencyContacts: [
+      { name: 'Michael Johnson', relation: 'Brother', phone: '+94 71 987 6543' }
+    ] as { name: string, relation: string, phone: string }[],
+    insurance: {
+      provider: 'National Health Insurance',
+      policyNumber: 'POL-2024-056789',
+      coverageType: 'Full Coverage',
+      expiryDate: '15 Dec 2025',
+      documentUrl: ''
+    },
+    createdAt: '',
+    stats: {
+      totalAppointments: 0,
+      completedAppointments: 0,
+    }
+  });
+
+  const calculateAge = (dobString: string) => {
+    if (!dobString) return 'N/A';
+    let dob = new Date(dobString);
+    
+    // Fallback parsing for "DD Month YYYY" format on certain JS engines (like Hermes)
+    if (isNaN(dob.getTime())) {
+      const parts = dobString.split(' ');
+      if (parts.length === 3) {
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        const monthIndex = monthNames.findIndex(m => dobString.includes(m));
+        if (monthIndex !== -1) {
+          const year = parseInt(parts[2]);
+          const day = parseInt(parts[0]);
+          dob = new Date(year, monthIndex, day);
+        }
+      }
+    }
+
+    if (isNaN(dob.getTime())) return 'N/A';
+    const ageDifMs = Date.now() - dob.getTime();
+    const ageDate = new Date(ageDifMs);
+    return Math.abs(ageDate.getUTCFullYear() - 1970);
+  };
+
+  const getMemberSince = (dateString: string) => {
+    if (!dateString) return 'N/A';
+    const d = new Date(dateString);
+    if (isNaN(d.getTime())) return 'N/A';
+    return d.toLocaleString('default', { month: 'short', year: 'numeric' });
+  };
+
+  const calculateBMI = (weightKg: string, heightCm: string) => {
+    const w = parseFloat(weightKg);
+    const h = parseFloat(heightCm) / 100;
+    if (w > 0 && h > 0) {
+      return (w / (h * h)).toFixed(1);
+    }
+    return '';
+  };
+
+  const handleHeightChange = (text: string) => {
+    setProfileData(prev => {
+      const newBmi = calculateBMI(prev.weight, text);
+      return { ...prev, height: text, bmi: newBmi || prev.bmi };
+    });
+  };
+
+  const handleWeightChange = (text: string) => {
+    setProfileData(prev => {
+      const newBmi = calculateBMI(text, prev.height);
+      return { ...prev, weight: text, bmi: newBmi || prev.bmi };
+    });
+  };
+
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(Platform.OS === 'ios');
+    if (selectedDate) {
+      const year = selectedDate.getFullYear();
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const day = String(selectedDate.getDate()).padStart(2, '0');
+      const formattedDate = `${year}-${month}-${day}`;
+      setProfileData(p => ({ ...p, dob: formattedDate }));
+    }
+  };
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const [meRes, statsRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/auth/me`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+          }),
+          fetch(`${API_BASE_URL}/api/patient/stats`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+          })
+        ]);
+
+        const data = await meRes.json();
+        const statsData = statsRes.ok ? await statsRes.json() : null;
+
+        if (meRes.ok && data) {
+          setProfileData(prev => ({
+            ...prev,
+            name: data.name || prev.name,
+            email: data.email || prev.email,
+            phone: data.phone || prev.phone,
+            nic: data.nic || prev.nic,
+            dob: data.dob || prev.dob,
+            gender: data.gender || prev.gender,
+            address: data.address || prev.address,
+            bloodGroup: data.bloodGroup || prev.bloodGroup,
+            height: data.height ? data.height.toString() : prev.height,
+            weight: data.weight ? data.weight.toString() : prev.weight,
+            bmi: data.bmi ? data.bmi.toString() : prev.bmi,
+            allergies: Array.isArray(data.allergies) ? data.allergies : prev.allergies,
+            chronicConditions: Array.isArray(data.chronicConditions) ? data.chronicConditions : prev.chronicConditions,
+            emergencyContacts: Array.isArray(data.emergencyContacts) && data.emergencyContacts.length > 0 ? data.emergencyContacts : prev.emergencyContacts,
+            insurance: data.insurance || prev.insurance,
+            createdAt: data.createdAt || prev.createdAt,
+            stats: statsData?.success ? statsData.data : prev.stats,
+          }));
+        }
+      } catch (err) {
+        console.error('Failed to fetch profile:', err);
+      }
+    };
+    if (token) {
+      fetchProfile();
+    }
+  }, [token]);
+
+  const handleUploadInsuranceCard = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert('Permission required', 'Permission to access gallery is required!');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const formData = new FormData();
+        const filename = asset.uri.split('/').pop() || 'insurance-card.jpg';
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : `image`;
+
+        formData.append('insuranceCard', {
+          uri: asset.uri,
+          name: filename,
+          type: type,
+        } as any);
+
+        const uploadRes = await fetch(`${API_BASE_URL}/api/patient/upload-insurance`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          body: formData,
+        });
+
+        if (uploadRes.ok) {
+          const uploadData = await uploadRes.json();
+          if (uploadData.success && uploadData.data && uploadData.data.documentUrl) {
+            setProfileData(p => ({
+              ...p,
+              insurance: {
+                ...p.insurance,
+                documentUrl: uploadData.data.documentUrl
+              }
+            }));
+            Alert.alert('Success', 'Insurance card uploaded successfully!');
+          }
+        } else {
+          Alert.alert('Error', 'Failed to upload insurance card');
+        }
+      }
+    } catch (error) {
+      console.error('Image picking/upload error:', error);
+      Alert.alert('Error', 'An error occurred while uploading');
+    }
+  };
+
+  const handleAddAllergy = () => {
+    const txt = newAllergy.trim();
+    if (!txt) return;
+    if ((profileData.allergies || []).includes(txt)) {
+      setNewAllergy('');
+      return;
+    }
+    setProfileData(p => ({ ...p, allergies: [...(p.allergies || []), txt] }));
+    setNewAllergy('');
+  };
+
+  const handleAddCondition = () => {
+    const txt = newCondition.trim();
+    if (!txt) return;
+    setProfileData(p => ({ ...p, chronicConditions: [...p.chronicConditions, txt] }));
+    setNewCondition('');
+  };
+
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      Alert.alert('Error', 'Please fill all password fields');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      Alert.alert('Error', 'New passwords do not match');
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ currentPassword, newPassword })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        Alert.alert('Success', 'Password changed successfully');
+        setShowPasswordModal(false);
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+      } else {
+        Alert.alert('Error', data.message || 'Failed to change password');
+      }
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Error', 'An error occurred while changing password');
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/patient/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(profileData),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        // Sync local state with the persisted server data so new allergies/conditions
+        // remain visible after save and re-renders.
+        if (data && data.data) {
+          const d = data.data;
+          setProfileData(prev => ({
+            ...prev,
+            allergies: Array.isArray(d.allergies) ? d.allergies : prev.allergies,
+            chronicConditions: Array.isArray(d.chronicConditions) ? d.chronicConditions : prev.chronicConditions,
+            emergencyContacts: Array.isArray(d.emergencyContacts) ? d.emergencyContacts : prev.emergencyContacts,
+            insurance: d.insurance || prev.insurance,
+          }));
+        }
+        Alert.alert('Success', 'Profile updated successfully');
+        setIsEditing(false);
+        setIsMedicalEditing(false);
+        setIsEmergencyEditing(false);
+        setIsInsuranceEditing(false);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        Alert.alert('Error', errorData.message || 'Failed to update profile');
+      }
+    } catch (err) {
+      Alert.alert('Error', 'An error occurred while updating the profile');
+      console.error(err);
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [
@@ -88,19 +402,19 @@ const PatientProfileScreen = () => {
               />
               <View style={styles.profileInfo}>
                 <View style={styles.nameRow}>
-                  <Text style={styles.patientName}>Sarah Johnson</Text>
+                  <Text style={styles.patientName}>{profileData.name}</Text>
                   <VerifiedIcon size={20} color="#10B981" fill="#10B981" />
                 </View>
                 <Text style={styles.patientId}>ID: MH-2024-08542</Text>
                 <View style={styles.badgesRow}>
                   <View style={styles.ageBadge}>
-                    <Text style={styles.badgeText}>28 y/o</Text>
+                    <Text style={styles.badgeText}>{calculateAge(profileData.dob)} y/o</Text>
                   </View>
                   <View style={styles.genderBadge}>
-                    <Text style={styles.badgeText}>Female</Text>
+                    <Text style={styles.badgeText}>{profileData.gender}</Text>
                   </View>
                   <View style={styles.bloodBadge}>
-                    <Text style={styles.bloodBadgeText}>O+</Text>
+                    <Text style={styles.bloodBadgeText}>{profileData.bloodGroup}</Text>
                   </View>
                 </View>
               </View>
@@ -109,61 +423,58 @@ const PatientProfileScreen = () => {
             <View style={styles.profileMeta}>
               <View style={styles.metaItem}>
                 <Text style={styles.metaLabel}>Member Since</Text>
-                <Text style={styles.metaValue}>Jan 2023</Text>
+                <Text style={styles.metaValue}>{getMemberSince(profileData.createdAt)}</Text>
               </View>
               <View style={styles.metaItem}>
                 <Text style={styles.metaLabel}>Completed</Text>
-                <Text style={styles.metaValue}>85%</Text>
+                <Text style={styles.metaValue}>{profileData.stats.completedAppointments}</Text>
               </View>
               <View style={styles.metaItem}>
                 <Text style={styles.metaLabel}>Appointments</Text>
-                <Text style={styles.metaValue}>12</Text>
+                <Text style={styles.metaValue}>{profileData.stats.totalAppointments}</Text>
               </View>
             </View>
-          </View>
-
-          {/* Quick Action Buttons */}
-          <View style={styles.quickActionsContainer}>
-            <TouchableOpacity style={[styles.quickActionBtn, SHADOWS.small]}>
-              <Edit3 size={24} color={COLORS.primary} />
-              <Text style={styles.quickActionLabel}>Edit Profile</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.quickActionBtn, SHADOWS.small]}>
-              <FileText size={24} color={COLORS.primary} />
-              <Text style={styles.quickActionLabel}>Medical Records</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.quickActionBtn, SHADOWS.small]}>
-              <Pill size={24} color={COLORS.primary} />
-              <Text style={styles.quickActionLabel}>Medications</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.quickActionBtn, SHADOWS.small]}>
-              <Activity size={24} color={COLORS.primary} />
-              <Text style={styles.quickActionLabel}>Health Score</Text>
-            </TouchableOpacity>
           </View>
 
           {/* Personal Information Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Personal Information</Text>
-              <TouchableOpacity>
-                <Edit3 size={18} color={COLORS.primary} />
-              </TouchableOpacity>
+              {isEditing ? (
+                <TouchableOpacity onPress={handleSaveProfile}>
+                  <CheckCircle2 size={24} color={COLORS.primary} />
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity onPress={() => setIsEditing(true)}>
+                  <Edit3 size={18} color={COLORS.primary} />
+                </TouchableOpacity>
+              )}
             </View>
             <View style={[styles.infoCard, SHADOWS.small]}>
-              <InfoRow label="Full Name" value="Sarah Johnson" />
+              <InfoRow label="Full Name" value={profileData.name} isEditing={isEditing} onChangeText={(t) => setProfileData(p => ({ ...p, name: t }))} />
               <View style={styles.infoDivider} />
-              <InfoRow label="NIC / Passport" value="XX****-****-1234" />
+              <InfoRow label="NIC / Passport" value={profileData.nic} isEditing={isEditing} onChangeText={(t) => setProfileData(p => ({ ...p, nic: t }))} />
               <View style={styles.infoDivider} />
-              <InfoRow label="Date of Birth" value="15 March 1996" />
+              <InfoRow label="Date of Birth" value={profileData.dob} isEditing={isEditing} onPress={() => setShowDatePicker(true)} />
+              {showDatePicker && (
+                <DateTimePicker
+                  value={profileData.dob ? new Date(profileData.dob) : new Date()}
+                  mode="date"
+                  display="default"
+                  onChange={handleDateChange}
+                  maximumDate={new Date()}
+                />
+              )}
               <View style={styles.infoDivider} />
-              <InfoRow label="Gender" value="Female" />
+              <InfoRow label="Age" value={`${calculateAge(profileData.dob)} Years`} isEditing={false} onChangeText={() => {}} editable={false} />
               <View style={styles.infoDivider} />
-              <InfoRow label="Mobile Number" value="+94 71 234 5678" />
+              <InfoRow label="Gender" value={profileData.gender} isEditing={isEditing} onChangeText={(t) => setProfileData(p => ({ ...p, gender: t }))} options={['Male', 'Female', 'Rather not to say']} />
               <View style={styles.infoDivider} />
-              <InfoRow label="Email" value="sarah@email.com" />
+              <InfoRow label="Mobile Number" value={profileData.phone} isEditing={isEditing} onChangeText={(t) => setProfileData(p => ({ ...p, phone: t }))} />
               <View style={styles.infoDivider} />
-              <InfoRow label="Address" value="123 Medical Lane, City" />
+              <InfoRow label="Email" value={profileData.email} isEditing={isEditing} onChangeText={(t) => setProfileData(p => ({ ...p, email: t }))} editable={false} />
+              <View style={styles.infoDivider} />
+              <InfoRow label="Address" value={profileData.address} isEditing={isEditing} onChangeText={(t) => setProfileData(p => ({ ...p, address: t }))} />
             </View>
           </View>
 
@@ -171,66 +482,157 @@ const PatientProfileScreen = () => {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Medical Information</Text>
-              <TouchableOpacity>
-                <Edit3 size={18} color={COLORS.primary} />
-              </TouchableOpacity>
+              {isMedicalEditing ? (
+                <TouchableOpacity onPress={handleSaveProfile}>
+                  <CheckCircle2 size={24} color={COLORS.primary} />
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity onPress={() => setIsMedicalEditing(true)}>
+                  <Edit3 size={18} color={COLORS.primary} />
+                </TouchableOpacity>
+              )}
             </View>
             <View style={[styles.medicalCard, SHADOWS.small]}>
               <View style={styles.medicalGrid}>
-                <MedicalInfoItem icon={<Droplets size={20} color="#EF4444" />} label="Blood Group" value="O+" />
+                <MedicalInfoItem
+                  icon={<Droplets size={20} color="#EF4444" />}
+                  label="Blood Group"
+                  value={profileData.bloodGroup}
+                  isEditing={isMedicalEditing}
+                  editable={false}
+                  onPress={isMedicalEditing ? () => setIsBloodGroupModalVisible(true) : undefined}
+                />
                 <MedicalInfoItem
                   icon={<Ruler size={20} color="#3B82F6" />}
                   label="Height"
-                  value="165 cm"
+                  value={profileData.height ? `${profileData.height} cm` : ''}
+                  isEditing={isMedicalEditing}
+                  onChangeText={(text) => handleHeightChange(text.replace(/[^0-9]/g, ''))}
+                  keyboardType="numeric"
                 />
                 <MedicalInfoItem
                   icon={<Ruler size={20} color="#3B82F6" />}
                   label="Weight"
-                  value="62 kg"
+                  value={profileData.weight ? `${profileData.weight} kg` : ''}
+                  isEditing={isMedicalEditing}
+                  onChangeText={(text) => handleWeightChange(text.replace(/[^0-9.]/g, ''))}
+                  keyboardType="numeric"
                 />
                 <MedicalInfoItem
                   icon={<Activity size={20} color="#8B5CF6" />}
                   label="BMI"
-                  value="22.8"
+                  value={profileData.bmi}
                 />
               </View>
               <View style={styles.medicalDivider} />
+              {/* Allergies */}
               <View style={styles.allergySection}>
                 <View style={styles.allergyHeader}>
                   <AlertTriangle size={18} color="#F59E0B" />
                   <Text style={styles.allergyTitle}>Allergies</Text>
                 </View>
-                <View style={styles.allergyBadges}>
-                  <View style={styles.allergyBadge}>
-                    <Text style={styles.allergyText}>Penicillin</Text>
+                {isMedicalEditing ? (
+                  <View>
+                    <View style={[styles.allergyBadges, { flexWrap: 'wrap' }]}>
+                      {profileData.allergies.map((allergy, index) => (
+                        <TouchableOpacity
+                          key={`${allergy}-${index}`}
+                          style={styles.allergyBadge}
+                          onPress={() =>
+                            setProfileData(p => ({
+                              ...p,
+                              allergies: p.allergies.filter((_, i) => i !== index),
+                            }))
+                          }
+                        >
+                          <Text style={styles.allergyText}>{allergy}  ✕</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                    <View style={styles.addRow}>
+                      <TextInput
+                        style={[styles.addInput, styles.addInputField]}
+                        placeholder="Add allergy and press +"
+                        placeholderTextColor="#9CA3AF"
+                        value={newAllergy}
+                        onChangeText={setNewAllergy}
+                        onSubmitEditing={handleAddAllergy}
+                        returnKeyType="done"
+                        blurOnSubmit={false}
+                      />
+                      <TouchableOpacity style={styles.addBtn} onPress={handleAddAllergy}>
+                        <Text style={styles.addBtnText}>+</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                  <View style={styles.allergyBadge}>
-                    <Text style={styles.allergyText}>Peanuts</Text>
+                ) : (
+                  <View style={[styles.allergyBadges, { flexWrap: 'wrap' }]}>
+                    {profileData.allergies.length > 0 ? (
+                      profileData.allergies.map((allergy, index) => (
+                        <View key={`${allergy}-${index}`} style={styles.allergyBadge}>
+                          <Text style={styles.allergyText}>{allergy}</Text>
+                        </View>
+                      ))
+                    ) : (
+                      <Text style={styles.noDataText}>No allergies recorded</Text>
+                    )}
                   </View>
-                </View>
+                )}
               </View>
               <View style={styles.medicalDivider} />
+              {/* Chronic Conditions */}
               <View style={styles.chronicSection}>
                 <View style={styles.chronicHeader}>
                   <Heart size={18} color="#EF4444" />
                   <Text style={styles.chronicTitle}>Chronic Conditions</Text>
                 </View>
-                <Text style={styles.noDataText}>No chronic conditions recorded</Text>
-              </View>
-              <View style={styles.medicalDivider} />
-              <View style={styles.medicationsSection}>
-                <View style={styles.medicationHeader}>
-                  <Pill size={18} color={COLORS.primary} />
-                  <Text style={styles.medicationTitle}>Current Medications</Text>
-                </View>
-                <View style={styles.medicationItem}>
-                  <View style={styles.medicationDot} />
-                  <Text style={styles.medicationName}>Vitamin D3 - 1000 IU daily</Text>
-                </View>
-                <View style={styles.medicationItem}>
-                  <View style={styles.medicationDot} />
-                  <Text style={styles.medicationName}>Multivitamin - Once daily</Text>
-                </View>
+                {isMedicalEditing ? (
+                  <View>
+                    <View style={[styles.allergyBadges, { flexWrap: 'wrap' }]}>
+                      {profileData.chronicConditions.map((condition, index) => (
+                        <TouchableOpacity
+                          key={`${condition}-${index}`}
+                          style={[styles.allergyBadge, { backgroundColor: '#FEE2E2' }]}
+                          onPress={() =>
+                            setProfileData(p => ({
+                              ...p,
+                              chronicConditions: p.chronicConditions.filter((_, i) => i !== index),
+                            }))
+                          }
+                        >
+                          <Text style={[styles.allergyText, { color: '#991B1B' }]}>{condition}  ✕</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                    <View style={styles.addRow}>
+                      <TextInput
+                        style={[styles.addInput, styles.addInputField]}
+                        placeholder="Add condition and press +"
+                        placeholderTextColor="#9CA3AF"
+                        value={newCondition}
+                        onChangeText={setNewCondition}
+                        onSubmitEditing={handleAddCondition}
+                        returnKeyType="done"
+                        blurOnSubmit={false}
+                      />
+                      <TouchableOpacity style={styles.addBtn} onPress={handleAddCondition}>
+                        <Text style={styles.addBtnText}>+</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={[styles.allergyBadges, { flexWrap: 'wrap' }]}>
+                    {profileData.chronicConditions.length > 0 ? (
+                      profileData.chronicConditions.map((condition, index) => (
+                        <View key={`${condition}-${index}`} style={[styles.allergyBadge, { backgroundColor: '#FEE2E2' }]}>
+                          <Text style={[styles.allergyText, { color: '#991B1B' }]}>{condition}</Text>
+                        </View>
+                      ))
+                    ) : (
+                      <Text style={styles.noDataText}>No chronic conditions recorded</Text>
+                    )}
+                  </View>
+                )}
               </View>
             </View>
           </View>
@@ -238,145 +640,118 @@ const PatientProfileScreen = () => {
           {/* Emergency Contact Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Emergency Contact</Text>
-              <TouchableOpacity>
-                <Edit3 size={18} color={COLORS.primary} />
-              </TouchableOpacity>
-            </View>
-            <View style={[styles.emergencyCard, SHADOWS.small]}>
-              <View style={styles.emergencyContact}>
-                <View style={styles.emergencyIcon}>
-                  <Phone size={24} color="#FFF" />
-                </View>
-                <View style={styles.emergencyInfo}>
-                  <Text style={styles.emergencyName}>Michael Johnson</Text>
-                  <Text style={styles.emergencyRelation}>Brother</Text>
-                </View>
-                <TouchableOpacity style={styles.emergencyCallBtn}>
-                  <Phone size={20} color={COLORS.primary} />
-                </TouchableOpacity>
-              </View>
-              <View style={styles.emergencyPhone}>
-                <Text style={styles.emergencyPhoneLabel}>Phone:</Text>
-                <Text style={styles.emergencyPhoneValue}>+94 71 987 6543</Text>
+              <Text style={styles.sectionTitle}>Emergency Contacts</Text>
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                {isEmergencyEditing && profileData.emergencyContacts.length < 5 && (
+                  <TouchableOpacity onPress={() => setIsEmergencyModalVisible(true)} style={styles.addBtnSmall}>
+                    <Text style={styles.addBtnTextSmall}>+</Text>
+                  </TouchableOpacity>
+                )}
+                {isEmergencyEditing ? (
+                  <TouchableOpacity onPress={handleSaveProfile}>
+                    <CheckCircle2 size={24} color={COLORS.primary} />
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity onPress={() => setIsEmergencyEditing(true)}>
+                    <Edit3 size={18} color={COLORS.primary} />
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
+            {profileData.emergencyContacts.map((contact, index) => (
+              <View key={index} style={[styles.emergencyCard, SHADOWS.small, { marginBottom: 12 }]}>
+                <View style={styles.emergencyContact}>
+                  <View style={styles.emergencyIcon}>
+                    <Phone size={24} color="#FFF" />
+                  </View>
+                  <View style={styles.emergencyInfo}>
+                    <Text style={styles.emergencyName}>{contact.name}</Text>
+                    <Text style={styles.emergencyRelation}>{contact.relation}</Text>
+                  </View>
+                  {isEmergencyEditing ? (
+                    <TouchableOpacity 
+                      style={[styles.emergencyCallBtn, { backgroundColor: '#FEE2E2' }]}
+                      onPress={() => setProfileData(p => ({...p, emergencyContacts: p.emergencyContacts.filter((_, i) => i !== index)}))}
+                    >
+                      <Text style={{color: '#EF4444', fontWeight: '800'}}>✕</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity style={styles.emergencyCallBtn}>
+                      <Phone size={20} color={COLORS.primary} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <View style={styles.emergencyPhone}>
+                  <Text style={styles.emergencyPhoneLabel}>Phone:</Text>
+                  <Text style={styles.emergencyPhoneValue}>{contact.phone}</Text>
+                </View>
+              </View>
+            ))}
+            {(!profileData.emergencyContacts || profileData.emergencyContacts.length === 0) && (
+              <Text style={styles.noDataText}>No emergency contacts recorded.</Text>
+            )}
           </View>
 
           {/* Insurance Information */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Insurance Information</Text>
-              <TouchableOpacity>
-                <Edit3 size={18} color={COLORS.primary} />
-              </TouchableOpacity>
+              {isInsuranceEditing ? (
+                <TouchableOpacity onPress={handleSaveProfile}>
+                  <CheckCircle2 size={24} color={COLORS.primary} />
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity onPress={() => setIsInsuranceEditing(true)}>
+                  <Edit3 size={18} color={COLORS.primary} />
+                </TouchableOpacity>
+              )}
             </View>
             <View style={[styles.insuranceCard, SHADOWS.small]}>
-              <InfoRow label="Insurance Provider" value="National Health Insurance" />
+              <InfoRow 
+                label="Insurance Provider" 
+                value={profileData.insurance.provider} 
+                isEditing={isInsuranceEditing} 
+                onChangeText={(t) => setProfileData(p => ({...p, insurance: {...p.insurance, provider: t}}))} 
+              />
               <View style={styles.infoDivider} />
-              <InfoRow label="Policy Number" value="POL-2024-056789" />
+              <InfoRow 
+                label="Policy Number" 
+                value={profileData.insurance.policyNumber} 
+                isEditing={isInsuranceEditing} 
+                onChangeText={(t) => setProfileData(p => ({...p, insurance: {...p.insurance, policyNumber: t}}))} 
+              />
               <View style={styles.infoDivider} />
-              <InfoRow label="Coverage Type" value="Full Coverage" />
+              <InfoRow 
+                label="Coverage Type" 
+                value={profileData.insurance.coverageType} 
+                isEditing={isInsuranceEditing} 
+                onChangeText={(t) => setProfileData(p => ({...p, insurance: {...p.insurance, coverageType: t}}))} 
+              />
               <View style={styles.infoDivider} />
-              <InfoRow label="Expiry Date" value="15 Dec 2025" />
-              <TouchableOpacity style={styles.uploadInsuranceBtn}>
-                <Text style={styles.uploadInsuranceBtnText}>Upload Insurance Card</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Upcoming Appointments Shortcut */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Upcoming Appointments</Text>
-              <TouchableOpacity>
-                <ChevronRight size={20} color={COLORS.primary} />
-              </TouchableOpacity>
-            </View>
-            {[
-              {
-                doctor: 'Dr. Emma Watson',
-                hospital: 'City Hospital',
-                date: '20 May 2024',
-                time: '10:30 AM',
-              },
-            ].map((apt, idx) => (
-              <View key={idx} style={[styles.appointmentShortcut, SHADOWS.small]}>
-                <View style={styles.appointmentIcon}>
-                  <Calendar size={24} color={COLORS.primary} />
-                </View>
-                <View style={styles.appointmentDetails}>
-                  <Text style={styles.appointmentDoctor}>{apt.doctor}</Text>
-                  <Text style={styles.appointmentHospital}>{apt.hospital}</Text>
-                  <View style={styles.appointmentMeta}>
-                    <Clock size={14} color="#9CA3AF" />
-                    <Text style={styles.appointmentTime}>
-                      {apt.date} at {apt.time}
-                    </Text>
-                  </View>
-                </View>
-                <TouchableOpacity style={styles.appointmentViewBtn}>
-                  <Text style={styles.appointmentViewBtnText}>View</Text>
-                </TouchableOpacity>
+              <InfoRow 
+                label="Expiry Date" 
+                value={profileData.insurance.expiryDate} 
+                isEditing={isInsuranceEditing} 
+                onChangeText={(t) => setProfileData(p => ({...p, insurance: {...p.insurance, expiryDate: t}}))} 
+              />
+              <View style={styles.infoDivider} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 }}>
+                <Text style={styles.infoLabel}>Insurance Card</Text>
+                {profileData.insurance.documentUrl ? (
+                  <Image source={{ uri: `${API_BASE_URL}${profileData.insurance.documentUrl}` }} style={{ width: 60, height: 40, borderRadius: 4 }} />
+                ) : (
+                  <Text style={styles.noDataText}>No Card Uploaded</Text>
+                )}
               </View>
-            ))}
-          </View>
 
-          {/* Medical Reports Shortcut */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Recent Reports</Text>
-              <TouchableOpacity>
-                <ChevronRight size={20} color={COLORS.primary} />
-              </TouchableOpacity>
-            </View>
-            {[
-              { title: 'Complete Blood Count', date: '12 May 2024', status: 'Ready' },
-              { title: 'Chest X-Ray', date: '08 May 2024', status: 'Reviewed' },
-            ].map((report, idx) => (
-              <View key={idx} style={[styles.reportShortcut, SHADOWS.small]}>
-                <View style={styles.reportIcon}>
-                  <FileText size={24} color={COLORS.primary} />
-                </View>
-                <View style={styles.reportDetails}>
-                  <Text style={styles.reportTitle}>{report.title}</Text>
-                  <Text style={styles.reportDate}>{report.date}</Text>
-                </View>
-                <View style={[styles.statusBadge, { backgroundColor: report.status === 'Ready' ? '#DCFCE7' : '#E9D5FF' }]}>
-                  <Text style={[styles.statusBadgeText, { color: report.status === 'Ready' ? '#166534' : '#6B21A8' }]}>
-                    {report.status}
+              {isInsuranceEditing && (
+                <TouchableOpacity style={styles.uploadInsuranceBtn} onPress={handleUploadInsuranceCard}>
+                  <Text style={styles.uploadInsuranceBtnText}>
+                    {profileData.insurance.documentUrl ? "Replace Insurance Card" : "Upload Insurance Card"}
                   </Text>
-                </View>
-              </View>
-            ))}
-          </View>
-
-          {/* AI Health Assistant Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>AI Health Insights</Text>
-            <LinearGradient colors={['#815CFB', '#6737EA']} style={[styles.aiCard, SHADOWS.medium]}>
-              <View style={styles.aiContent}>
-                <View style={styles.healthScoreContainer}>
-                  <Text style={styles.healthScoreLabel}>Overall Health Score</Text>
-                  <Text style={styles.healthScore}>82/100</Text>
-                  <View style={styles.scoreBar}>
-                    <View style={[styles.scoreBarFill, { width: '82%' }]} />
-                  </View>
-                </View>
-                <View style={styles.aiDivider} />
-                <View style={styles.aiRecommendations}>
-                  <Text style={styles.aiRecTitle}>Daily Recommendations</Text>
-                  <View style={styles.aiRecItem}>
-                    <CheckCircle2 size={16} color="#10B981" />
-                    <Text style={styles.aiRecText}>Stay hydrated - Drink 8 glasses of water</Text>
-                  </View>
-                  <View style={styles.aiRecItem}>
-                    <CheckCircle2 size={16} color="#10B981" />
-                    <Text style={styles.aiRecText}>30-minute walk daily for better health</Text>
-                  </View>
-                </View>
-              </View>
-            </LinearGradient>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
 
           {/* Notifications & Preferences */}
@@ -410,7 +785,7 @@ const PatientProfileScreen = () => {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Security & Privacy</Text>
             <View style={[styles.securityCard, SHADOWS.small]}>
-              <TouchableOpacity style={styles.securityOption}>
+              <TouchableOpacity style={styles.securityOption} onPress={() => setShowPasswordModal(true)}>
                 <Lock size={20} color={COLORS.primary} />
                 <Text style={styles.securityLabel}>Change Password</Text>
                 <ChevronRight size={20} color="#D1D5DB" />
@@ -451,15 +826,185 @@ const PatientProfileScreen = () => {
 
         <BottomNavBar />
       </View>
+
+      {/* Password Modal */}
+      <Modal
+        visible={showPasswordModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowPasswordModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Change Password</Text>
+            
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Current Password"
+              placeholderTextColor="#9CA3AF"
+              secureTextEntry
+              value={currentPassword}
+              onChangeText={setCurrentPassword}
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="New Password"
+              placeholderTextColor="#9CA3AF"
+              secureTextEntry
+              value={newPassword}
+              onChangeText={setNewPassword}
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Confirm New Password"
+              placeholderTextColor="#9CA3AF"
+              secureTextEntry
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+            />
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowPasswordModal(false)}>
+                <Text style={styles.modalCancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalSaveBtn} onPress={handleChangePassword}>
+                <Text style={styles.modalSaveBtnText}>Update</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={isBloodGroupModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsBloodGroupModalVisible(false)}
+      >
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setIsBloodGroupModalVisible(false)}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Select Blood Group</Text>
+            <View style={styles.bloodGroupGrid}>
+              {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(bg => (
+                <TouchableOpacity
+                  key={bg}
+                  style={[styles.bloodGroupBtn, profileData.bloodGroup === bg && styles.bloodGroupBtnSelected]}
+                  onPress={() => {
+                    setProfileData(p => ({ ...p, bloodGroup: bg }));
+                    setIsBloodGroupModalVisible(false);
+                  }}
+                >
+                  <Text style={[styles.bloodGroupText, profileData.bloodGroup === bg && styles.bloodGroupTextSelected]}>{bg}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      <Modal
+        visible={isEmergencyModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsEmergencyModalVisible(false)}
+      >
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setIsEmergencyModalVisible(false)}>
+          <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
+            <Text style={styles.modalTitle}>Add Emergency Contact</Text>
+            
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Name"
+              placeholderTextColor="#9CA3AF"
+              value={newEmergencyName}
+              onChangeText={setNewEmergencyName}
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Relation (e.g. Brother)"
+              placeholderTextColor="#9CA3AF"
+              value={newEmergencyRelation}
+              onChangeText={setNewEmergencyRelation}
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Phone Number"
+              placeholderTextColor="#9CA3AF"
+              keyboardType="phone-pad"
+              value={newEmergencyPhone}
+              onChangeText={setNewEmergencyPhone}
+            />
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setIsEmergencyModalVisible(false)}>
+                <Text style={styles.modalCancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.modalSaveBtn} 
+                onPress={() => {
+                  if (newEmergencyName.trim() && newEmergencyRelation.trim() && newEmergencyPhone.trim()) {
+                    setProfileData(p => ({
+                      ...p, 
+                      emergencyContacts: [
+                        ...p.emergencyContacts, 
+                        { name: newEmergencyName.trim(), relation: newEmergencyRelation.trim(), phone: newEmergencyPhone.trim() }
+                      ]
+                    }));
+                    setNewEmergencyName('');
+                    setNewEmergencyRelation('');
+                    setNewEmergencyPhone('');
+                    setIsEmergencyModalVisible(false);
+                  } else {
+                    Alert.alert("Missing Fields", "Please fill out all fields.");
+                  }
+                }}
+              >
+                <Text style={styles.modalSaveBtnText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 };
 
 // Info Row Component
-const InfoRow = ({ label, value }: { label: string; value: string }) => (
+const InfoRow = ({ label, value, isEditing, onChangeText, editable = true, options, onPress }: { label: string; value: string; isEditing?: boolean; onChangeText?: (text: string) => void; editable?: boolean; options?: string[]; onPress?: () => void }) => (
   <View style={styles.infoRow}>
     <Text style={styles.infoLabel}>{label}</Text>
-    <Text style={styles.infoValue}>{value}</Text>
+    {isEditing && editable ? (
+      options ? (
+        <View style={styles.optionsRow}>
+          {options.map(opt => (
+            <TouchableOpacity key={opt} onPress={() => onChangeText?.(opt)} style={[styles.optionBtn, value === opt && styles.optionBtnSelected]}>
+              <Text style={[styles.optionText, value === opt && styles.optionTextSelected]}>{opt}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      ) : onPress ? (
+        <TouchableOpacity onPress={onPress}>
+          <TextInput
+            style={[styles.infoValue, styles.infoInput]}
+            value={value}
+            editable={false}
+            pointerEvents="none"
+            placeholder={label}
+            placeholderTextColor="#9CA3AF"
+          />
+        </TouchableOpacity>
+      ) : (
+        <TextInput
+          style={[styles.infoValue, styles.infoInput]}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={label}
+          placeholderTextColor="#9CA3AF"
+        />
+      )
+    ) : (
+      <Text style={styles.infoValue}>{value}</Text>
+    )}
   </View>
 );
 
@@ -468,16 +1013,37 @@ const MedicalInfoItem = ({
   icon,
   label,
   value,
+  isEditing,
+  onChangeText,
+  keyboardType = 'default',
+  editable = true,
+  onPress,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
+  isEditing?: boolean;
+  onChangeText?: (text: string) => void;
+  keyboardType?: any;
+  editable?: boolean;
+  onPress?: () => void;
 }) => (
-  <View style={styles.medicalItem}>
+  <TouchableOpacity style={styles.medicalItem} onPress={onPress} disabled={!onPress}>
     {icon}
     <Text style={styles.medicalItemLabel}>{label}</Text>
-    <Text style={styles.medicalItemValue}>{value}</Text>
-  </View>
+    {isEditing && editable ? (
+      <TextInput
+        style={[styles.medicalItemValue, styles.medicalInput]}
+        value={value}
+        onChangeText={onChangeText}
+        keyboardType={keyboardType}
+        placeholder={label}
+        placeholderTextColor="#9CA3AF"
+      />
+    ) : (
+      <Text style={styles.medicalItemValue}>{value}</Text>
+    )}
+  </TouchableOpacity>
 );
 
 // Setting Row Component
@@ -562,6 +1128,12 @@ const styles = StyleSheet.create({
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 },
   infoLabel: { fontSize: 13, fontWeight: '600', color: COLORS.textSecondary },
   infoValue: { fontSize: 14, fontWeight: '700', color: COLORS.textHeader },
+  infoInput: { borderBottomWidth: 1, borderBottomColor: COLORS.primary, padding: 0, margin: 0, minWidth: 150, textAlign: 'right' },
+  optionsRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end', flex: 1, paddingLeft: 10 },
+  optionBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: '#E5E7EB' },
+  optionBtnSelected: { backgroundColor: COLORS.primary + '1A', borderColor: COLORS.primary },
+  optionText: { fontSize: 11, color: COLORS.textSecondary, fontWeight: '600' },
+  optionTextSelected: { color: COLORS.primary },
   infoDivider: { height: 1, backgroundColor: '#F3F4F6' },
 
   // Medical Card
@@ -588,6 +1160,10 @@ const styles = StyleSheet.create({
   medicationDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.primary },
   medicationName: { fontSize: 12, color: COLORS.textSecondary },
 
+  // Add row (input + button)
+  addRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  addInputField: { flex: 1, marginTop: 0 },
+
   // Emergency Card
   emergencyCard: { backgroundColor: '#FFF', borderRadius: 16, padding: 16 },
   emergencyContact: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
@@ -604,40 +1180,6 @@ const styles = StyleSheet.create({
   insuranceCard: { backgroundColor: '#FFF', borderRadius: 16, padding: 16 },
   uploadInsuranceBtn: { marginTop: 12, paddingVertical: 10, paddingHorizontal: 16, backgroundColor: COLORS.primary, borderRadius: 12, alignItems: 'center' },
   uploadInsuranceBtnText: { color: '#FFF', fontWeight: '700', fontSize: 13 },
-
-  // Appointment Shortcut
-  appointmentShortcut: { backgroundColor: '#FFF', borderRadius: 16, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
-  appointmentIcon: { width: 48, height: 48, borderRadius: 12, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
-  appointmentDetails: { flex: 1 },
-  appointmentDoctor: { fontSize: 14, fontWeight: '700', color: COLORS.textHeader },
-  appointmentHospital: { fontSize: 12, color: COLORS.textSecondary },
-  appointmentMeta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  appointmentTime: { fontSize: 11, color: '#9CA3AF' },
-  appointmentViewBtn: { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#F3F4F6', borderRadius: 8 },
-  appointmentViewBtnText: { fontSize: 12, fontWeight: '600', color: COLORS.primary },
-
-  // Report Shortcut
-  reportShortcut: { backgroundColor: '#FFF', borderRadius: 16, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
-  reportIcon: { width: 48, height: 48, borderRadius: 12, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
-  reportDetails: { flex: 1 },
-  reportTitle: { fontSize: 14, fontWeight: '700', color: COLORS.textHeader },
-  reportDate: { fontSize: 12, color: COLORS.textSecondary, marginTop: 2 },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  statusBadgeText: { fontSize: 11, fontWeight: '600' },
-
-  // AI Card
-  aiCard: { borderRadius: 16, padding: 16, marginBottom: 24 },
-  aiContent: { gap: 0 },
-  healthScoreContainer: { marginBottom: 16 },
-  healthScoreLabel: { fontSize: 12, color: 'rgba(255,255,255,0.8)', marginBottom: 4 },
-  healthScore: { fontSize: 32, fontWeight: '800', color: '#FFF', marginBottom: 8 },
-  scoreBar: { height: 6, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 3, overflow: 'hidden' },
-  scoreBarFill: { height: '100%', backgroundColor: '#10B981', borderRadius: 3 },
-  aiDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.2)', marginVertical: 12 },
-  aiRecommendations: { marginTop: 12 },
-  aiRecTitle: { fontSize: 13, fontWeight: '700', color: '#FFF', marginBottom: 8 },
-  aiRecItem: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
-  aiRecText: { fontSize: 12, color: 'rgba(255,255,255,0.9)', flex: 1 },
 
   // Settings Card
   settingsCard: { backgroundColor: '#FFF', borderRadius: 16, padding: 16 },
@@ -656,6 +1198,27 @@ const styles = StyleSheet.create({
   // Logout Button
   logoutBtn: { backgroundColor: '#FFF', borderRadius: 16, borderWidth: 2, borderColor: '#EF4444', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, gap: 8 },
   logoutBtnText: { fontSize: 14, fontWeight: '700', color: '#EF4444' },
+
+  medicalInput: { borderBottomWidth: 1, borderBottomColor: COLORS.primary, padding: 0, margin: 0, minWidth: 60, textAlign: 'center' },
+  addInput: { borderBottomWidth: 1, borderBottomColor: COLORS.primary, paddingVertical: 4, fontSize: 13, color: COLORS.textHeader },
+  addBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
+  addBtnText: { color: '#FFF', fontSize: 20, fontWeight: '800', lineHeight: 22 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { width: '80%', backgroundColor: '#FFF', borderRadius: 20, padding: 24 },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: COLORS.textHeader, marginBottom: 20, textAlign: 'center' },
+  bloodGroupGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center' },
+  bloodGroupBtn: { width: '45%', paddingVertical: 12, borderRadius: 12, backgroundColor: '#F3F4F6', alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB' },
+  bloodGroupBtnSelected: { backgroundColor: COLORS.primary + '1A', borderColor: COLORS.primary },
+  bloodGroupText: { fontSize: 16, fontWeight: '700', color: COLORS.textSecondary },
+  bloodGroupTextSelected: { color: COLORS.primary },
+  addBtnSmall: { width: 28, height: 28, borderRadius: 14, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
+  addBtnTextSmall: { color: '#FFF', fontSize: 18, fontWeight: '800', lineHeight: 20 },
+  modalInput: { borderBottomWidth: 1, borderBottomColor: '#E5E7EB', paddingVertical: 10, marginBottom: 16, fontSize: 15, color: COLORS.textHeader },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 12 },
+  modalCancelBtn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8, backgroundColor: '#F3F4F6' },
+  modalCancelBtnText: { color: COLORS.textSecondary, fontWeight: '700' },
+  modalSaveBtn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8, backgroundColor: COLORS.primary },
+  modalSaveBtnText: { color: '#FFF', fontWeight: '700' },
 });
 
 export default PatientProfileScreen;

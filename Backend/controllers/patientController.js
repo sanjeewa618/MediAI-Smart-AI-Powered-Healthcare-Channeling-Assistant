@@ -50,6 +50,18 @@ export const updateProfile = async (req, res) => {
       // Update fields if they were provided in the request body
       user.name = req.body.name || user.name;
       user.phone = req.body.phone || user.phone;
+      if (req.body.nic !== undefined) user.nic = req.body.nic;
+      if (req.body.dob !== undefined) user.dob = req.body.dob;
+      if (req.body.gender !== undefined) user.gender = req.body.gender;
+      if (req.body.address !== undefined) user.address = req.body.address;
+      if (req.body.bloodGroup !== undefined) user.bloodGroup = req.body.bloodGroup;
+      if (req.body.height !== undefined) user.height = req.body.height;
+      if (req.body.weight !== undefined) user.weight = req.body.weight;
+      if (req.body.bmi !== undefined) user.bmi = req.body.bmi;
+      if (req.body.allergies !== undefined) user.allergies = req.body.allergies;
+      if (req.body.chronicConditions !== undefined) user.chronicConditions = req.body.chronicConditions;
+      if (req.body.emergencyContacts !== undefined) user.emergencyContacts = req.body.emergencyContacts;
+      if (req.body.insurance !== undefined) user.insurance = req.body.insurance;
 
       if (req.body.password) {
         user.password = req.body.password;
@@ -74,3 +86,48 @@ export const updateProfile = async (req, res) => {
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
+
+// @desc    Upload Insurance Document
+// @route   POST /api/patient/upload-insurance
+// @access  Private (Patient only)
+export const uploadInsuranceDocument = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    // req.file contains the uploaded file info from multer
+    // We return the relative static path, e.g., '/uploads/filename.ext'
+    const fileUrl = `/uploads/${req.file.filename}`;
+    
+    res.json({
+      success: true,
+      data: {
+        documentUrl: fileUrl
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error during file upload', error: error.message });
+  }
+};
+
+// @desc    Get patient profile stats (total & completed appointments)
+// @route   GET /api/patient/stats
+// @access  Private (Patient only)
+export const getPatientStats = async (req, res) => {
+  try {
+    const totalAppointments = await Appointment.countDocuments({ patient: req.user._id });
+    const completedAppointments = await Appointment.countDocuments({ patient: req.user._id, status: 'completed' });
+
+    res.json({
+      success: true,
+      data: {
+        totalAppointments,
+        completedAppointments
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+

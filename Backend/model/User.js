@@ -11,6 +11,30 @@ const userSchema = new mongoose.Schema(
     status: { type: String, enum: ['pending', 'approved', 'rejected', 'active', 'suspended', 'disabled', 'verified'], default: 'approved' },
     staffId: { type: String }, // Store Doctor ID or Nurse ID
     
+    // Patient Specific Profile
+    nic: { type: String, trim: true },
+    dob: { type: String, trim: true },
+    gender: { type: String, enum: ['Male', 'Female', 'Other', 'Rather not to say'], default: 'Other' },
+    address: { type: String, trim: true },
+    bloodGroup: { type: String, enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] },
+    height: { type: Number }, // in cm
+    weight: { type: Number }, // in kg
+    bmi: { type: Number },
+    allergies: [{ type: String }],
+    chronicConditions: [{ type: String }],
+    emergencyContacts: [{
+      name: String,
+      relation: String,
+      phone: String
+    }],
+    insurance: {
+      provider: String,
+      policyNumber: String,
+      coverageType: String,
+      expiryDate: String,
+      documentUrl: String
+    },
+
     // Doctor Specific Profile
     specialization: { type: String },
     department: { type: String }, // For Nurses (e.g. ICU, OPD)
