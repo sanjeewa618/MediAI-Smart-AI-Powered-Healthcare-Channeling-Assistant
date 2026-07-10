@@ -1,6 +1,7 @@
 import User from '../model/User.js';
 import Appointment from '../model/Appointment.js';
 import MedicalRecord from '../model/MedicalRecord.js';
+import LabDepartment from '../model/LabDepartment.js';
 
 // @desc    Get all nurses (Optional filtering by department/lab category)
 // @route   GET /api/nurse
@@ -108,6 +109,33 @@ export const createMedicalRecord = async (req, res) => {
       success: true,
       data: newRecord
     });
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+// @desc    Get all lab departments
+// @route   GET /api/nurse/departments
+// @access  Public
+export const getLabDepartments = async (req, res) => {
+  try {
+    let departments = await LabDepartment.find().sort({ name: 1 });
+    
+    // Auto-seed if empty for convenience
+    if (departments.length === 0) {
+      const defaultDepartments = [
+        { name: 'Blood Test', bg: '#FEE2E2', text: '#EF4444' },
+        { name: 'Urine Test', bg: '#FEF3C7', text: '#D97706' },
+        { name: 'Diabetes', bg: '#E0F2FE', text: '#0EA5E9' },
+        { name: 'Heart', bg: '#FCE7F3', text: '#DB2777' },
+        { name: 'Liver', bg: '#F0FDF4', text: '#16A34A' },
+        { name: 'Pregnancy', bg: '#FFF1F2', text: '#E11D48' }
+      ];
+      await LabDepartment.insertMany(defaultDepartments);
+      departments = await LabDepartment.find().sort({ name: 1 });
+    }
+
+    res.json({ success: true, data: departments });
   } catch (error) {
     res.status(500).json({ message: 'Server Error', error: error.message });
   }

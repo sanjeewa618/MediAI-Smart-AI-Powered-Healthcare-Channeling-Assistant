@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Platform, Switch, Image, Alert, Modal, TextInput } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { User, Star, Clock, Shield, Bell, LogOut, ChevronRight, Edit3, Phone, Mail, MapPin, Pencil, X, Lock } from 'lucide-react-native';
+import { User, Star, Clock, Shield, Bell, LogOut, ChevronRight, Edit3, Phone, Mail, MapPin, Pencil, X, Lock, ChevronDown, CheckCircle2 } from 'lucide-react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import DoctorBottomNavBar from '../../components/DoctorBottomNavBar';
 import NurseBottomNavBar from '../../components/NurseBottomNavBar';
@@ -26,6 +26,8 @@ const DoctorProfileScreen = () => {
   const [profileImage, setProfileImage] = useState('https://img.icons8.com/bubbles/100/000000/doctor-male.png');
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
+  const [specialtyDropdownOpen, setSpecialtyDropdownOpen] = useState(false);
+  const [doctorSpecialties, setDoctorSpecialties] = useState<any[]>([]);
 
   // Profile Info State
   const [profileInfo, setProfileInfo] = useState({
@@ -33,7 +35,8 @@ const DoctorProfileScreen = () => {
     email: '',
     hospital: '',
     experienceYears: '0 yrs',
-    totalConsultations: '0'
+    totalConsultations: '0',
+    specialization: ''
   });
 
   // Password State
@@ -61,7 +64,8 @@ const DoctorProfileScreen = () => {
             email: data.email || 'dr.saman@mediAI.lk',
             hospital: data.hospital || 'National Hospital, Colombo',
             experienceYears: data.experienceYears || '12 yrs',
-            totalConsultations: data.totalConsultations || '1.2k+'
+            totalConsultations: data.totalConsultations || '1.2k+',
+            specialization: data.specialization || 'General Practitioner'
           });
         }
       } catch (err) {
@@ -69,8 +73,21 @@ const DoctorProfileScreen = () => {
       }
     };
 
+    const fetchSpecialties = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/doctor/specialties`);
+        const data = await res.json();
+        if (data.success && data.data) {
+          setDoctorSpecialties(data.data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch doctor specialties:', err);
+      }
+    };
+
     if (token) {
       fetchProfile();
+      fetchSpecialties();
     }
   }, [token]);
 
@@ -293,7 +310,7 @@ const DoctorProfileScreen = () => {
                 <X size={20} color="#1F2937" />
               </TouchableOpacity>
             </View>
-            <View style={styles.modalBody}>
+            <ScrollView contentContainerStyle={styles.modalBody} showsVerticalScrollIndicator={false}>
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Phone Number</Text>
                 <TextInput
@@ -336,10 +353,42 @@ const DoctorProfileScreen = () => {
                   onChangeText={(t) => setProfileInfo({ ...profileInfo, totalConsultations: t })}
                 />
               </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Specialization</Text>
+                <TouchableOpacity
+                  style={styles.dropdownSelector}
+                  onPress={() => setSpecialtyDropdownOpen(!specialtyDropdownOpen)}
+                >
+                  <Text style={[styles.dropdownText, !profileInfo.specialization && { color: '#9CA3AF' }]}>
+                    {profileInfo.specialization || 'Select Specialty'}
+                  </Text>
+                  <ChevronDown size={20} color="#6B7280" />
+                </TouchableOpacity>
+                {specialtyDropdownOpen && (
+                  <ScrollView style={styles.dropdownList} nestedScrollEnabled={true}>
+                    {doctorSpecialties.map((spec) => (
+                      <TouchableOpacity
+                        key={spec.name}
+                        style={styles.dropdownItem}
+                        onPress={() => {
+                          setProfileInfo({ ...profileInfo, specialization: spec.name });
+                          setDoctorSpec(spec.name);
+                          setSpecialtyDropdownOpen(false);
+                        }}
+                      >
+                        <Text style={[styles.dropdownItemText, profileInfo.specialization === spec.name && { color: COLORS.primary, fontWeight: '600' }]}>
+                          {spec.name}
+                        </Text>
+                        {profileInfo.specialization === spec.name && <CheckCircle2 size={16} color={COLORS.primary} />}
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                )}
+              </View>
               <TouchableOpacity style={styles.saveBtn} onPress={saveProfile}>
                 <Text style={styles.saveBtnText}>Save Changes</Text>
               </TouchableOpacity>
-            </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -523,6 +572,44 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 15,
     fontWeight: '700',
+  },
+  dropdownSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginTop: 8,
+  },
+  dropdownText: {
+    fontSize: 15,
+    color: '#1F2937',
+  },
+  dropdownList: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    marginTop: 6,
+    overflow: 'hidden',
+    maxHeight: 200,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  dropdownItemText: {
+    fontSize: 15,
+    color: '#374151',
   },
 });
 
