@@ -54,6 +54,12 @@ export const updateProfile = async (req, res) => {
       if (req.body.dob !== undefined) user.dob = req.body.dob;
       if (req.body.gender !== undefined) user.gender = req.body.gender;
       if (req.body.address !== undefined) user.address = req.body.address;
+      if (req.body.bloodGroup !== undefined) user.bloodGroup = req.body.bloodGroup;
+      if (req.body.height !== undefined) user.height = req.body.height;
+      if (req.body.weight !== undefined) user.weight = req.body.weight;
+      if (req.body.bmi !== undefined) user.bmi = req.body.bmi;
+      if (req.body.allergies !== undefined) user.allergies = req.body.allergies;
+      if (req.body.chronicConditions !== undefined) user.chronicConditions = req.body.chronicConditions;
 
       if (req.body.password) {
         user.password = req.body.password;

@@ -16,6 +16,12 @@ const userSchema = new mongoose.Schema(
     dob: { type: String, trim: true },
     gender: { type: String, enum: ['Male', 'Female', 'Other', 'Rather not to say'], default: 'Other' },
     address: { type: String, trim: true },
+    bloodGroup: { type: String, enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] },
+    height: { type: Number }, // in cm
+    weight: { type: Number }, // in kg
+    bmi: { type: Number },
+    allergies: [{ type: String }],
+    chronicConditions: [{ type: String }],
 
     // Doctor Specific Profile
     specialization: { type: String },
