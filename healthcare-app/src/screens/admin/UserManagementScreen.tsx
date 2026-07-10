@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,8 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, SHADOWS, SIZES } from '../../theme/theme';
+import { COLORS, SHADOWS } from '../../theme/theme';
+import { useAuth } from '../../context/AuthContext';
 import { 
   ArrowLeft, 
   Search, 
@@ -25,80 +26,197 @@ import {
   Check, 
   UserCheck, 
   ShieldAlert,
-  SlidersHorizontal,
   X
 } from 'lucide-react-native';
 import AdminBottomNavBar from '../../components/AdminBottomNavBar';
 
-// Initial Mock data
-const INITIAL_PATIENTS = [
-  { id: 'P001', name: 'Dilshan Silva', email: 'dilshan@gmail.com', phone: '0771234567', status: 'Active', img: 'https://i.pravatar.cc/150?img=12' },
-  { id: 'P002', name: 'Nisansala Perera', email: 'nisansala@gmail.com', phone: '0719876543', status: 'Active', img: 'https://i.pravatar.cc/150?img=47' },
-  { id: 'P003', name: 'Ruwan Fernando', email: 'ruwan@gmail.com', phone: '0761112223', status: 'Suspended', img: 'https://i.pravatar.cc/150?img=8' },
-  { id: 'P004', name: 'Shalini de Silva', email: 'shalini@gmail.com', phone: '0724445556', status: 'Active', img: 'https://i.pravatar.cc/150?img=5' },
-];
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
 
-const INITIAL_DOCTORS = [
-  { id: 'D001', name: 'Dr. Saman Perera', email: 'saman.p@hospital.lk', specialty: 'Cardiologist', status: 'Verified', img: 'https://img.icons8.com/bubbles/100/000000/doctor-male.png' },
-  { id: 'D002', name: 'Dr. Priyantha Cooray', email: 'priyantha@hospital.lk', specialty: 'Pediatrician', status: 'Pending Verification', img: 'https://img.icons8.com/bubbles/100/000000/doctor-male.png' },
-  { id: 'D003', name: 'Dr. K. Liyanage', email: 'k.liyanage@hospital.lk', specialty: 'Neurologist', status: 'Suspended', img: 'https://img.icons8.com/bubbles/100/000000/female-doctor.png' },
-];
-
-const INITIAL_NURSES = [
-  { id: 'N001', name: 'Nurse Anula Ratnayake', email: 'anula.r@hospital.lk', department: 'ICU', status: 'Active', img: 'https://i.pravatar.cc/150?img=31' },
-  { id: 'N002', name: 'Nurse K. Perera', email: 'k.perera@hospital.lk', department: 'OPD', status: 'Disabled', img: 'https://i.pravatar.cc/150?img=25' },
-];
+type UserItem = {
+  _id: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: 'patient' | 'doctor' | 'nurse' | 'admin';
+  status: 'pending' | 'approved' | 'rejected' | 'active' | 'suspended' | 'disabled' | 'verified';
+  specialization?: string;
+  department?: string;
+};
 
 const UserManagementScreen = () => {
   const navigation = useNavigation<any>();
+  const { token } = useAuth();
   const [activeTab, setActiveTab] = useState<'patients' | 'doctors' | 'nurses'>('patients');
   const [searchQuery, setSearchQuery] = useState('');
-  
-  // Data States
-  const [patients, setPatients] = useState(INITIAL_PATIENTS);
-  const [doctors, setDoctors] = useState(INITIAL_DOCTORS);
-  const [nurses, setNurses] = useState(INITIAL_NURSES);
+  const [patients, setPatients] = useState<UserItem[]>([]);
+  const [doctors, setDoctors] = useState<UserItem[]>([]);
+  const [nurses, setNurses] = useState<UserItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Edit Modal States
   const [editModalVisible, setEditModalVisible] = useState(false);
-  const [editingUser, setEditingUser] = useState<any>(null);
+  const [editingUser, setEditingUser] = useState<UserItem | null>(null);
   const [editName, setEditName] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [editExtra, setEditExtra] = useState(''); // specialty or department
+
+  const fetchUsers = async () => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/users`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.message || 'Failed to load users');
+      }
+
+      const users: UserItem[] = data.data || [];
+      setPatients(users.filter(user => user.role === 'patient'));
+      setDoctors(users.filter(user => user.role === 'doctor'));
+      setNurses(users.filter(user => user.role === 'nurse'));
+    } catch (error) {
+      console.error('Fetch users error:', error);
+      Alert.alert('Error', 'Failed to load users from the server.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, [token]);
+
+  const updateUserStatus = async (userId: string, status: UserItem['status'], successMessage: string) => {
+    if (!token) {
+      Alert.alert('Error', 'You must be signed in as an admin.');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.message || 'Failed to update user status');
+      }
+
+      Alert.alert('Success', successMessage);
+      fetchUsers();
+    } catch (error) {
+      console.error('Update user status error:', error);
+      Alert.alert('Error', 'Unable to update the user status.');
+    }
+  };
+
+  const updateUserDetails = async (
+    userId: string,
+    payload: { name: string; email: string; specialization?: string; department?: string }
+  ) => {
+    if (!token) {
+      Alert.alert('Error', 'You must be signed in as an admin.');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.message || 'Failed to update user details');
+      }
+
+      Alert.alert('Saved', 'User profile details updated successfully.');
+      setEditModalVisible(false);
+      fetchUsers();
+    } catch (error) {
+      console.error('Update user details error:', error);
+      Alert.alert('Error', 'Unable to save the user profile changes.');
+    }
+  };
+
+  const deletePatient = async (userId: string) => {
+    if (!token) {
+      Alert.alert('Error', 'You must be signed in as an admin.');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.message || 'Failed to delete user');
+      }
+
+      Alert.alert('Deleted', 'Patient record has been deleted');
+      fetchUsers();
+    } catch (error) {
+      console.error('Delete patient error:', error);
+      Alert.alert('Error', 'Unable to delete the patient record.');
+    }
+  };
 
   // Filters
   const filteredPatients = useMemo(() => {
     return patients.filter(p => 
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      p.id.toLowerCase().includes(searchQuery.toLowerCase())
+      p._id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.phone.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.email.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [patients, searchQuery]);
 
   const filteredDoctors = useMemo(() => {
     return doctors.filter(d => 
       d.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      d.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      d.specialty.toLowerCase().includes(searchQuery.toLowerCase())
+      d._id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (d.specialization || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      d.email.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [doctors, searchQuery]);
 
   const filteredNurses = useMemo(() => {
     return nurses.filter(n => 
       n.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      n.id.toLowerCase().includes(searchQuery.toLowerCase())
+      n._id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (n.department || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      n.email.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [nurses, searchQuery]);
 
   // Actions for Patients
   const handleSuspendPatient = (id: string) => {
-    setPatients(prev => prev.map(p => {
-      if (p.id === id) {
-        const newStatus = p.status === 'Suspended' ? 'Active' : 'Suspended';
-        Alert.alert('Status Updated', `Patient is now ${newStatus}`);
-        return { ...p, status: newStatus };
-      }
-      return p;
-    }));
+    const patient = patients.find(item => item._id === id);
+    const nextStatus = patient?.status === 'suspended' ? 'active' : 'suspended';
+    updateUserStatus(id, nextStatus, `Patient is now ${nextStatus === 'active' ? 'active' : 'suspended'}.`);
   };
 
   const handleDeletePatient = (id: string) => {
@@ -107,46 +225,27 @@ const UserManagementScreen = () => {
       'Are you sure you want to permanently delete this patient record?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => {
-          setPatients(prev => prev.filter(p => p.id !== id));
-          Alert.alert('Deleted', 'Patient record has been deleted');
-        }}
+        { text: 'Delete', style: 'destructive', onPress: () => deletePatient(id) }
       ]
     );
   };
 
   // Actions for Doctors
   const handleSuspendDoctor = (id: string) => {
-    setDoctors(prev => prev.map(d => {
-      if (d.id === id) {
-        const newStatus = d.status === 'Suspended' ? 'Verified' : 'Suspended';
-        Alert.alert('Status Updated', `Doctor status updated to ${newStatus}`);
-        return { ...d, status: newStatus };
-      }
-      return d;
-    }));
+    const doctor = doctors.find(item => item._id === id);
+    const nextStatus = doctor?.status === 'suspended' ? 'verified' : 'suspended';
+    updateUserStatus(id, nextStatus, `Doctor status updated to ${nextStatus}.`);
   };
 
   const handleVerifyDoctorDirect = (id: string) => {
-    setDoctors(prev => prev.map(d => {
-      if (d.id === id) {
-        Alert.alert('Doctor Verified', 'Doctor credentials verified successfully');
-        return { ...d, status: 'Verified' };
-      }
-      return d;
-    }));
+    updateUserStatus(id, 'verified', 'Doctor credentials verified successfully');
   };
 
   // Actions for Nurses
   const handleDisableNurse = (id: string) => {
-    setNurses(prev => prev.map(n => {
-      if (n.id === id) {
-        const newStatus = n.status === 'Disabled' ? 'Active' : 'Disabled';
-        Alert.alert('Status Updated', `Nurse account is now ${newStatus}`);
-        return { ...n, status: newStatus };
-      }
-      return n;
-    }));
+    const nurse = nurses.find(item => item._id === id);
+    const nextStatus = nurse?.status === 'disabled' ? 'active' : 'disabled';
+    updateUserStatus(id, nextStatus, `Nurse account is now ${nextStatus}.`);
   };
 
   // Open Edit Modal
@@ -154,40 +253,72 @@ const UserManagementScreen = () => {
     setEditingUser(user);
     setEditName(user.name);
     setEditEmail(user.email);
-    setEditExtra(user.specialty || user.department || '');
+    setEditExtra(user.specialization || user.department || '');
     setEditModalVisible(true);
   };
 
   const saveEdit = () => {
-    if (!editName || !editEmail) {
+    if (!editingUser) {
+      Alert.alert('Error', 'No user selected for editing.');
+      return;
+    }
+
+    if (!editName.trim() || !editEmail.trim()) {
       Alert.alert('Error', 'Name and Email are required.');
       return;
     }
 
-    if (activeTab === 'doctors') {
-      setDoctors(prev => prev.map(d => d.id === editingUser.id ? { ...d, name: editName, email: editEmail, specialty: editExtra } : d));
-    } else if (activeTab === 'nurses') {
-      setNurses(prev => prev.map(n => n.id === editingUser.id ? { ...n, name: editName, email: editEmail, department: editExtra } : n));
-    }
-
-    setEditModalVisible(false);
-    Alert.alert('Saved', 'User profile details updated successfully.');
+    updateUserDetails(editingUser._id, {
+      name: editName.trim(),
+      email: editEmail.trim().toLowerCase(),
+      ...(activeTab === 'doctors' ? { specialization: editExtra.trim() } : {}),
+      ...(activeTab === 'nurses' ? { department: editExtra.trim() } : {}),
+    });
   };
 
   const getStatusStyle = (status: string) => {
     switch (status) {
-      case 'Active':
-      case 'Verified':
+      case 'active':
+      case 'approved':
+      case 'verified':
         return { bg: '#ECFDF5', color: '#10B981' };
-      case 'Suspended':
-      case 'Disabled':
+      case 'suspended':
+      case 'disabled':
         return { bg: '#FEF2F2', color: '#EF4444' };
-      case 'Pending Verification':
+      case 'pending':
         return { bg: '#FFFBEB', color: '#F59E0B' };
       default:
         return { bg: '#F3F4F6', color: '#6B7280' };
     }
   };
+
+  const formatStatusLabel = (status: string) => {
+    switch (status) {
+      case 'active':
+        return 'Active';
+      case 'verified':
+        return 'Verified';
+      case 'suspended':
+        return 'Suspended';
+      case 'disabled':
+        return 'Disabled';
+      case 'pending':
+        return 'Pending Verification';
+      case 'approved':
+        return 'Active';
+      case 'rejected':
+        return 'Rejected';
+      default:
+        return status;
+    }
+  };
+
+  const handleTabChange = (tab: 'patients' | 'doctors' | 'nurses') => {
+    setActiveTab(tab);
+    setSearchQuery('');
+  };
+
+  const renderUserId = (item: UserItem) => item._id.slice(-6).toUpperCase();
 
   return (
     <SafeAreaView style={styles.container}>
@@ -206,19 +337,19 @@ const UserManagementScreen = () => {
         <View style={styles.tabContainer}>
           <TouchableOpacity 
             style={[styles.tab, activeTab === 'patients' && styles.activeTab]}
-            onPress={() => { setActiveTab('patients'); setSearchQuery(''); }}
+            onPress={() => handleTabChange('patients')}
           >
             <Text style={[styles.tabText, activeTab === 'patients' && styles.activeTabText]}>Patients</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={[styles.tab, activeTab === 'doctors' && styles.activeTab]}
-            onPress={() => { setActiveTab('doctors'); setSearchQuery(''); }}
+            onPress={() => handleTabChange('doctors')}
           >
             <Text style={[styles.tabText, activeTab === 'doctors' && styles.activeTabText]}>Doctors</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={[styles.tab, activeTab === 'nurses' && styles.activeTab]}
-            onPress={() => { setActiveTab('nurses'); setSearchQuery(''); }}
+            onPress={() => handleTabChange('nurses')}
           >
             <Text style={[styles.tabText, activeTab === 'nurses' && styles.activeTabText]}>Nurses</Text>
           </TouchableOpacity>
@@ -241,39 +372,45 @@ const UserManagementScreen = () => {
 
       {/* Lists */}
       <View style={styles.listContainer}>
+        {loading && (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>Loading users...</Text>
+          </View>
+        )}
+
         {activeTab === 'patients' && (
           <FlatList 
             data={filteredPatients}
-            keyExtractor={item => item.id}
+            keyExtractor={item => item._id}
             showsVerticalScrollIndicator={false}
             renderItem={({ item }) => {
               const statusInfo = getStatusStyle(item.status);
               return (
                 <View style={[styles.userCard, SHADOWS.light]}>
                   <View style={styles.userInfoRow}>
-                    <Image source={{ uri: item.img }} style={styles.avatar} />
+                    <Image source={{ uri: `https://i.pravatar.cc/150?u=${item._id}` }} style={styles.avatar} />
                     <View style={styles.userDetails}>
                       <Text style={styles.userName}>{item.name}</Text>
-                      <Text style={styles.userId}>{item.id} • {item.phone}</Text>
+                      <Text style={styles.userId}>{renderUserId(item)} • {item.phone}</Text>
                       <Text style={styles.userEmail}>{item.email}</Text>
                     </View>
                     <View style={[styles.statusBadge, { backgroundColor: statusInfo.bg }]}>
-                      <Text style={[styles.statusText, { color: statusInfo.color }]}>{item.status}</Text>
+                      <Text style={[styles.statusText, { color: statusInfo.color }]}>{formatStatusLabel(item.status)}</Text>
                     </View>
                   </View>
                   <View style={styles.cardActionsRow}>
                     <TouchableOpacity 
-                      style={[styles.actionBtn, { borderColor: item.status === 'Suspended' ? '#10B981' : '#F59E0B' }]}
-                      onPress={() => handleSuspendPatient(item.id)}
+                      style={[styles.actionBtn, { borderColor: item.status === 'suspended' ? '#10B981' : '#F59E0B' }]}
+                      onPress={() => handleSuspendPatient(item._id)}
                     >
-                      <ShieldAlert size={14} color={item.status === 'Suspended' ? '#10B981' : '#F59E0B'} />
-                      <Text style={[styles.actionBtnText, { color: item.status === 'Suspended' ? '#10B981' : '#F59E0B' }]}>
-                        {item.status === 'Suspended' ? 'Activate' : 'Suspend'}
+                      <ShieldAlert size={14} color={item.status === 'suspended' ? '#10B981' : '#F59E0B'} />
+                      <Text style={[styles.actionBtnText, { color: item.status === 'suspended' ? '#10B981' : '#F59E0B' }]}>
+                        {item.status === 'suspended' ? 'Activate' : 'Suspend'}
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
                       style={[styles.actionBtn, { borderColor: '#EF4444' }]}
-                      onPress={() => handleDeletePatient(item.id)}
+                      onPress={() => handleDeletePatient(item._id)}
                     >
                       <Trash2 size={14} color="#EF4444" />
                       <Text style={[styles.actionBtnText, { color: '#EF4444' }]}>Delete</Text>
@@ -293,21 +430,21 @@ const UserManagementScreen = () => {
         {activeTab === 'doctors' && (
           <FlatList 
             data={filteredDoctors}
-            keyExtractor={item => item.id}
+            keyExtractor={item => item._id}
             showsVerticalScrollIndicator={false}
             renderItem={({ item }) => {
               const statusInfo = getStatusStyle(item.status);
               return (
                 <View style={[styles.userCard, SHADOWS.light]}>
                   <View style={styles.userInfoRow}>
-                    <Image source={{ uri: item.img }} style={styles.avatar} />
+                    <Image source={{ uri: `https://i.pravatar.cc/150?u=${item._id}` }} style={styles.avatar} />
                     <View style={styles.userDetails}>
                       <Text style={styles.userName}>{item.name}</Text>
-                      <Text style={styles.userId}>{item.id} • {item.specialty}</Text>
+                      <Text style={styles.userId}>{renderUserId(item)} • {item.specialization || 'No specialty'}</Text>
                       <Text style={styles.userEmail}>{item.email}</Text>
                     </View>
                     <View style={[styles.statusBadge, { backgroundColor: statusInfo.bg }]}>
-                      <Text style={[styles.statusText, { color: statusInfo.color }]}>{item.status}</Text>
+                      <Text style={[styles.statusText, { color: statusInfo.color }]}>{formatStatusLabel(item.status)}</Text>
                     </View>
                   </View>
                   <View style={styles.cardActionsRow}>
@@ -319,18 +456,18 @@ const UserManagementScreen = () => {
                       <Text style={[styles.actionBtnText, { color: COLORS.primary }]}>Edit Info</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
-                      style={[styles.actionBtn, { borderColor: item.status === 'Suspended' ? '#10B981' : '#F59E0B' }]}
-                      onPress={() => handleSuspendDoctor(item.id)}
+                      style={[styles.actionBtn, { borderColor: item.status === 'suspended' ? '#10B981' : '#F59E0B' }]}
+                      onPress={() => handleSuspendDoctor(item._id)}
                     >
-                      <ShieldAlert size={14} color={item.status === 'Suspended' ? '#10B981' : '#F59E0B'} />
-                      <Text style={[styles.actionBtnText, { color: item.status === 'Suspended' ? '#10B981' : '#F59E0B' }]}>
-                        {item.status === 'Suspended' ? 'Activate' : 'Suspend'}
+                      <ShieldAlert size={14} color={item.status === 'suspended' ? '#10B981' : '#F59E0B'} />
+                      <Text style={[styles.actionBtnText, { color: item.status === 'suspended' ? '#10B981' : '#F59E0B' }]}>
+                        {item.status === 'suspended' ? 'Activate' : 'Suspend'}
                       </Text>
                     </TouchableOpacity>
-                    {item.status === 'Pending Verification' && (
+                    {item.status === 'pending' && (
                       <TouchableOpacity 
                         style={[styles.actionBtn, { borderColor: '#10B981', backgroundColor: '#ECFDF5' }]}
-                        onPress={() => handleVerifyDoctorDirect(item.id)}
+                        onPress={() => handleVerifyDoctorDirect(item._id)}
                       >
                         <UserCheck size={14} color="#10B981" />
                         <Text style={[styles.actionBtnText, { color: '#10B981' }]}>Verify</Text>
@@ -351,21 +488,21 @@ const UserManagementScreen = () => {
         {activeTab === 'nurses' && (
           <FlatList 
             data={filteredNurses}
-            keyExtractor={item => item.id}
+            keyExtractor={item => item._id}
             showsVerticalScrollIndicator={false}
             renderItem={({ item }) => {
               const statusInfo = getStatusStyle(item.status);
               return (
                 <View style={[styles.userCard, SHADOWS.light]}>
                   <View style={styles.userInfoRow}>
-                    <Image source={{ uri: item.img }} style={styles.avatar} />
+                    <Image source={{ uri: `https://i.pravatar.cc/150?u=${item._id}` }} style={styles.avatar} />
                     <View style={styles.userDetails}>
                       <Text style={styles.userName}>{item.name}</Text>
-                      <Text style={styles.userId}>{item.id} • Dept: {item.department}</Text>
+                      <Text style={styles.userId}>{renderUserId(item)} • Dept: {item.department || 'Unknown'}</Text>
                       <Text style={styles.userEmail}>{item.email}</Text>
                     </View>
                     <View style={[styles.statusBadge, { backgroundColor: statusInfo.bg }]}>
-                      <Text style={[styles.statusText, { color: statusInfo.color }]}>{item.status}</Text>
+                      <Text style={[styles.statusText, { color: statusInfo.color }]}>{formatStatusLabel(item.status)}</Text>
                     </View>
                   </View>
                   <View style={styles.cardActionsRow}>
@@ -377,12 +514,12 @@ const UserManagementScreen = () => {
                       <Text style={[styles.actionBtnText, { color: COLORS.primary }]}>Edit Info</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
-                      style={[styles.actionBtn, { borderColor: item.status === 'Disabled' ? '#10B981' : '#EF4444' }]}
-                      onPress={() => handleDisableNurse(item.id)}
+                      style={[styles.actionBtn, { borderColor: item.status === 'disabled' ? '#10B981' : '#EF4444' }]}
+                      onPress={() => handleDisableNurse(item._id)}
                     >
-                      <UserX size={14} color={item.status === 'Disabled' ? '#10B981' : '#EF4444'} />
-                      <Text style={[styles.actionBtnText, { color: item.status === 'Disabled' ? '#10B981' : '#EF4444' }]}>
-                        {item.status === 'Disabled' ? 'Enable' : 'Disable'}
+                      <UserX size={14} color={item.status === 'disabled' ? '#10B981' : '#EF4444'} />
+                      <Text style={[styles.actionBtnText, { color: item.status === 'disabled' ? '#10B981' : '#EF4444' }]}>
+                        {item.status === 'disabled' ? 'Enable' : 'Disable'}
                       </Text>
                     </TouchableOpacity>
                   </View>
