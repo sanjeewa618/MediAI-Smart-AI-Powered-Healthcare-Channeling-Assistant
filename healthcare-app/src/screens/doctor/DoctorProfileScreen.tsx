@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Platform, Switch, Image, Alert, Modal, TextInput } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { User, Star, Clock, Shield, Bell, LogOut, ChevronRight, Edit3, Phone, Mail, MapPin, Pencil, X, Lock } from 'lucide-react-native';
@@ -7,6 +7,9 @@ import DoctorBottomNavBar from '../../components/DoctorBottomNavBar';
 import NurseBottomNavBar from '../../components/NurseBottomNavBar';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
+import { useAuth } from '../../context/AuthContext';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
 
 const MENU_ITEMS = [
   { icon: Bell, label: 'Notifications', sub: 'Appointment alerts & reminders', color: '#F59E0B', action: null },
@@ -16,16 +19,21 @@ const MENU_ITEMS = [
 
 const DoctorProfileScreen = () => {
   const navigation = useNavigation<any>();
+  const { token } = useAuth();
+  const [doctorName, setDoctorName] = useState('Loading...');
+  const [doctorSpec, setDoctorSpec] = useState('Doctor');
   const [onlineStatus, setOnlineStatus] = useState(true);
   const [profileImage, setProfileImage] = useState('https://img.icons8.com/bubbles/100/000000/doctor-male.png');
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
 
-  // Contact Info State
-  const [contactInfo, setContactInfo] = useState({
-    phone: '+94 77 123 4567',
-    email: 'dr.saman@mediAI.lk',
-    hospital: 'National Hospital, Colombo'
+  // Profile Info State
+  const [profileInfo, setProfileInfo] = useState({
+    phone: '',
+    email: '',
+    hospital: '',
+    experienceYears: '0 yrs',
+    totalConsultations: '0'
   });
 
   // Password State
@@ -34,6 +42,91 @@ const DoctorProfileScreen = () => {
     new: '',
     confirm: ''
   });
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const data = await response.json();
+        if (response.ok && data) {
+          const name = data.name || 'Doctor';
+          setDoctorName(name.startsWith('Dr.') ? name : `Dr. ${name}`);
+          setDoctorSpec(data.specialization || 'General Practitioner');
+          setProfileInfo({
+            phone: data.phone || '+94 77 123 4567',
+            email: data.email || 'dr.saman@mediAI.lk',
+            hospital: data.hospital || 'National Hospital, Colombo',
+            experienceYears: data.experienceYears || '12 yrs',
+            totalConsultations: data.totalConsultations || '1.2k+'
+          });
+        }
+      } catch (err) {
+        console.error('Failed to fetch doctor profile:', err);
+      }
+    };
+
+    if (token) {
+      fetchProfile();
+    }
+  }, [token]);
+
+  const saveProfile = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/doctor/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(profileInfo)
+      });
+      if (response.ok) {
+        Alert.alert('Success', 'Profile updated successfully!');
+        setEditModalVisible(false);
+      } else {
+        Alert.alert('Error', 'Failed to update profile');
+      }
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Error', 'Network error');
+    }
+  };
+
+  const handlePasswordChange = async () => {
+    if (passwords.new !== passwords.confirm) {
+      Alert.alert('Error', 'New passwords do not match!');
+      return;
+    }
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          currentPassword: passwords.current,
+          newPassword: passwords.new
+        })
+      });
+      
+      const data = await response.json();
+      if (response.ok) {
+        Alert.alert('Success', 'Password changed successfully!');
+        setPasswordModalVisible(false);
+        setPasswords({ current: '', new: '', confirm: '' });
+      } else {
+        Alert.alert('Error', data.message || 'Failed to change password');
+      }
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Error', 'Network error');
+    }
+  };
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -66,7 +159,7 @@ const DoctorProfileScreen = () => {
             <ChevronRight size={22} color="#FFF" style={{ transform: [{ rotate: '180deg' }] }} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>My Profile</Text>
-          <TouchableOpacity style={styles.editBtn}>
+          <TouchableOpacity style={styles.editBtn} onPress={() => setEditModalVisible(true)}>
             <Edit3 size={18} color="#FFF" />
           </TouchableOpacity>
         </View>
@@ -83,8 +176,8 @@ const DoctorProfileScreen = () => {
             </TouchableOpacity>
           </View>
           <View style={styles.profileInfo}>
-            <Text style={styles.docName}>Dr. Saman Perera</Text>
-            <Text style={styles.docSpec}>Senior Cardiologist</Text>
+            <Text style={styles.docName}>{doctorName}</Text>
+            <Text style={styles.docSpec}>{doctorSpec}</Text>
             <View style={styles.ratingRow}>
               <Star size={14} color="#FBBF24" fill="#FBBF24" />
               <Text style={styles.rating}>4.9</Text>
@@ -125,9 +218,9 @@ const DoctorProfileScreen = () => {
             </TouchableOpacity>
           </View>
           {[
-            { icon: Phone, text: contactInfo.phone },
-            { icon: Mail, text: contactInfo.email },
-            { icon: MapPin, text: contactInfo.hospital },
+            { icon: Phone, text: profileInfo.phone },
+            { icon: Mail, text: profileInfo.email },
+            { icon: MapPin, text: profileInfo.hospital },
           ].map((item, i) => (
             <View key={i} style={styles.contactRow}>
               <View style={styles.contactIcon}>
@@ -141,8 +234,8 @@ const DoctorProfileScreen = () => {
         {/* Stats Row */}
         <View style={styles.statsRow}>
           {[
-            { label: 'Experience', value: '12 yrs' },
-            { label: 'Consultations', value: '1.2k+' },
+            { label: 'Experience', value: profileInfo.experienceYears },
+            { label: 'Consultations', value: profileInfo.totalConsultations },
             { label: 'Avg. Time', value: '24 min' },
           ].map((s) => (
             <View key={s.label} style={[styles.statBox, SHADOWS.small]}>
@@ -195,7 +288,7 @@ const DoctorProfileScreen = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContentSmall}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Edit Contact Info</Text>
+              <Text style={styles.modalTitle}>Edit Profile Info</Text>
               <TouchableOpacity onPress={() => setEditModalVisible(false)} style={styles.modalCloseBtn}>
                 <X size={20} color="#1F2937" />
               </TouchableOpacity>
@@ -205,8 +298,8 @@ const DoctorProfileScreen = () => {
                 <Text style={styles.inputLabel}>Phone Number</Text>
                 <TextInput
                   style={styles.input}
-                  value={contactInfo.phone}
-                  onChangeText={(t) => setContactInfo({ ...contactInfo, phone: t })}
+                  value={profileInfo.phone}
+                  onChangeText={(t) => setProfileInfo({ ...profileInfo, phone: t })}
                   keyboardType="phone-pad"
                 />
               </View>
@@ -214,20 +307,36 @@ const DoctorProfileScreen = () => {
                 <Text style={styles.inputLabel}>Email Address</Text>
                 <TextInput
                   style={styles.input}
-                  value={contactInfo.email}
-                  onChangeText={(t) => setContactInfo({ ...contactInfo, email: t })}
+                  value={profileInfo.email}
+                  onChangeText={(t) => setProfileInfo({ ...profileInfo, email: t })}
                   keyboardType="email-address"
                 />
               </View>
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Hospital/Clinic</Text>
+                <Text style={styles.inputLabel}>Location (Hospital/Clinic)</Text>
                 <TextInput
                   style={styles.input}
-                  value={contactInfo.hospital}
-                  onChangeText={(t) => setContactInfo({ ...contactInfo, hospital: t })}
+                  value={profileInfo.hospital}
+                  onChangeText={(t) => setProfileInfo({ ...profileInfo, hospital: t })}
                 />
               </View>
-              <TouchableOpacity style={styles.saveBtn} onPress={() => setEditModalVisible(false)}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Experience</Text>
+                <TextInput
+                  style={styles.input}
+                  value={profileInfo.experienceYears}
+                  onChangeText={(t) => setProfileInfo({ ...profileInfo, experienceYears: t })}
+                />
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Total Consultations</Text>
+                <TextInput
+                  style={styles.input}
+                  value={profileInfo.totalConsultations}
+                  onChangeText={(t) => setProfileInfo({ ...profileInfo, totalConsultations: t })}
+                />
+              </View>
+              <TouchableOpacity style={styles.saveBtn} onPress={saveProfile}>
                 <Text style={styles.saveBtnText}>Save Changes</Text>
               </TouchableOpacity>
             </View>
@@ -273,10 +382,7 @@ const DoctorProfileScreen = () => {
                   onChangeText={(t) => setPasswords({ ...passwords, confirm: t })}
                 />
               </View>
-              <TouchableOpacity style={styles.saveBtn} onPress={() => {
-                Alert.alert('Success', 'Password changed successfully!');
-                setPasswordModalVisible(false);
-              }}>
+              <TouchableOpacity style={styles.saveBtn} onPress={handlePasswordChange}>
                 <Text style={styles.saveBtnText}>Update Password</Text>
               </TouchableOpacity>
             </View>

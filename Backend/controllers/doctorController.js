@@ -32,7 +32,6 @@ export const getDoctorDashboard = async (req, res) => {
     });
 
     // 3. Calculate Unique Patients Count
-    // To get unique patients, we find all appointments for this doctor and distinct by patient
     const uniquePatients = await Appointment.distinct('patient', { doctor: req.user._id });
     const totalPatients = uniquePatients.length;
 
@@ -62,6 +61,9 @@ export const updateDoctorProfile = async (req, res) => {
       // Basic info
       user.name = req.body.name || user.name;
       user.phone = req.body.phone || user.phone;
+      if (req.body.email) {
+        user.email = req.body.email.toLowerCase();
+      }
 
       // Doctor specific fields
       user.specialization = req.body.specialization || user.specialization;
@@ -69,6 +71,7 @@ export const updateDoctorProfile = async (req, res) => {
       user.bio = req.body.bio || user.bio;
       user.experienceYears = req.body.experienceYears || user.experienceYears;
       user.consultationFee = req.body.consultationFee || user.consultationFee;
+      user.totalConsultations = req.body.totalConsultations || user.totalConsultations;
 
       const updatedUser = await user.save();
 
