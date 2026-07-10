@@ -20,16 +20,15 @@ interface Doctor {
   hospital?: string;
 }
 
-const categories = ['All', 'Cardiology', 'Paediatrics', 'Urology', 'Oncology', 'Dermatology'];
-
-const DoctorAvailability = () => {
-  const navigation = useNavigation<NavProp>();
-  const { token } = useAuth();
-  
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [doctors, setDoctors] = useState<Doctor[]>([]);
-  const [loading, setLoading] = useState(true);
+  const DoctorAvailability = () => {
+    const navigation = useNavigation<NavProp>();
+    const { token } = useAuth();
+    
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState('All');
+    const [categories, setCategories] = useState<string[]>(['All']);
+    const [doctors, setDoctors] = useState<Doctor[]>([]);
+    const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchDoctors = async () => {
@@ -49,13 +48,28 @@ const DoctorAvailability = () => {
         setLoading(false);
       }
     };
-    
-    if (token) {
-      fetchDoctors();
-    } else {
-      setLoading(false);
-    }
-  }, [token]);
+      const fetchSpecialties = async () => {
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/doctor/specialties`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const data = await res.json();
+          if (res.ok && data.success) {
+            const specNames = data.data.map((s: any) => s.name);
+            setCategories(['All', ...specNames]);
+          }
+        } catch (err) {
+          console.error('Failed to fetch specialties:', err);
+        }
+      };
+      
+      if (token) {
+        fetchDoctors();
+        fetchSpecialties();
+      } else {
+        setLoading(false);
+      }
+    }, [token]);
 
   const filteredDoctors = doctors.filter((doc) => {
     return doc.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
