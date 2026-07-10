@@ -27,6 +27,7 @@ export type RootStackParamList = {
   PatientAppointments: undefined;
   PatientProfile: undefined;
   DoctorAvailability: { specialty?: string };
+  DoctorAvailabilityCalendar: { doctorId: string; doctorName: string; specialty: string };
   SpecialtyDoctors: { specialty: string };
   AvailabilitySelection: undefined;
   LabAvailability: undefined;

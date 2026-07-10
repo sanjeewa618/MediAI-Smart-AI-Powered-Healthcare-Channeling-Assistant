@@ -93,12 +93,10 @@ interface Doctor {
 
       <TouchableOpacity 
         style={styles.bookBtn}
-        onPress={() => navigation.navigate('BookAppointment', {
+        onPress={() => navigation.navigate('DoctorAvailabilityCalendar', {
           doctorId: item._id,
           doctorName: item.name,
-          specialty: item.specialization || 'General Physician',
-          date: '2026-05-20',
-          time: '10:00 AM'
+          specialty: item.specialization || 'General Physician'
         })}
       >
         <LinearGradient
