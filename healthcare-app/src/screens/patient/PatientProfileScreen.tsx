@@ -38,7 +38,9 @@ import {
   Activity,
   TrendingUp,
   CheckCircle2,
+  Camera,
 } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import BottomNavBar from '../../components/BottomNavBar';
 import { COLORS, SHADOWS } from '../../theme/theme';
@@ -58,7 +60,13 @@ const PatientProfileScreen = () => {
 
   const [isEditing, setIsEditing] = useState(false);
   const [isMedicalEditing, setIsMedicalEditing] = useState(false);
+  const [isInsuranceEditing, setIsInsuranceEditing] = useState(false);
   const [isBloodGroupModalVisible, setIsBloodGroupModalVisible] = useState(false);
+  const [isEmergencyEditing, setIsEmergencyEditing] = useState(false);
+  const [isEmergencyModalVisible, setIsEmergencyModalVisible] = useState(false);
+  const [newEmergencyName, setNewEmergencyName] = useState('');
+  const [newEmergencyRelation, setNewEmergencyRelation] = useState('');
+  const [newEmergencyPhone, setNewEmergencyPhone] = useState('');
   const [newAllergy, setNewAllergy] = useState('');
   const [newCondition, setNewCondition] = useState('');
   const [profileData, setProfileData] = useState({
@@ -75,6 +83,16 @@ const PatientProfileScreen = () => {
     bmi: '22.8',
     allergies: ['Penicillin', 'Peanuts'] as string[],
     chronicConditions: [] as string[],
+    emergencyContacts: [
+      { name: 'Michael Johnson', relation: 'Brother', phone: '+94 71 987 6543' }
+    ] as { name: string, relation: string, phone: string }[],
+    insurance: {
+      provider: 'National Health Insurance',
+      policyNumber: 'POL-2024-056789',
+      coverageType: 'Full Coverage',
+      expiryDate: '15 Dec 2025',
+      documentUrl: ''
+    }
   });
 
   const calculateBMI = (weightKg: string, heightCm: string) => {
@@ -125,6 +143,8 @@ const PatientProfileScreen = () => {
             bmi: data.bmi ? data.bmi.toString() : prev.bmi,
             allergies: Array.isArray(data.allergies) ? data.allergies : prev.allergies,
             chronicConditions: Array.isArray(data.chronicConditions) ? data.chronicConditions : prev.chronicConditions,
+            emergencyContacts: Array.isArray(data.emergencyContacts) && data.emergencyContacts.length > 0 ? data.emergencyContacts : prev.emergencyContacts,
+            insurance: data.insurance || prev.insurance,
           }));
         }
       } catch (err) {
@@ -135,6 +155,62 @@ const PatientProfileScreen = () => {
       fetchProfile();
     }
   }, [token]);
+
+  const handleUploadInsuranceCard = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert('Permission required', 'Permission to access gallery is required!');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const formData = new FormData();
+        const filename = asset.uri.split('/').pop() || 'insurance-card.jpg';
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : `image`;
+
+        formData.append('insuranceCard', {
+          uri: asset.uri,
+          name: filename,
+          type: type,
+        } as any);
+
+        const uploadRes = await fetch(`${API_BASE_URL}/api/patient/upload-insurance`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          body: formData,
+        });
+
+        if (uploadRes.ok) {
+          const uploadData = await uploadRes.json();
+          if (uploadData.success && uploadData.data && uploadData.data.documentUrl) {
+            setProfileData(p => ({
+              ...p,
+              insurance: {
+                ...p.insurance,
+                documentUrl: uploadData.data.documentUrl
+              }
+            }));
+            Alert.alert('Success', 'Insurance card uploaded successfully!');
+          }
+        } else {
+          Alert.alert('Error', 'Failed to upload insurance card');
+        }
+      }
+    } catch (error) {
+      console.error('Image picking/upload error:', error);
+      Alert.alert('Error', 'An error occurred while uploading');
+    }
+  };
 
   const handleAddAllergy = () => {
     const txt = newAllergy.trim();
@@ -178,11 +254,15 @@ const PatientProfileScreen = () => {
             ...prev,
             allergies: Array.isArray(d.allergies) ? d.allergies : prev.allergies,
             chronicConditions: Array.isArray(d.chronicConditions) ? d.chronicConditions : prev.chronicConditions,
+            emergencyContacts: Array.isArray(d.emergencyContacts) ? d.emergencyContacts : prev.emergencyContacts,
+            insurance: d.insurance || prev.insurance,
           }));
         }
         Alert.alert('Success', 'Profile updated successfully');
         setIsEditing(false);
         setIsMedicalEditing(false);
+        setIsEmergencyEditing(false);
+        setIsInsuranceEditing(false);
       } else {
         const errorData = await response.json().catch(() => ({}));
         Alert.alert('Error', errorData.message || 'Failed to update profile');
@@ -479,50 +559,117 @@ const PatientProfileScreen = () => {
           {/* Emergency Contact Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Emergency Contact</Text>
-              <TouchableOpacity>
-                <Edit3 size={18} color={COLORS.primary} />
-              </TouchableOpacity>
-            </View>
-            <View style={[styles.emergencyCard, SHADOWS.small]}>
-              <View style={styles.emergencyContact}>
-                <View style={styles.emergencyIcon}>
-                  <Phone size={24} color="#FFF" />
-                </View>
-                <View style={styles.emergencyInfo}>
-                  <Text style={styles.emergencyName}>Michael Johnson</Text>
-                  <Text style={styles.emergencyRelation}>Brother</Text>
-                </View>
-                <TouchableOpacity style={styles.emergencyCallBtn}>
-                  <Phone size={20} color={COLORS.primary} />
-                </TouchableOpacity>
-              </View>
-              <View style={styles.emergencyPhone}>
-                <Text style={styles.emergencyPhoneLabel}>Phone:</Text>
-                <Text style={styles.emergencyPhoneValue}>+94 71 987 6543</Text>
+              <Text style={styles.sectionTitle}>Emergency Contacts</Text>
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                {isEmergencyEditing && profileData.emergencyContacts.length < 5 && (
+                  <TouchableOpacity onPress={() => setIsEmergencyModalVisible(true)} style={styles.addBtnSmall}>
+                    <Text style={styles.addBtnTextSmall}>+</Text>
+                  </TouchableOpacity>
+                )}
+                {isEmergencyEditing ? (
+                  <TouchableOpacity onPress={handleSaveProfile}>
+                    <CheckCircle2 size={24} color={COLORS.primary} />
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity onPress={() => setIsEmergencyEditing(true)}>
+                    <Edit3 size={18} color={COLORS.primary} />
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
+            {profileData.emergencyContacts.map((contact, index) => (
+              <View key={index} style={[styles.emergencyCard, SHADOWS.small, { marginBottom: 12 }]}>
+                <View style={styles.emergencyContact}>
+                  <View style={styles.emergencyIcon}>
+                    <Phone size={24} color="#FFF" />
+                  </View>
+                  <View style={styles.emergencyInfo}>
+                    <Text style={styles.emergencyName}>{contact.name}</Text>
+                    <Text style={styles.emergencyRelation}>{contact.relation}</Text>
+                  </View>
+                  {isEmergencyEditing ? (
+                    <TouchableOpacity 
+                      style={[styles.emergencyCallBtn, { backgroundColor: '#FEE2E2' }]}
+                      onPress={() => setProfileData(p => ({...p, emergencyContacts: p.emergencyContacts.filter((_, i) => i !== index)}))}
+                    >
+                      <Text style={{color: '#EF4444', fontWeight: '800'}}>✕</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity style={styles.emergencyCallBtn}>
+                      <Phone size={20} color={COLORS.primary} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <View style={styles.emergencyPhone}>
+                  <Text style={styles.emergencyPhoneLabel}>Phone:</Text>
+                  <Text style={styles.emergencyPhoneValue}>{contact.phone}</Text>
+                </View>
+              </View>
+            ))}
+            {(!profileData.emergencyContacts || profileData.emergencyContacts.length === 0) && (
+              <Text style={styles.noDataText}>No emergency contacts recorded.</Text>
+            )}
           </View>
 
           {/* Insurance Information */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Insurance Information</Text>
-              <TouchableOpacity>
-                <Edit3 size={18} color={COLORS.primary} />
-              </TouchableOpacity>
+              {isInsuranceEditing ? (
+                <TouchableOpacity onPress={handleSaveProfile}>
+                  <CheckCircle2 size={24} color={COLORS.primary} />
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity onPress={() => setIsInsuranceEditing(true)}>
+                  <Edit3 size={18} color={COLORS.primary} />
+                </TouchableOpacity>
+              )}
             </View>
             <View style={[styles.insuranceCard, SHADOWS.small]}>
-              <InfoRow label="Insurance Provider" value="National Health Insurance" />
+              <InfoRow 
+                label="Insurance Provider" 
+                value={profileData.insurance.provider} 
+                isEditing={isInsuranceEditing} 
+                onChangeText={(t) => setProfileData(p => ({...p, insurance: {...p.insurance, provider: t}}))} 
+              />
               <View style={styles.infoDivider} />
-              <InfoRow label="Policy Number" value="POL-2024-056789" />
+              <InfoRow 
+                label="Policy Number" 
+                value={profileData.insurance.policyNumber} 
+                isEditing={isInsuranceEditing} 
+                onChangeText={(t) => setProfileData(p => ({...p, insurance: {...p.insurance, policyNumber: t}}))} 
+              />
               <View style={styles.infoDivider} />
-              <InfoRow label="Coverage Type" value="Full Coverage" />
+              <InfoRow 
+                label="Coverage Type" 
+                value={profileData.insurance.coverageType} 
+                isEditing={isInsuranceEditing} 
+                onChangeText={(t) => setProfileData(p => ({...p, insurance: {...p.insurance, coverageType: t}}))} 
+              />
               <View style={styles.infoDivider} />
-              <InfoRow label="Expiry Date" value="15 Dec 2025" />
-              <TouchableOpacity style={styles.uploadInsuranceBtn}>
-                <Text style={styles.uploadInsuranceBtnText}>Upload Insurance Card</Text>
-              </TouchableOpacity>
+              <InfoRow 
+                label="Expiry Date" 
+                value={profileData.insurance.expiryDate} 
+                isEditing={isInsuranceEditing} 
+                onChangeText={(t) => setProfileData(p => ({...p, insurance: {...p.insurance, expiryDate: t}}))} 
+              />
+              <View style={styles.infoDivider} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 }}>
+                <Text style={styles.infoLabel}>Insurance Card</Text>
+                {profileData.insurance.documentUrl ? (
+                  <Image source={{ uri: `${API_BASE_URL}${profileData.insurance.documentUrl}` }} style={{ width: 60, height: 40, borderRadius: 4 }} />
+                ) : (
+                  <Text style={styles.noDataText}>No Card Uploaded</Text>
+                )}
+              </View>
+
+              {isInsuranceEditing && (
+                <TouchableOpacity style={styles.uploadInsuranceBtn} onPress={handleUploadInsuranceCard}>
+                  <Text style={styles.uploadInsuranceBtnText}>
+                    {profileData.insurance.documentUrl ? "Replace Insurance Card" : "Upload Insurance Card"}
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
 
@@ -715,6 +862,70 @@ const PatientProfileScreen = () => {
                   <Text style={[styles.bloodGroupText, profileData.bloodGroup === bg && styles.bloodGroupTextSelected]}>{bg}</Text>
                 </TouchableOpacity>
               ))}
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      <Modal
+        visible={isEmergencyModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsEmergencyModalVisible(false)}
+      >
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setIsEmergencyModalVisible(false)}>
+          <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
+            <Text style={styles.modalTitle}>Add Emergency Contact</Text>
+            
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Name"
+              placeholderTextColor="#9CA3AF"
+              value={newEmergencyName}
+              onChangeText={setNewEmergencyName}
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Relation (e.g. Brother)"
+              placeholderTextColor="#9CA3AF"
+              value={newEmergencyRelation}
+              onChangeText={setNewEmergencyRelation}
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Phone Number"
+              placeholderTextColor="#9CA3AF"
+              keyboardType="phone-pad"
+              value={newEmergencyPhone}
+              onChangeText={setNewEmergencyPhone}
+            />
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setIsEmergencyModalVisible(false)}>
+                <Text style={styles.modalCancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.modalSaveBtn} 
+                onPress={() => {
+                  if (newEmergencyName.trim() && newEmergencyRelation.trim() && newEmergencyPhone.trim()) {
+                    setProfileData(p => ({
+                      ...p, 
+                      emergencyContacts: [
+                        ...p.emergencyContacts, 
+                        { name: newEmergencyName.trim(), relation: newEmergencyRelation.trim(), phone: newEmergencyPhone.trim() }
+                      ]
+                    }));
+                    setNewEmergencyName('');
+                    setNewEmergencyRelation('');
+                    setNewEmergencyPhone('');
+                    setIsEmergencyModalVisible(false);
+                  } else {
+                    Alert.alert("Missing Fields", "Please fill out all fields.");
+                  }
+                }}
+              >
+                <Text style={styles.modalSaveBtnText}>Add</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </TouchableOpacity>
@@ -988,6 +1199,14 @@ const styles = StyleSheet.create({
   bloodGroupBtnSelected: { backgroundColor: COLORS.primary + '1A', borderColor: COLORS.primary },
   bloodGroupText: { fontSize: 16, fontWeight: '700', color: COLORS.textSecondary },
   bloodGroupTextSelected: { color: COLORS.primary },
+  addBtnSmall: { width: 28, height: 28, borderRadius: 14, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
+  addBtnTextSmall: { color: '#FFF', fontSize: 18, fontWeight: '800', lineHeight: 20 },
+  modalInput: { borderBottomWidth: 1, borderBottomColor: '#E5E7EB', paddingVertical: 10, marginBottom: 16, fontSize: 15, color: COLORS.textHeader },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 12 },
+  modalCancelBtn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8, backgroundColor: '#F3F4F6' },
+  modalCancelBtnText: { color: COLORS.textSecondary, fontWeight: '700' },
+  modalSaveBtn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8, backgroundColor: COLORS.primary },
+  modalSaveBtnText: { color: '#FFF', fontWeight: '700' },
 });
 
 export default PatientProfileScreen;

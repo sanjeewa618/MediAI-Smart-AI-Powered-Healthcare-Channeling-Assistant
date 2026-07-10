@@ -22,6 +22,18 @@ const userSchema = new mongoose.Schema(
     bmi: { type: Number },
     allergies: [{ type: String }],
     chronicConditions: [{ type: String }],
+    emergencyContacts: [{
+      name: String,
+      relation: String,
+      phone: String
+    }],
+    insurance: {
+      provider: String,
+      policyNumber: String,
+      coverageType: String,
+      expiryDate: String,
+      documentUrl: String
+    },
 
     // Doctor Specific Profile
     specialization: { type: String },

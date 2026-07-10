@@ -60,6 +60,8 @@ export const updateProfile = async (req, res) => {
       if (req.body.bmi !== undefined) user.bmi = req.body.bmi;
       if (req.body.allergies !== undefined) user.allergies = req.body.allergies;
       if (req.body.chronicConditions !== undefined) user.chronicConditions = req.body.chronicConditions;
+      if (req.body.emergencyContacts !== undefined) user.emergencyContacts = req.body.emergencyContacts;
+      if (req.body.insurance !== undefined) user.insurance = req.body.insurance;
 
       if (req.body.password) {
         user.password = req.body.password;
@@ -84,3 +86,28 @@ export const updateProfile = async (req, res) => {
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
+
+// @desc    Upload Insurance Document
+// @route   POST /api/patient/upload-insurance
+// @access  Private (Patient only)
+export const uploadInsuranceDocument = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    // req.file contains the uploaded file info from multer
+    // We return the relative static path, e.g., '/uploads/filename.ext'
+    const fileUrl = `/uploads/${req.file.filename}`;
+    
+    res.json({
+      success: true,
+      data: {
+        documentUrl: fileUrl
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error during file upload', error: error.message });
+  }
+};
+
