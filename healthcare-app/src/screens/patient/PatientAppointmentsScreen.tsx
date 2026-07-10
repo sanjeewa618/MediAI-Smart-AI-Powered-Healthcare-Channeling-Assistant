@@ -1,49 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, SafeAreaView, StatusBar } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/types';
 import { ArrowLeft, ArrowRight, Home, Calendar, Heart, FileText, User, ChevronLeft, Stethoscope, FlaskConical, CheckCircle2, Clock, XCircle, Plus } from 'lucide-react-native';
 import BottomNavBar from '../../components/BottomNavBar';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useAuth } from '../../context/AuthContext';
+import moment from 'moment';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
 
 type AppointmentsNavProp = StackNavigationProp<RootStackParamList, 'PatientAppointments'>;
 
 const tabs = ['Upcoming', 'Completed', 'Cancelled'];
 
-const mockDoctorAppointments = [
-  {
-    id: 'D1',
-    name: 'Dr. Emma Watson',
-    specialty: 'Cardiologist',
-    hospital: 'City Hospital',
-    date: '20 May 2024',
-    time: '10:30 AM',
-    status: 'Upcoming',
-    avatar: require('../../../assets/dr-emma.png')
-  },
-  {
-    id: 'D2',
-    name: 'Dr. James Smith',
-    specialty: 'Neurologist',
-    hospital: 'City Hospital',
-    date: '15 May 2024',
-    time: '02:00 PM',
-    status: 'Completed',
-    avatar: require('../../../assets/dr-james.png')
-  },
-  {
-    id: 'D3',
-    name: 'Dr. Olivia Brown',
-    specialty: 'Dermatologist',
-    hospital: 'Derma Care Hospital',
-    date: '10 May 2024',
-    time: '11:00 AM',
-    status: 'Cancelled',
-    avatar: require('../../../assets/dr-olivia.png')
-  }
-];
+const mockDoctorAppointments: any[] = [];
 
 const mockLabAppointments = [
   {
@@ -70,11 +43,58 @@ const mockLabAppointments = [
 
 const PatientAppointmentsScreen = () => {
   const navigation = useNavigation<AppointmentsNavProp>();
+  const { token } = useAuth();
+  
   const [activeCategory, setActiveCategory] = useState<'Doctor' | 'Lab'>('Doctor');
   const [activeTab, setActiveTab] = useState('Upcoming');
+  const [doctorAppointments, setDoctorAppointments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      const fetchAppointments = async () => {
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/appointments`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          const data = await response.json();
+          
+          if (response.ok && data.success) {
+            const formatted = data.data.map((app: any) => {
+              let mappedStatus = 'Upcoming';
+              if (app.status === 'completed') mappedStatus = 'Completed';
+              if (app.status === 'cancelled') mappedStatus = 'Cancelled';
+              
+              return {
+                id: app._id,
+                name: app.doctor?.name || 'Unknown Doctor',
+                specialty: app.doctor?.specialization || 'General Physician',
+                hospital: app.doctor?.hospital || 'City Hospital',
+                date: moment(app.date).format('DD MMM YYYY'),
+                time: app.timeSlot || 'TBD',
+                status: mappedStatus,
+                avatar: null
+              };
+            });
+            setDoctorAppointments(formatted);
+          }
+        } catch (err) {
+          console.error('Failed to fetch appointments:', err);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      if (token) {
+        fetchAppointments();
+      }
+    }, [token])
+  );
 
   const getFilteredAppointments = () => {
-    const data = activeCategory === 'Doctor' ? mockDoctorAppointments : mockLabAppointments;
+    const data = activeCategory === 'Doctor' ? doctorAppointments : mockLabAppointments;
     return data.filter(item => item.status === activeTab);
   };
 
@@ -91,7 +111,13 @@ const PatientAppointmentsScreen = () => {
     <TouchableOpacity key={item.id} style={[styles.appointmentCard, SHADOWS.small]}>
       <View style={styles.cardHeader}>
         <View style={styles.avatarWrap}>
-          <Image source={item.avatar} style={styles.avatar} />
+          {item.avatar ? (
+            <Image source={item.avatar} style={styles.avatar} />
+          ) : (
+            <View style={{width: 50, height: 50, borderRadius: 25, backgroundColor: '#F3F0FF', alignItems: 'center', justifyContent: 'center'}}>
+              <Text style={{fontSize: 20, color: COLORS.primary, fontWeight: 'bold'}}>{item.name.charAt(0)}</Text>
+            </View>
+          )}
         </View>
         <View style={styles.cardMainInfo}>
           <Text style={styles.docName}>{item.name}</Text>
