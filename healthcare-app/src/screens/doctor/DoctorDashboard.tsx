@@ -7,7 +7,9 @@ const { height } = Dimensions.get('window');
 import DoctorBottomNavBar from '../../components/DoctorBottomNavBar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useAuth } from '../../context/AuthContext';
 
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
 const MOCK_APPOINTMENTS = [
   { id: '1', name: 'Sarah Johnson', age: 28, time: '09:00 AM', minutes: 540, type: 'Physical', status: 'Emergency', img: 'https://i.pravatar.cc/150?img=5' },
   { id: '2', name: 'Michael Smith', age: 45, time: '09:15 AM', minutes: 555, type: 'Video', status: 'Waiting', img: 'https://i.pravatar.cc/150?img=11' },
@@ -39,6 +41,10 @@ const greyShadow = {
 const DoctorDashboard = () => {
   const navigation = useNavigation<any>();
   const isLoggingOut = useRef(false);
+  const { token } = useAuth();
+  
+  const [doctorName, setDoctorName] = useState('Loading...');
+  const [doctorSpecialty, setDoctorSpecialty] = useState('Doctor');
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
@@ -68,6 +74,30 @@ const DoctorDashboard = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentMinutes, setCurrentMinutes] = useState(todayStartMinutes());
   const [timeSlotModalVisible, setTimeSlotModalVisible] = useState(false);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const data = await response.json();
+        if (response.ok && data) {
+          const name = data.name || 'Doctor';
+          setDoctorName(name.startsWith('Dr.') ? name : `Dr. ${name}`);
+          setDoctorSpecialty(data.specialization || 'General Practitioner');
+        }
+      } catch (err) {
+        console.error('Failed to fetch doctor profile:', err);
+      }
+    };
+
+    if (token) {
+      fetchProfile();
+    }
+  }, [token]);
 
   // Animation and PanResponder for Bottom Sheet
   const transitionAnim = useRef(new Animated.Value(height)).current;
@@ -260,8 +290,8 @@ const DoctorDashboard = () => {
             <View style={styles.headerProfile}>
               <Image source={{ uri: 'https://img.icons8.com/bubbles/100/000000/doctor-male.png' }} style={styles.docAvatar} />
               <View>
-                <Text style={styles.docName}>Dr. Saman Perera</Text>
-                <Text style={styles.docSpecialty}>Senior Cardiologist</Text>
+                <Text style={styles.docName}>{doctorName}</Text>
+                <Text style={styles.docSpecialty}>{doctorSpecialty}</Text>
               </View>
             </View>
             <View style={styles.headerRight}>

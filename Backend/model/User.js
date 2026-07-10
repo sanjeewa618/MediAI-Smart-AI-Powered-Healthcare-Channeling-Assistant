@@ -16,8 +16,9 @@ const userSchema = new mongoose.Schema(
     department: { type: String }, // For Nurses (e.g. ICU, OPD)
     hospital: { type: String },
     bio: { type: String },
-    experienceYears: { type: Number },
+    experienceYears: { type: String },
     consultationFee: { type: Number },
+    totalConsultations: { type: String },
   },
   { timestamps: true }
 );

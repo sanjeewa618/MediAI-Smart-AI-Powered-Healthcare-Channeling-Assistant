@@ -1,5 +1,13 @@
 import express from 'express';
-import { getDoctorDashboard, updateDoctorProfile, getAllDoctors } from '../controllers/doctorController.js';
+import { 
+  getDoctorDashboard, 
+  updateDoctorProfile, 
+  getAllDoctors,
+  getDoctorSchedule,
+  createDoctorSchedule,
+  updateDoctorSchedule,
+  deleteDoctorSchedule
+} from '../controllers/doctorController.js';
 import { protect } from '../middlewares/authMiddleware.js';
 import { doctorOnly } from '../middlewares/roleMiddleware.js';
 
@@ -11,6 +19,12 @@ router.use(protect);
 // Doctor Dashboard Data & Profile update (Only accessible by doctors)
 router.get('/dashboard', doctorOnly, getDoctorDashboard);
 router.put('/profile', doctorOnly, updateDoctorProfile);
+
+// Schedule Management
+router.get('/schedule', doctorOnly, getDoctorSchedule);
+router.post('/schedule', doctorOnly, createDoctorSchedule);
+router.put('/schedule/:id', doctorOnly, updateDoctorSchedule);
+router.delete('/schedule/:id', doctorOnly, deleteDoctorSchedule);
 
 // Get a list of all doctors (Accessible by anyone who is logged in, mainly patients searching)
 router.get('/', getAllDoctors);

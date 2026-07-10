@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Modal, TextInput, Platform, Switch } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Plus, Clock, Trash2, Edit3, X, CheckCircle, AlertCircle, ChevronRight } from 'lucide-react-native';
@@ -6,6 +6,9 @@ import { COLORS, SHADOWS } from '../../theme/theme';
 import DoctorBottomNavBar from '../../components/DoctorBottomNavBar';
 import NurseBottomNavBar from '../../components/NurseBottomNavBar';
 import { useNavigation } from '@react-navigation/native';
+import { useAuth } from '../../context/AuthContext';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const DATES = ['19', '20', '21', '22', '23', '24', '25'];
@@ -23,17 +26,7 @@ interface Slot {
   notes?: string;
 }
 
-const INITIAL_SLOTS: Slot[] = [
-  { id: '1', day: 'Mon', startTime: '09:00 AM', endTime: '09:30 AM', type: 'available', consultType: 'Physical', maxPatients: 1, notes: '' },
-  { id: '2', day: 'Mon', startTime: '09:30 AM', endTime: '10:00 AM', type: 'booked', consultType: 'Video', maxPatients: 1, notes: '' },
-  { id: '3', day: 'Mon', startTime: '10:00 AM', endTime: '10:30 AM', type: 'available', consultType: 'Physical', maxPatients: 1, notes: '' },
-  { id: '4', day: 'Mon', startTime: '01:00 PM', endTime: '02:00 PM', type: 'break', consultType: '', maxPatients: 0, notes: 'Lunch break' },
-  { id: '5', day: 'Tue', startTime: '10:00 AM', endTime: '10:30 AM', type: 'available', consultType: 'Physical', maxPatients: 1, notes: '' },
-  { id: '6', day: 'Tue', startTime: '11:00 AM', endTime: '11:30 AM', type: 'blocked', consultType: '', maxPatients: 0, notes: 'Emergency blocked' },
-  { id: '7', day: 'Wed', startTime: '09:00 AM', endTime: '09:30 AM', type: 'booked', consultType: 'Video', maxPatients: 1, notes: '' },
-  { id: '8', day: 'Thu', startTime: '02:00 PM', endTime: '02:30 PM', type: 'available', consultType: 'Physical', maxPatients: 1, notes: '' },
-  { id: '9', day: 'Fri', startTime: '09:00 AM', endTime: '09:30 AM', type: 'available', consultType: 'Physical', maxPatients: 1, notes: '' },
-];
+const INITIAL_SLOTS: Slot[] = [];
 
 const SLOT_COLORS: Record<SlotType, { bg: string; border: string; label: string }> = {
   available: { bg: COLORS.primaryLight, border: COLORS.primary, label: 'Available' },
@@ -44,12 +37,31 @@ const SLOT_COLORS: Record<SlotType, { bg: string; border: string; label: string 
 
 const DoctorSchedulingScreen = () => {
   const navigation = useNavigation<any>();
+  const { token } = useAuth();
   const [selectedDay, setSelectedDay] = useState('Mon');
-  const [slots, setSlots] = useState<Slot[]>(INITIAL_SLOTS);
+  const [slots, setSlots] = useState<Slot[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
   const [form, setForm] = useState({ startTime: '', endTime: '', consultType: 'Physical', maxPatients: '10', notes: '', repeat: 'none', physical: true, video: false });
   const [conflict, setConflict] = useState('');
+
+  const fetchSlots = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/doctor/schedule`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSlots(data.data);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    if (token) fetchSlots();
+  }, [token]);
 
   const daySlots = slots.filter(s => s.day === selectedDay);
 
@@ -62,7 +74,16 @@ const DoctorSchedulingScreen = () => {
 
   const openEditModal = (slot: Slot) => {
     setSelectedSlot(slot);
-    setForm({ startTime: slot.startTime, endTime: slot.endTime, consultType: slot.consultType, maxPatients: String(slot.maxPatients), notes: slot.notes || '', repeat: 'none', physical: slot.consultType === 'Physical', video: slot.consultType === 'Video' });
+    setForm({ 
+      startTime: slot.startTime, 
+      endTime: slot.endTime, 
+      consultType: slot.consultType, 
+      maxPatients: String(slot.maxPatients || 1), 
+      notes: slot.notes || '', 
+      repeat: 'none', 
+      physical: slot.consultType === 'Physical' || slot.consultType === 'Both', 
+      video: slot.consultType === 'Video' || slot.consultType === 'Both' 
+    });
     setConflict('');
     setShowModal(true);
   };
@@ -72,26 +93,70 @@ const DoctorSchedulingScreen = () => {
     return existing.some(s => s.startTime === start || s.endTime === end || s.startTime === end);
   };
 
-  const saveSlot = () => {
+  const saveSlot = async () => {
     if (!form.startTime || !form.endTime) { setConflict('Please fill start and end time'); return; }
     if (checkConflict(form.startTime, form.endTime, selectedSlot?.id)) {
       setConflict('⚠ This slot already has an appointment or overlaps with another slot.');
       return;
     }
     const cType = form.video && !form.physical ? 'Video' : form.physical && form.video ? 'Both' : 'Physical';
-    if (selectedSlot) {
-      setSlots(prev => prev.map(s => s.id === selectedSlot.id ? { ...s, startTime: form.startTime, endTime: form.endTime, consultType: cType, maxPatients: parseInt(form.maxPatients) || 1, notes: form.notes, type: 'available' } : s));
-    } else {
-      const newSlot: Slot = { id: Date.now().toString(), day: selectedDay, startTime: form.startTime, endTime: form.endTime, type: 'available', consultType: cType, maxPatients: parseInt(form.maxPatients) || 1, notes: form.notes };
-      setSlots(prev => [...prev, newSlot]);
+    
+    const payload = {
+      day: selectedDay,
+      startTime: form.startTime,
+      endTime: form.endTime,
+      type: 'available',
+      consultType: cType,
+      maxPatients: parseInt(form.maxPatients) || 1,
+      notes: form.notes
+    };
+
+    try {
+      if (selectedSlot) {
+        const res = await fetch(`${API_BASE_URL}/api/doctor/schedule/${selectedSlot.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) fetchSlots();
+      } else {
+        const res = await fetch(`${API_BASE_URL}/api/doctor/schedule`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) fetchSlots();
+      }
+      setShowModal(false);
+    } catch (error) {
+      setConflict('Network error. Please try again.');
     }
-    setShowModal(false);
   };
 
-  const deleteSlot = (id: string) => setSlots(prev => prev.filter(s => s.id !== id));
+  const deleteSlot = async (id: string) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/doctor/schedule/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) fetchSlots();
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
-  const toggleBlock = (id: string) => {
-    setSlots(prev => prev.map(s => s.id === id ? { ...s, type: s.type === 'blocked' ? 'available' : 'blocked' } : s));
+  const toggleBlock = async (slot: Slot) => {
+    const newType = slot.type === 'blocked' ? 'available' : 'blocked';
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/doctor/schedule/${slot.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ type: newType })
+      });
+      if (res.ok) fetchSlots();
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   return (
@@ -163,7 +228,7 @@ const DoctorSchedulingScreen = () => {
                 </View>
                 {slot.type !== 'booked' && (
                   <View style={styles.slotActions}>
-                    <TouchableOpacity onPress={() => toggleBlock(slot.id)} style={styles.iconBtn}>
+                    <TouchableOpacity onPress={() => toggleBlock(slot)} style={styles.iconBtn}>
                       <AlertCircle size={16} color={slot.type === 'blocked' ? COLORS.error : '#9CA3AF'} />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => openEditModal(slot)} style={styles.iconBtn}>
