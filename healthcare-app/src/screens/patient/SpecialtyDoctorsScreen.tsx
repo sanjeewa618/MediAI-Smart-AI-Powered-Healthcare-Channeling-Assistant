@@ -1,11 +1,14 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, SafeAreaView, Platform, StatusBar } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, SafeAreaView, Platform, StatusBar, ActivityIndicator } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import { ArrowLeft, Star, Clock, ChevronRight, MapPin, Award } from 'lucide-react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/types';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useAuth } from '../../context/AuthContext';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
 
 type SpecialtyDoctorsRouteProp = RouteProp<RootStackParamList, 'SpecialtyDoctors'>;
 type SpecialtyDoctorsNavigationProp = StackNavigationProp<RootStackParamList, 'SpecialtyDoctors'>;
@@ -15,49 +18,30 @@ const SpecialtyDoctorsScreen = () => {
   const route = useRoute<SpecialtyDoctorsRouteProp>();
   const { specialty } = route.params;
 
-  // Dummy data for doctors based on specialty
-  const doctors = [
-    {
-      id: '1',
-      name: 'Dr. James Robinson',
-      specialty: specialty,
-      experience: '12 Years',
-      rating: 4.8,
-      reviews: 120,
-      image: 'https://img.freepik.com/free-photo/doctor-offering-medical-teleconsultation_23-2149329007.jpg',
-      hospital: 'City Central Hospital'
-    },
-    {
-      id: '2',
-      name: 'Dr. Sarah Mitchell',
-      specialty: specialty,
-      experience: '8 Years',
-      rating: 4.9,
-      reviews: 85,
-      image: 'https://img.freepik.com/free-photo/woman-doctor-wearing-lab-coat-with-stethoscope-isolated_1303-29791.jpg',
-      hospital: 'MediCare Plus'
-    },
-    {
-      id: '3',
-      name: 'Dr. Robert Wilson',
-      specialty: specialty,
-      experience: '15 Years',
-      rating: 4.7,
-      reviews: 210,
-      image: 'https://img.freepik.com/free-photo/medium-shot-male-doctor-with-stethoscope_23-2148821615.jpg',
-      hospital: 'General Wellness Center'
-    },
-    {
-      id: '4',
-      name: 'Dr. Emily Chen',
-      specialty: specialty,
-      experience: '10 Years',
-      rating: 4.9,
-      reviews: 150,
-      image: 'https://img.freepik.com/free-photo/smiling-female-doctor-white-coat-standing-with-arms-crossed-hospital-corridor_651396-63.jpg',
-      hospital: 'Apex Medical Group'
+  const { token } = useAuth();
+  const [doctors, setDoctors] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDoctors = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/doctors?specialty=${specialty}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        if (response.ok && data.success) {
+          setDoctors(data.data);
+        }
+      } catch (error) {
+        console.error('Error fetching doctors by specialty:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (token) {
+      fetchDoctors();
     }
-  ];
+  }, [token, specialty]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -93,44 +77,52 @@ const SpecialtyDoctorsScreen = () => {
 
         <Text style={styles.sectionTitle}>Available Doctors ({doctors.length})</Text>
 
-        {doctors.map((doctor) => (
-          <TouchableOpacity 
-            key={doctor.id} 
-            style={styles.doctorCard}
-            onPress={() => navigation.navigate('DoctorAvailability', { specialty: specialty })}
-          >
-            <Image source={{ uri: doctor.image }} style={styles.doctorImage} />
-            <View style={styles.doctorDetails}>
-              <View style={styles.nameRow}>
-                <Text style={styles.doctorName}>{doctor.name}</Text>
-                <View style={styles.ratingBox}>
-                  <Star size={14} color="#FFB800" fill="#FFB800" />
-                  <Text style={styles.ratingText}>{doctor.rating}</Text>
+        {loading ? (
+          <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 20 }} />
+        ) : doctors.length === 0 ? (
+          <View style={{ alignItems: 'center', marginTop: 40 }}>
+            <Text style={{ color: '#9CA3AF', fontSize: 16 }}>No doctors found for this specialty.</Text>
+          </View>
+        ) : (
+          doctors.map((doctor) => (
+            <TouchableOpacity 
+              key={doctor._id || Math.random().toString()} 
+              style={styles.doctorCard}
+              onPress={() => navigation.navigate('DoctorAvailability', { specialty: specialty })}
+            >
+              <Image source={{ uri: doctor.profileImage || 'https://img.freepik.com/free-photo/doctor-offering-medical-teleconsultation_23-2149329007.jpg' }} style={styles.doctorImage} />
+              <View style={styles.doctorDetails}>
+                <View style={styles.nameRow}>
+                  <Text style={styles.doctorName}>{doctor.name}</Text>
+                  <View style={styles.ratingBox}>
+                    <Star size={14} color="#FFB800" fill="#FFB800" />
+                    <Text style={styles.ratingText}>4.9</Text>
+                  </View>
                 </View>
-              </View>
-              <Text style={styles.specialtyText}>{doctor.specialty}</Text>
-              
-              <View style={styles.infoRow}>
-                <View style={styles.infoItem}>
-                  <Clock size={14} color={COLORS.textSecondary} />
-                  <Text style={styles.infoText}>{doctor.experience}</Text>
+                <Text style={styles.specialtyText}>{doctor.specialization || specialty}</Text>
+                
+                <View style={styles.infoRow}>
+                  <View style={styles.infoItem}>
+                    <Clock size={14} color={COLORS.textSecondary} />
+                    <Text style={styles.infoText}>{doctor.experienceYears || '10+'} Years Exp.</Text>
+                  </View>
+                  <View style={[styles.infoItem, { marginLeft: 16 }]}>
+                    <MapPin size={14} color={COLORS.textSecondary} />
+                    <Text style={styles.infoText} numberOfLines={1}>{doctor.hospital || 'MediCare Hospital'}</Text>
+                  </View>
                 </View>
-                <View style={[styles.infoItem, { marginLeft: 16 }]}>
-                  <MapPin size={14} color={COLORS.textSecondary} />
-                  <Text style={styles.infoText} numberOfLines={1}>{doctor.hospital}</Text>
-                </View>
-              </View>
 
-              <TouchableOpacity 
-                style={styles.availabilityBtn}
-                onPress={() => navigation.navigate('DoctorAvailability', { specialty: specialty })}
-              >
-                <Text style={styles.availabilityBtnText}>Check Availability</Text>
-                <ChevronRight size={16} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
-        ))}
+                <TouchableOpacity 
+                  style={styles.availabilityBtn}
+                  onPress={() => navigation.navigate('DoctorAvailability', { specialty: specialty })}
+                >
+                  <Text style={styles.availabilityBtnText}>Check Availability</Text>
+                  <ChevronRight size={16} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          ))
+        )}
       </ScrollView>
     </SafeAreaView>
   );

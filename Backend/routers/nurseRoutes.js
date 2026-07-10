@@ -1,12 +1,17 @@
 import express from 'express';
-import { getTodayAppointments, updateAppointmentStatus, createMedicalRecord } from '../controllers/nurseController.js';
+import { getTodayAppointments, updateAppointmentStatus, createMedicalRecord, getAllNurses } from '../controllers/nurseController.js';
 import { protect } from '../middlewares/authMiddleware.js';
 import { nurseOnly } from '../middlewares/roleMiddleware.js';
 
 const router = express.Router();
 
-// Require login and Nurse role for all routes
+// Require login for all routes
 router.use(protect);
+
+// Get all nurses (Accessible by patients searching for labs/nurses)
+router.get('/', getAllNurses);
+
+// Require Nurse role for the routes below
 router.use(nurseOnly);
 
 // Appointment Management (Queue tracking)

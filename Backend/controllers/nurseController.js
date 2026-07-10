@@ -2,6 +2,37 @@ import User from '../model/User.js';
 import Appointment from '../model/Appointment.js';
 import MedicalRecord from '../model/MedicalRecord.js';
 
+// @desc    Get all nurses (Optional filtering by department/lab category)
+// @route   GET /api/nurse
+// @access  Private (Accessible by authenticated users)
+export const getAllNurses = async (req, res) => {
+  try {
+    const filter = { role: 'nurse' };
+
+    // Optional filter by department from query string: ?department=Blood Test
+    if (req.query.department && req.query.department !== 'All') {
+      filter.department = req.query.department;
+    }
+
+    // Optional text search by name
+    if (req.query.search) {
+      filter.name = { $regex: req.query.search, $options: 'i' };
+    }
+
+    const nurses = await User.find(filter)
+      .select('-password')
+      .sort({ name: 1 });
+
+    res.json({
+      success: true,
+      count: nurses.length,
+      data: nurses
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
 // @desc    Get all appointments for today (to manage the clinic queue)
 // @route   GET /api/nurse/appointments/today
 // @access  Private (Nurse only)
