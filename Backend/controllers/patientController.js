@@ -50,6 +50,10 @@ export const updateProfile = async (req, res) => {
       // Update fields if they were provided in the request body
       user.name = req.body.name || user.name;
       user.phone = req.body.phone || user.phone;
+      if (req.body.nic !== undefined) user.nic = req.body.nic;
+      if (req.body.dob !== undefined) user.dob = req.body.dob;
+      if (req.body.gender !== undefined) user.gender = req.body.gender;
+      if (req.body.address !== undefined) user.address = req.body.address;
 
       if (req.body.password) {
         user.password = req.body.password;

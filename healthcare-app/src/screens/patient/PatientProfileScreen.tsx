@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Platform,
   Switch,
   Alert,
+  TextInput,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -40,14 +41,83 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import BottomNavBar from '../../components/BottomNavBar';
 import { COLORS, SHADOWS } from '../../theme/theme';
+import { useAuth } from '../../context/AuthContext';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
 
 type PatientProfileNavProp = StackNavigationProp<RootStackParamList, 'PatientDashboard'>;
 
 const PatientProfileScreen = () => {
   const navigation = useNavigation<PatientProfileNavProp>();
+  const { token } = useAuth();
+
   const [appointmentReminder, setAppointmentReminder] = useState(true);
   const [smsAlerts, setSmsAlerts] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(false);
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [profileData, setProfileData] = useState({
+    name: 'Sarah Johnson',
+    nic: 'XX****-****-1234',
+    dob: '15 March 1996',
+    gender: 'Female',
+    phone: '+94 71 234 5678',
+    email: 'sarah@email.com',
+    address: '123 Medical Lane, City'
+  });
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const data = await response.json();
+        if (response.ok && data) {
+          setProfileData(prev => ({
+            ...prev,
+            name: data.name || prev.name,
+            email: data.email || prev.email,
+            phone: data.phone || prev.phone,
+            nic: data.nic || prev.nic,
+            dob: data.dob || prev.dob,
+            gender: data.gender || prev.gender,
+            address: data.address || prev.address,
+          }));
+        }
+      } catch (err) {
+        console.error('Failed to fetch profile:', err);
+      }
+    };
+    if (token) {
+      fetchProfile();
+    }
+  }, [token]);
+
+  const handleSaveProfile = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/patient/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(profileData)
+      });
+      if (response.ok) {
+        Alert.alert('Success', 'Profile updated successfully');
+        setIsEditing(false);
+      } else {
+        const errorData = await response.json();
+        Alert.alert('Error', errorData.message || 'Failed to update profile');
+      }
+    } catch (err) {
+      Alert.alert('Error', 'An error occurred while updating the profile');
+      console.error(err);
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [
@@ -88,7 +158,7 @@ const PatientProfileScreen = () => {
               />
               <View style={styles.profileInfo}>
                 <View style={styles.nameRow}>
-                  <Text style={styles.patientName}>Sarah Johnson</Text>
+                  <Text style={styles.patientName}>{profileData.name}</Text>
                   <VerifiedIcon size={20} color="#10B981" fill="#10B981" />
                 </View>
                 <Text style={styles.patientId}>ID: MH-2024-08542</Text>
@@ -146,24 +216,30 @@ const PatientProfileScreen = () => {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Personal Information</Text>
-              <TouchableOpacity>
-                <Edit3 size={18} color={COLORS.primary} />
-              </TouchableOpacity>
+              {isEditing ? (
+                <TouchableOpacity onPress={handleSaveProfile}>
+                  <CheckCircle2 size={24} color={COLORS.primary} />
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity onPress={() => setIsEditing(true)}>
+                  <Edit3 size={18} color={COLORS.primary} />
+                </TouchableOpacity>
+              )}
             </View>
             <View style={[styles.infoCard, SHADOWS.small]}>
-              <InfoRow label="Full Name" value="Sarah Johnson" />
+              <InfoRow label="Full Name" value={profileData.name} isEditing={isEditing} onChangeText={(t) => setProfileData(p => ({...p, name: t}))} />
               <View style={styles.infoDivider} />
-              <InfoRow label="NIC / Passport" value="XX****-****-1234" />
+              <InfoRow label="NIC / Passport" value={profileData.nic} isEditing={isEditing} onChangeText={(t) => setProfileData(p => ({...p, nic: t}))} />
               <View style={styles.infoDivider} />
-              <InfoRow label="Date of Birth" value="15 March 1996" />
+              <InfoRow label="Date of Birth" value={profileData.dob} isEditing={isEditing} onChangeText={(t) => setProfileData(p => ({...p, dob: t}))} />
               <View style={styles.infoDivider} />
-              <InfoRow label="Gender" value="Female" />
+              <InfoRow label="Gender" value={profileData.gender} isEditing={isEditing} onChangeText={(t) => setProfileData(p => ({...p, gender: t}))} options={['Male', 'Female', 'Rather not to say']} />
               <View style={styles.infoDivider} />
-              <InfoRow label="Mobile Number" value="+94 71 234 5678" />
+              <InfoRow label="Mobile Number" value={profileData.phone} isEditing={isEditing} onChangeText={(t) => setProfileData(p => ({...p, phone: t}))} />
               <View style={styles.infoDivider} />
-              <InfoRow label="Email" value="sarah@email.com" />
+              <InfoRow label="Email" value={profileData.email} isEditing={isEditing} onChangeText={(t) => setProfileData(p => ({...p, email: t}))} editable={false} />
               <View style={styles.infoDivider} />
-              <InfoRow label="Address" value="123 Medical Lane, City" />
+              <InfoRow label="Address" value={profileData.address} isEditing={isEditing} onChangeText={(t) => setProfileData(p => ({...p, address: t}))} />
             </View>
           </View>
 
@@ -456,10 +532,30 @@ const PatientProfileScreen = () => {
 };
 
 // Info Row Component
-const InfoRow = ({ label, value }: { label: string; value: string }) => (
+const InfoRow = ({ label, value, isEditing, onChangeText, editable = true, options }: { label: string; value: string; isEditing?: boolean; onChangeText?: (text: string) => void; editable?: boolean; options?: string[] }) => (
   <View style={styles.infoRow}>
     <Text style={styles.infoLabel}>{label}</Text>
-    <Text style={styles.infoValue}>{value}</Text>
+    {isEditing && editable ? (
+      options ? (
+        <View style={styles.optionsRow}>
+          {options.map(opt => (
+            <TouchableOpacity key={opt} onPress={() => onChangeText?.(opt)} style={[styles.optionBtn, value === opt && styles.optionBtnSelected]}>
+              <Text style={[styles.optionText, value === opt && styles.optionTextSelected]}>{opt}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      ) : (
+        <TextInput
+          style={[styles.infoValue, styles.infoInput]}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={label}
+          placeholderTextColor="#9CA3AF"
+        />
+      )
+    ) : (
+      <Text style={styles.infoValue}>{value}</Text>
+    )}
   </View>
 );
 
@@ -562,6 +658,12 @@ const styles = StyleSheet.create({
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 },
   infoLabel: { fontSize: 13, fontWeight: '600', color: COLORS.textSecondary },
   infoValue: { fontSize: 14, fontWeight: '700', color: COLORS.textHeader },
+  infoInput: { borderBottomWidth: 1, borderBottomColor: COLORS.primary, padding: 0, margin: 0, minWidth: 150, textAlign: 'right' },
+  optionsRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end', flex: 1, paddingLeft: 10 },
+  optionBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: '#E5E7EB' },
+  optionBtnSelected: { backgroundColor: COLORS.primary + '1A', borderColor: COLORS.primary },
+  optionText: { fontSize: 11, color: COLORS.textSecondary, fontWeight: '600' },
+  optionTextSelected: { color: COLORS.primary },
   infoDivider: { height: 1, backgroundColor: '#F3F4F6' },
 
   // Medical Card
