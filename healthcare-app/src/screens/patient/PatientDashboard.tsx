@@ -5,6 +5,7 @@ import { Search, Calendar, User, FileText, Activity, MoreHorizontal, Home, Heart
 import BottomNavBar from '../../components/BottomNavBar';
 import { useAuth } from '../../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
+import moment from 'moment';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -85,6 +86,10 @@ const PatientDashboard = () => {
   const [patientName, setPatientName] = useState('Patient');
   const [patientFullName, setPatientFullName] = useState('Patient Name');
   const [patientEmail, setPatientEmail] = useState('patient@example.com');
+  const [activeAppointmentTab, setActiveAppointmentTab] = useState<'Doctor' | 'Lab'>('Doctor');
+  
+  const [upcomingDoctorAppointment, setUpcomingDoctorAppointment] = useState<any>(null);
+  const [upcomingLabAppointment, setUpcomingLabAppointment] = useState<any>(null);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -108,6 +113,29 @@ const PatientDashboard = () => {
       fetchProfile();
     }
   }, [token]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const fetchDashboardData = async () => {
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/patient/dashboard`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const data = await response.json();
+          if (response.ok && data.success) {
+            setUpcomingDoctorAppointment(data.data.doctorAppointments[0] || null);
+            setUpcomingLabAppointment(data.data.labAppointments[0] || null);
+          }
+        } catch (err) {
+          console.error('Failed to fetch dashboard data:', err);
+        }
+      };
+
+      if (token) {
+        fetchDashboardData();
+      }
+    }, [token])
+  );
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (e) => {
@@ -513,51 +541,83 @@ const PatientDashboard = () => {
             <Text style={[styles.sectionTitle, { fontSize: 18, color: '#000000' }]}>Upcoming Appointments</Text>
           </View>
 
-          {/* Doctor Appointment Sub-Section */}
-          <View style={styles.appointmentSubSection}>
-            <Text style={styles.appointmentSubTitle}>Doctor Appointment</Text>
-            <TouchableOpacity
-              style={[styles.mainAppointmentCard, SHADOWS.small]}
-              onPress={() => navigation.navigate('PatientAppointments')}
+          {/* Custom Segmented Control */}
+          <View style={styles.appointmentTabsContainer}>
+            <TouchableOpacity 
+              style={[styles.appointmentTab, activeAppointmentTab === 'Doctor' && styles.activeAppointmentTab]}
+              onPress={() => setActiveAppointmentTab('Doctor')}
             >
-              <View style={[styles.mainAppIconWrap, { backgroundColor: '#F3F0FF' }]}>
-                <Stethoscope size={28} color={COLORS.primary} />
-              </View>
-              <View style={styles.mainAppInfo}>
-                <Text style={styles.mainAppTitle}>Dr. Emma Watson</Text>
-                <Text style={styles.mainAppSub}>Cardiology  •  20 May  •  10:30 AM</Text>
-                {/* Live countdown pill */}
-                <View style={styles.countdownPill}>
-                  <Activity size={11} color={COLORS.primary} />
-                  <Text style={styles.countdownText}>{doctorCountdown}</Text>
-                </View>
-              </View>
-              <ChevronRight size={20} color="#9CA3AF" />
+              <Text style={[styles.appointmentTabText, activeAppointmentTab === 'Doctor' && styles.activeAppointmentTabText]}>Doctor</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.appointmentTab, activeAppointmentTab === 'Lab' && styles.activeAppointmentTab]}
+              onPress={() => setActiveAppointmentTab('Lab')}
+            >
+              <Text style={[styles.appointmentTabText, activeAppointmentTab === 'Lab' && styles.activeAppointmentTabText]}>Lab Test</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Lab Test Appointment Sub-Section */}
-          <View style={[styles.appointmentSubSection, { marginTop: 15 }]}>
-            <Text style={styles.appointmentSubTitle}>Lab Test Appointment</Text>
-            <TouchableOpacity
-              style={[styles.mainAppointmentCard, SHADOWS.small]}
-              onPress={() => navigation.navigate('Reports')}
-            >
-              <View style={[styles.mainAppIconWrap, { backgroundColor: '#ECFDF5' }]}>
-                <FlaskConical size={28} color="#10B981" />
+          {activeAppointmentTab === 'Doctor' ? (
+            upcomingDoctorAppointment ? (
+              <View style={styles.appointmentSubSection}>
+                <TouchableOpacity
+                  style={[styles.mainAppointmentCard, SHADOWS.small]}
+                  onPress={() => navigation.navigate('PatientAppointments')}
+                >
+                  <View style={[styles.mainAppIconWrap, { backgroundColor: '#F3F0FF' }]}>
+                    <Stethoscope size={28} color={COLORS.primary} />
+                  </View>
+                  <View style={styles.mainAppInfo}>
+                    <Text style={styles.mainAppTitle}>
+                      {upcomingDoctorAppointment.doctor?.name || 'Doctor Appointment'}
+                    </Text>
+                    <Text style={styles.mainAppSub}>
+                      {upcomingDoctorAppointment.doctor?.specialization || 'Consultation'}  •  {moment(upcomingDoctorAppointment.date).format('DD MMM')}  •  {upcomingDoctorAppointment.timeSlot || 'TBD'}
+                    </Text>
+                    <View style={styles.countdownPill}>
+                      <Activity size={11} color={COLORS.primary} />
+                      <Text style={styles.countdownText}>Upcoming</Text>
+                    </View>
+                  </View>
+                  <ChevronRight size={20} color="#9CA3AF" />
+                </TouchableOpacity>
               </View>
-              <View style={styles.mainAppInfo}>
-                <Text style={styles.mainAppTitle}>Complete Blood Count</Text>
-                <Text style={styles.mainAppSub}>City Lab  •  22 May  •  08:00 AM</Text>
-                {/* Live countdown pill */}
-                <View style={[styles.countdownPill, { backgroundColor: '#ECFDF5' }]}>
-                  <Activity size={11} color="#10B981" />
-                  <Text style={[styles.countdownText, { color: '#10B981' }]}>{labCountdown}</Text>
-                </View>
+            ) : (
+              <View style={[styles.mainAppointmentCard, SHADOWS.small, { alignItems: 'center', justifyContent: 'center', padding: 30 }]}>
+                <Text style={{ color: COLORS.textSecondary, fontWeight: '500' }}>No upcoming doctor appointments</Text>
               </View>
-              <ChevronRight size={20} color="#9CA3AF" />
-            </TouchableOpacity>
-          </View>
+            )
+          ) : (
+            upcomingLabAppointment ? (
+              <View style={styles.appointmentSubSection}>
+                <TouchableOpacity
+                  style={[styles.mainAppointmentCard, SHADOWS.small]}
+                  onPress={() => navigation.navigate('Reports')}
+                >
+                  <View style={[styles.mainAppIconWrap, { backgroundColor: '#ECFDF5' }]}>
+                    <FlaskConical size={28} color="#10B981" />
+                  </View>
+                  <View style={styles.mainAppInfo}>
+                    <Text style={styles.mainAppTitle}>
+                      {upcomingLabAppointment.testName || 'Lab Test'}
+                    </Text>
+                    <Text style={styles.mainAppSub}>
+                      Lab Visit  •  {moment(upcomingLabAppointment.date).format('DD MMM')}  •  {upcomingLabAppointment.timeSlot || 'TBD'}
+                    </Text>
+                    <View style={[styles.countdownPill, { backgroundColor: '#ECFDF5' }]}>
+                      <Activity size={11} color="#10B981" />
+                      <Text style={[styles.countdownText, { color: '#10B981' }]}>Upcoming</Text>
+                    </View>
+                  </View>
+                  <ChevronRight size={20} color="#9CA3AF" />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={[styles.mainAppointmentCard, SHADOWS.small, { alignItems: 'center', justifyContent: 'center', padding: 30 }]}>
+                <Text style={{ color: COLORS.textSecondary, fontWeight: '500' }}>No upcoming lab appointments</Text>
+              </View>
+            )
+          )}
 
           {/* Two Info Cards Box */}
           <View style={styles.infoCardsRow}>
@@ -1141,6 +1201,36 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 30,
     fontWeight: '600',
+  },
+  appointmentTabsContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 16,
+  },
+  appointmentTab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 10,
+  },
+  activeAppointmentTab: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  appointmentTabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  activeAppointmentTabText: {
+    color: COLORS.primary,
+    fontWeight: '700',
   },
   appointmentSubSection: {
     marginBottom: 5,

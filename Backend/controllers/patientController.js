@@ -9,10 +9,13 @@ import MedicalRecord from '../model/MedicalRecord.js';
 // @access  Private (Patient only)
 export const getDashboardData = async (req, res) => {
   try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     // 1. Fetch upcoming doctor appointments (Populating doctor details for the UI)
     const doctorAppointments = await Appointment.find({
       patient: req.user._id,
-      date: { $gte: new Date() },
+      date: { $gte: today },
       status: { $in: ['pending', 'confirmed'] }
     })
       .populate('doctor', 'name specialization hospital')
@@ -22,7 +25,7 @@ export const getDashboardData = async (req, res) => {
     // 2. Fetch upcoming lab tests
     const labAppointments = await LabTest.find({
       patient: req.user._id,
-      date: { $gte: new Date() },
+      date: { $gte: today },
       status: { $in: ['pending', 'scheduled'] }
     })
       .sort({ date: 1 })
