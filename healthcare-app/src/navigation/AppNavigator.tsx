@@ -37,7 +37,7 @@ import SpecialtyDoctorsScreen from '../screens/patient/SpecialtyDoctorsScreen';
 import AvailabilitySelectionScreen from '../screens/patient/AvailabilitySelectionScreen';
 import LabAvailabilityScreen from '../screens/patient/LabAvailabilityScreen';
 import LabBookingFlowScreen from '../screens/patient/LabBookingFlowScreen';
-import DoctorAvailability from '../screens/doctor/DoctorAvailability';
+import DoctorAvailability from '../screens/patient/DoctorAvailability';
 import SettingsScreen from '../screens/patient/SettingsScreen';
 
 // Admin Screens
