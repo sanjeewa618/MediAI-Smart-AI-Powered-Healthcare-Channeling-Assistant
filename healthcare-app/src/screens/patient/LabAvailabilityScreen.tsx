@@ -1,8 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, 
   TextInput, SafeAreaView, Platform, StatusBar, Modal, Dimensions,
-  Animated, PanResponder
+  Animated, PanResponder, ActivityIndicator
 } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import { 
@@ -16,22 +16,22 @@ import BottomNavBar from '../../components/BottomNavBar';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/types';
+import { useAuth } from '../../context/AuthContext';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'LabAvailability'>;
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const labCategories = [
-  { id: '1', name: 'Blood Tests', icon: '🩸', color: '#FEE2E2' },
-  { id: '2', name: 'Urine Tests', icon: '🧪', color: '#FEF3C7' },
-  { id: '3', name: 'Diabetes', icon: '💉', color: '#E0F2FE' },
-  { id: '4', name: 'Heart', icon: '❤️', color: '#FCE7F3' },
-  { id: '5', name: 'Liver', icon: '🫀', color: '#F0FDF4' },
-  { id: '6', name: 'Kidney', icon: '🧬', color: '#F5F3FF' },
-  { id: '7', name: 'Thyroid', icon: '🦋', color: '#FFF7ED' },
-  { id: '8', name: 'Hormone', icon: '⚕️', color: '#ECFDF5' },
-  { id: '9', name: 'Pregnancy', icon: '👶', color: '#FFF1F2' },
-  { id: '10', name: 'Full Body', icon: '🏥', color: '#F1F5F9' },
+  { id: '1', name: 'Blood Test', icon: '🩸', color: '#FEE2E2' },
+  { id: '2', name: 'Urine Test', icon: '🧪', color: '#FEF3C7' },
+  { id: '3', name: 'X-Ray', icon: '🦴', color: '#E0F2FE' },
+  { id: '4', name: 'MRI Scan', icon: '🧠', color: '#FCE7F3' },
+  { id: '5', name: 'CT Scan', icon: '🔬', color: '#F3E8FF' },
+  { id: '6', name: 'ECG', icon: '❤️', color: '#ECFDF5' },
+  { id: '7', name: 'Ultrasound', icon: '👶', color: '#FFF1F2' },
 ];
 
 const mockLabs = [
@@ -193,11 +193,56 @@ const LabAvailabilityScreen = () => {
     })
   ).current;
 
-  const filteredLabs = mockLabs.filter(lab => 
-    lab.category === selectedCategory && 
-    (lab.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-     lab.description.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const { token } = useAuth();
+  const [dbNurses, setDbNurses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchNurses = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/nurse`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        if (response.ok && data.success) {
+          setDbNurses(data.data);
+        }
+      } catch (error) {
+        console.error('Error fetching nurses:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (token) fetchNurses();
+  }, [token]);
+
+  const selectedCategoryName = labCategories.find(c => c.id === selectedCategory)?.name || '';
+
+  const filteredLabs = dbNurses
+    .filter(nurse => nurse.department === selectedCategoryName)
+    .filter(nurse => 
+      nurse.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      (nurse.department || '').toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .map((nurse, index) => ({
+      id: nurse._id,
+      category: selectedCategory,
+      name: `Lab - ${nurse.name.split(' ')[0] || 'Unit'}`,
+      description: nurse.department || 'Lab Test',
+      floor: 'Main Floor',
+      duration: '1-2 Hours',
+      price: 'LKR 1500',
+      status: 'Available',
+      nurse: nurse.name,
+      rating: 4.8,
+      queue: Math.floor(Math.random() * 5),
+      wait: '15 mins',
+      currentToken: 12,
+      yourToken: 15,
+      openTime: '08:00 AM',
+      closeTime: '06:00 PM',
+      image: nurse.profileImage || 'https://img.freepik.com/free-photo/lab-technician-holding-blood-tube_23-2148166567.jpg'
+    }));
 
   const currentTimeSlots = timeSlotsData[selectedDate] || timeSlotsData['default'];
 
