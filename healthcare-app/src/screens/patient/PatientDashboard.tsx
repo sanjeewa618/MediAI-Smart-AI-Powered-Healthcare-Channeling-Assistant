@@ -3,7 +3,10 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, 
 import { COLORS, SHADOWS } from '../../theme/theme';
 import { Search, Calendar, User, FileText, Activity, MoreHorizontal, Home, Heart, Shield, MessageCircle, FileEdit, FlaskConical, ChevronRight, Baby, Droplets, Sparkles, Plus, Bell, LogOut, Pill, Truck, Settings, X, LifeBuoy, Stethoscope, Dna, Brain, Bone, Eye, Smile, Wallet, Clock, AlertCircle } from 'lucide-react-native';
 import BottomNavBar from '../../components/BottomNavBar';
+import { useAuth } from '../../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/types';
@@ -14,19 +17,19 @@ type PatientDashboardProp = StackNavigationProp<RootStackParamList, 'PatientDash
 
 // --- Countdown Timer Helpers ---
 const DOCTOR_APPT = new Date(2026, 4, 20, 10, 30, 0);  // 20 May 2026 10:30 AM
-const LAB_APPT    = new Date(2026, 4, 22,  8,  0, 0);  // 22 May 2026 08:00 AM
+const LAB_APPT = new Date(2026, 4, 22, 8, 0, 0);  // 22 May 2026 08:00 AM
 
 const calcCountdown = (target: Date): string => {
   const diff = target.getTime() - Date.now();
   if (diff <= 0) return 'Now!';
   const totalSec = Math.floor(diff / 1000);
-  const s   = totalSec % 60;
-  const m   = Math.floor(totalSec / 60) % 60;
-  const h   = Math.floor(totalSec / 3600) % 24;
-  const d   = Math.floor(totalSec / 86400);
-  const ss  = String(s).padStart(2, '0');
-  const mm  = String(m).padStart(2, '0');
-  const hh  = String(h).padStart(2, '0');
+  const s = totalSec % 60;
+  const m = Math.floor(totalSec / 60) % 60;
+  const h = Math.floor(totalSec / 3600) % 24;
+  const d = Math.floor(totalSec / 86400);
+  const ss = String(s).padStart(2, '0');
+  const mm = String(m).padStart(2, '0');
+  const hh = String(h).padStart(2, '0');
   if (d > 0) return `${d}d ${hh}h ${mm}m ${ss}s`;
   return `${hh}h ${mm}m ${ss}s`;
 };
@@ -78,6 +81,33 @@ const StaggeredView = ({ children, delay = 0, style }: { children: React.ReactNo
 const PatientDashboard = () => {
   const navigation = useNavigation<PatientDashboardProp>();
   const isLoggingOut = useRef(false);
+  const { token } = useAuth();
+  const [patientName, setPatientName] = useState('Patient');
+  const [patientFullName, setPatientFullName] = useState('Patient Name');
+  const [patientEmail, setPatientEmail] = useState('patient@example.com');
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const data = await response.json();
+        if (response.ok && data) {
+          setPatientName(data.name ? data.name.split(' ')[0] : 'Patient');
+          setPatientFullName(data.name || 'Patient Name');
+          setPatientEmail(data.email || 'patient@example.com');
+        }
+      } catch (err) {
+        console.error('Failed to fetch profile:', err);
+      }
+    };
+    if (token) {
+      fetchProfile();
+    }
+  }, [token]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (e) => {
@@ -110,7 +140,7 @@ const PatientDashboard = () => {
   const [aiCardPressed, setAiCardPressed] = useState(false);
   const [aiCardHovered, setAiCardHovered] = useState(false);
   const aiCardScale = useRef(new Animated.Value(1)).current;
-  const aiCardLift  = useRef(new Animated.Value(0)).current;
+  const aiCardLift = useRef(new Animated.Value(0)).current;
   const aiGlowPulse = useRef(new Animated.Value(0.75)).current;
 
   // Menu Animation & PanResponder
@@ -176,7 +206,7 @@ const PatientDashboard = () => {
 
   // Live countdown state
   const [doctorCountdown, setDoctorCountdown] = useState(() => calcCountdown(DOCTOR_APPT));
-  const [labCountdown,    setLabCountdown]    = useState(() => calcCountdown(LAB_APPT));
+  const [labCountdown, setLabCountdown] = useState(() => calcCountdown(LAB_APPT));
   const [reminderVisible, setReminderVisible] = useState(false);
   const [reminderMsg, setReminderMsg] = useState('');
 
@@ -290,7 +320,7 @@ const PatientDashboard = () => {
     <View style={styles.container}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        
+
         {/* Purple Top Background Section */}
         <LinearGradient
           colors={COLORS.screenHeaderGradient}
@@ -299,7 +329,7 @@ const PatientDashboard = () => {
           {/* Header */}
           <StaggeredView delay={100}>
             <View style={styles.header}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.menuIconBtn}
                 onPress={openMenu}
               >
@@ -309,12 +339,12 @@ const PatientDashboard = () => {
               </TouchableOpacity>
 
               <View style={styles.headerTextContainer}>
-                <Text style={styles.greeting}>Hello, Sarah 👋</Text>
+                <Text style={styles.greeting}>Hello, {patientName} 👋</Text>
                 <Text style={styles.subGreeting}>Take care of your health</Text>
               </View>
 
               <View style={styles.headerActions}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.headerActionButton}
                   onPress={() => setAppointmentModalVisible(true)}
                 >
@@ -323,7 +353,7 @@ const PatientDashboard = () => {
                 <TouchableOpacity style={[styles.headerActionButton, { marginLeft: 10 }]}>
                   <Bell size={20} color="#FFFFFF" />
                 </TouchableOpacity>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.headerActionButton, { marginLeft: 10 }]}
                   onPress={() => {
                     isLoggingOut.current = true;
@@ -349,7 +379,7 @@ const PatientDashboard = () => {
 
           {/* Appointment Reminder Alert */}
           {reminderVisible && (
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.reminderBanner}
               onPress={() => setReminderVisible(false)}
             >
@@ -375,15 +405,15 @@ const PatientDashboard = () => {
                 <LinearGradient
                   colors={['#FFFFFF', '#F7F2FF']}
                   style={[
-                    styles.aiCard, 
-                    aiCardPressed ? styles.aiCardPressed : null, 
+                    styles.aiCard,
+                    aiCardPressed ? styles.aiCardPressed : null,
                     aiCardHovered ? styles.aiCardHovered : null
                   ]}
                 >
                   <View style={styles.aiCardContent}>
                     <Text style={styles.aiCardTitle}>AI Health Assistant</Text>
                     <Text style={styles.aiCardText}>Check your symptoms and get{'\n'}AI health suggestions</Text>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={styles.aiCardBtn}
                       onPress={() => navigation.navigate('AIHealthAssistant')}
                     >
@@ -397,9 +427,9 @@ const PatientDashboard = () => {
                         style={styles.aiCardImageGlow}
                       />
                     </Animated.View>
-                    <Image 
-                      source={require('../../../assets/bot2.jpg')} 
-                      style={styles.aiCardImage} 
+                    <Image
+                      source={require('../../../assets/bot2.jpg')}
+                      style={styles.aiCardImage}
                       resizeMode="contain"
                     />
                   </View>
@@ -411,72 +441,72 @@ const PatientDashboard = () => {
 
         {/* Bottom White Section */}
         <View style={styles.whiteCurveContainer}>
-          
+
           {/* Specialties Categories */}
           <StaggeredView delay={400}>
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false} 
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.categoriesContainer}
             >
-            <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('SpecialtyDoctors', { specialty: 'Cardiology' })}>
-              <View style={[styles.categoryIconWrap, { backgroundColor: '#FFF1F2' }]}>
-                <Heart size={28} color="#E11D48" fill="#E11D48" />
-              </View>
-              <Text style={styles.categoryText}>Cardiology</Text>
-            </TouchableOpacity>
+              <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('SpecialtyDoctors', { specialty: 'Cardiology' })}>
+                <View style={[styles.categoryIconWrap, { backgroundColor: '#FFF1F2' }]}>
+                  <Heart size={28} color="#E11D48" fill="#E11D48" />
+                </View>
+                <Text style={styles.categoryText}>Cardiology</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('SpecialtyDoctors', { specialty: 'Paediatrics' })}>
-              <View style={[styles.categoryIconWrap, { backgroundColor: '#E0F2FE' }]}>
-                <Baby size={28} color="#0EA5E9" />
-              </View>
-              <Text style={styles.categoryText}>Paediatrics</Text>
-            </TouchableOpacity>
+              <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('SpecialtyDoctors', { specialty: 'Paediatrics' })}>
+                <View style={[styles.categoryIconWrap, { backgroundColor: '#E0F2FE' }]}>
+                  <Baby size={28} color="#0EA5E9" />
+                </View>
+                <Text style={styles.categoryText}>Paediatrics</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('SpecialtyDoctors', { specialty: 'Urology' })}>
-              <View style={[styles.categoryIconWrap, { backgroundColor: '#F0FDF4' }]}>
-                <Droplets size={28} color="#22C55E" />
-              </View>
-              <Text style={styles.categoryText}>Urology</Text>
-            </TouchableOpacity>
+              <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('SpecialtyDoctors', { specialty: 'Urology' })}>
+                <View style={[styles.categoryIconWrap, { backgroundColor: '#F0FDF4' }]}>
+                  <Droplets size={28} color="#22C55E" />
+                </View>
+                <Text style={styles.categoryText}>Urology</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('SpecialtyDoctors', { specialty: 'Oncology' })}>
-              <View style={[styles.categoryIconWrap, { backgroundColor: '#FFF7ED' }]}>
-                <Dna size={28} color="#F97316" />
-              </View>
-              <Text style={styles.categoryText}>Oncology</Text>
-            </TouchableOpacity>
+              <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('SpecialtyDoctors', { specialty: 'Oncology' })}>
+                <View style={[styles.categoryIconWrap, { backgroundColor: '#FFF7ED' }]}>
+                  <Dna size={28} color="#F97316" />
+                </View>
+                <Text style={styles.categoryText}>Oncology</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('SpecialtyDoctors', { specialty: 'Dermatology' })}>
-              <View style={[styles.categoryIconWrap, { backgroundColor: '#F5F3FF' }]}>
-                <Sparkles size={28} color={COLORS.primary} />
-              </View>
-              <Text style={styles.categoryText}>Dermatology</Text>
-            </TouchableOpacity>
+              <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('SpecialtyDoctors', { specialty: 'Dermatology' })}>
+                <View style={[styles.categoryIconWrap, { backgroundColor: '#F5F3FF' }]}>
+                  <Sparkles size={28} color={COLORS.primary} />
+                </View>
+                <Text style={styles.categoryText}>Dermatology</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('SpecialtyDoctors', { specialty: 'Neurology' })}>
-              <View style={[styles.categoryIconWrap, { backgroundColor: '#FDF2F8' }]}>
-                <Brain size={28} color="#DB2777" />
-              </View>
-              <Text style={styles.categoryText}>Neurology</Text>
-            </TouchableOpacity>
+              <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('SpecialtyDoctors', { specialty: 'Neurology' })}>
+                <View style={[styles.categoryIconWrap, { backgroundColor: '#FDF2F8' }]}>
+                  <Brain size={28} color="#DB2777" />
+                </View>
+                <Text style={styles.categoryText}>Neurology</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('SpecialtyDoctors', { specialty: 'Orthopedics' })}>
-              <View style={[styles.categoryIconWrap, { backgroundColor: '#F1F5F9' }]}>
-                <Bone size={28} color="#475569" />
-              </View>
-              <Text style={styles.categoryText}>Orthopedics</Text>
-            </TouchableOpacity>
+              <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('SpecialtyDoctors', { specialty: 'Orthopedics' })}>
+                <View style={[styles.categoryIconWrap, { backgroundColor: '#F1F5F9' }]}>
+                  <Bone size={28} color="#475569" />
+                </View>
+                <Text style={styles.categoryText}>Orthopedics</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('SpecialtyDoctors', { specialty: 'Ophthalmology' })}>
-              <View style={[styles.categoryIconWrap, { backgroundColor: '#FFF7ED' }]}>
-                <Eye size={28} color="#EA580C" />
-              </View>
-              <Text style={styles.categoryText}>Ophthalmology</Text>
-            </TouchableOpacity>
+              <TouchableOpacity style={styles.categoryItem} onPress={() => navigation.navigate('SpecialtyDoctors', { specialty: 'Ophthalmology' })}>
+                <View style={[styles.categoryIconWrap, { backgroundColor: '#FFF7ED' }]}>
+                  <Eye size={28} color="#EA580C" />
+                </View>
+                <Text style={styles.categoryText}>Ophthalmology</Text>
+              </TouchableOpacity>
 
-          </ScrollView>
-        </StaggeredView>
+            </ScrollView>
+          </StaggeredView>
 
           {/* Upcoming Appointments Main Section */}
           <View style={[styles.sectionHeader, { marginTop: 5, marginBottom: 15 }]}>
@@ -486,7 +516,7 @@ const PatientDashboard = () => {
           {/* Doctor Appointment Sub-Section */}
           <View style={styles.appointmentSubSection}>
             <Text style={styles.appointmentSubTitle}>Doctor Appointment</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.mainAppointmentCard, SHADOWS.small]}
               onPress={() => navigation.navigate('PatientAppointments')}
             >
@@ -509,7 +539,7 @@ const PatientDashboard = () => {
           {/* Lab Test Appointment Sub-Section */}
           <View style={[styles.appointmentSubSection, { marginTop: 15 }]}>
             <Text style={styles.appointmentSubTitle}>Lab Test Appointment</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.mainAppointmentCard, SHADOWS.small]}
               onPress={() => navigation.navigate('Reports')}
             >
@@ -593,7 +623,7 @@ const PatientDashboard = () => {
               <Text style={styles.quickActionText}>Health Records</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.quickActionItem}
               onPress={() => setMoreModalVisible(true)}
             >
@@ -603,7 +633,7 @@ const PatientDashboard = () => {
               <Text style={styles.quickActionText}>More</Text>
             </TouchableOpacity>
           </View>
-          
+
         </View>
       </ScrollView>
 
@@ -618,8 +648,8 @@ const PatientDashboard = () => {
         ]}
         {...panResponder.panHandlers}
       >
-        <TouchableOpacity 
-          style={[styles.fab, SHADOWS.medium]} 
+        <TouchableOpacity
+          style={[styles.fab, SHADOWS.medium]}
           onPress={() => navigation.navigate('AvailabilitySelection')}
         >
           <Plus size={28} color="#FFFFFF" />
@@ -635,12 +665,12 @@ const PatientDashboard = () => {
       >
         <View style={styles.menuOverlay}>
           <Animated.View style={[styles.menuDismissArea, { opacity: overlayOpacity }]}>
-            <Pressable 
-              style={StyleSheet.absoluteFill} 
-              onPress={closeMenu} 
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={closeMenu}
             />
           </Animated.View>
-          <Animated.View 
+          <Animated.View
             style={[styles.menuContent, { transform: [{ translateX: menuAnimX }] }]}
             {...menuPanResponder.panHandlers}
           >
@@ -648,20 +678,20 @@ const PatientDashboard = () => {
               colors={['#8B3DFF', '#5F0FFF']}
               style={styles.menuHeader}
             >
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.menuCloseBtn}
                 onPress={closeMenu}
               >
                 <X size={24} color="#FFF" />
               </TouchableOpacity>
-              
-              <Image 
-                source={require('../../../assets/signup-image2.png')} 
-                style={styles.menuAvatar} 
+
+              <Image
+                source={require('../../../assets/signup-image2.png')}
+                style={styles.menuAvatar}
               />
-              <Text style={styles.menuUserName}>Sarah Johnson</Text>
-              <Text style={styles.menuUserEmail}>sarah.j@example.com</Text>
-              
+              <Text style={styles.menuUserName}>{patientFullName}</Text>
+              <Text style={styles.menuUserEmail}>{patientEmail}</Text>
+
               <View style={styles.membershipBadge}>
                 <Sparkles size={12} color="#FFD700" fill="#FFD700" />
                 <Text style={styles.membershipText}>Premium Member</Text>
@@ -728,17 +758,17 @@ const PatientDashboard = () => {
                   <Text style={styles.menuItemText}>Help & Support</Text>
                 </TouchableOpacity>
 
-                  <TouchableOpacity 
-                   style={[styles.menuItem, { marginTop: 5 }]}
-                   onPress={() => {
-                     closeMenu();
-                     isLoggingOut.current = true;
-                     navigation.reset({
-                       index: 0,
-                       routes: [{ name: 'SignIn', params: { role: 'patient' } }],
-                     });
-                   }}
-                 >
+                <TouchableOpacity
+                  style={[styles.menuItem, { marginTop: 5 }]}
+                  onPress={() => {
+                    closeMenu();
+                    isLoggingOut.current = true;
+                    navigation.reset({
+                      index: 0,
+                      routes: [{ name: 'SignIn', params: { role: 'patient' } }],
+                    });
+                  }}
+                >
                   <View style={[styles.menuIconBox, { backgroundColor: '#FEF2F2' }]}>
                     <LogOut size={20} color="#EF4444" />
                   </View>
@@ -748,7 +778,7 @@ const PatientDashboard = () => {
                 <View style={styles.menuDivider} />
               </ScrollView>
             </View>
-            
+
             <Text style={styles.menuVersion}>Version 1.0.2 (Beta)</Text>
           </Animated.View>
         </View>
@@ -797,7 +827,7 @@ const PatientDashboard = () => {
                   <Text style={styles.scheduleTime}>22 May 2024 • 09:00 AM</Text>
                 </View>
               </View>
-              
+
               <View style={styles.scheduleItem}>
                 <View style={[styles.scheduleIconWrap, { backgroundColor: '#FDF2F8' }]}>
                   <FlaskConical size={20} color="#DB2777" />
@@ -821,14 +851,14 @@ const PatientDashboard = () => {
         onRequestClose={() => setMoreModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <Pressable 
-            style={styles.modalDismissArea} 
-            onPress={() => setMoreModalVisible(false)} 
+          <Pressable
+            style={styles.modalDismissArea}
+            onPress={() => setMoreModalVisible(false)}
           />
           <Animated.View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>More Services</Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={() => setMoreModalVisible(false)}
                 style={styles.modalCloseBtn}
               >
@@ -880,7 +910,7 @@ const PatientDashboard = () => {
               </TouchableOpacity>
 
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.modalGridItem}
                 onPress={() => {
                   setMoreModalVisible(false);
@@ -904,22 +934,22 @@ const PatientDashboard = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: COLORS.background 
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background
   },
-  scrollContent: { 
-    paddingBottom: 120 
+  scrollContent: {
+    paddingBottom: 120
   },
   topPurpleBackground: {
     paddingTop: Platform.OS === 'ios' ? 60 : 50,
     paddingHorizontal: 24,
     paddingBottom: 60, // Extra padding for the white curve overlay
   },
-  header: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    marginBottom: 24 
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24
   },
   profileImageContainer: {
     width: 44,
@@ -953,15 +983,15 @@ const styles = StyleSheet.create({
   logoutButtonSpacing: {
     marginLeft: 10,
   },
-  greeting: { 
-    fontSize: 22, 
-    fontWeight: '700', 
-    color: '#FFFFFF' 
+  greeting: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#FFFFFF'
   },
-  subGreeting: { 
-    fontSize: 14, 
-    color: 'rgba(255,255,255,0.85)', 
-    marginTop: 4 
+  subGreeting: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.85)',
+    marginTop: 4
   },
   reminderBanner: {
     marginHorizontal: 24,
@@ -1171,12 +1201,12 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontVariant: ['tabular-nums'],
   },
-  searchContainer: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    backgroundColor: '#FFFFFF', 
-    padding: 14, 
-    borderRadius: 16, 
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    padding: 14,
+    borderRadius: 16,
     marginBottom: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -1184,15 +1214,15 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 2,
   },
-  searchPlaceholder: { 
-    marginLeft: 12, 
-    color: COLORS.textSecondary, 
-    fontSize: 14 
+  searchPlaceholder: {
+    marginLeft: 12,
+    color: COLORS.textSecondary,
+    fontSize: 14
   },
-  aiCard: { 
-    borderRadius: 20, 
-    padding: 20, 
-    flexDirection: 'row', 
+  aiCard: {
+    borderRadius: 20,
+    padding: 20,
+    flexDirection: 'row',
     alignItems: 'center',
     position: 'relative',
     height: 140,
@@ -1221,34 +1251,34 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 9 },
     elevation: 10,
   },
-  aiCardContent: { 
-    flex: 1, 
+  aiCardContent: {
+    flex: 1,
     zIndex: 2,
     marginRight: 100
   },
-  aiCardTitle: { 
-    color: '#342350', 
-    fontSize: 16, 
-    fontWeight: '700', 
-    marginBottom: 6 
+  aiCardTitle: {
+    color: '#342350',
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 6
   },
-  aiCardText: { 
-    color: COLORS.textSecondary, 
-    fontSize: 12, 
-    marginBottom: 14, 
-    lineHeight: 16 
+  aiCardText: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    marginBottom: 14,
+    lineHeight: 16
   },
-  aiCardBtn: { 
-    backgroundColor: COLORS.primary, 
-    paddingHorizontal: 16, 
-    paddingVertical: 8, 
-    borderRadius: 10, 
-    alignSelf: 'flex-start' 
+  aiCardBtn: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 10,
+    alignSelf: 'flex-start'
   },
-  aiCardBtnText: { 
-    color: '#FFFFFF', 
-    fontWeight: '700', 
-    fontSize: 12 
+  aiCardBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 12
   },
   aiCardImageContainer: {
     width: 140,
@@ -1270,8 +1300,8 @@ const styles = StyleSheet.create({
     borderRadius: 70,
     opacity: 0.98,
   },
-  aiCardImage: { 
-    width: 142, 
+  aiCardImage: {
+    width: 142,
     height: 170,
     zIndex: 0,
   },
@@ -1312,25 +1342,25 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#4B5563'
   },
-  sectionHeader: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    marginBottom: 16 
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16
   },
-  sectionTitle: { 
-    fontSize: 16, 
-    fontWeight: '800', 
-    color: COLORS.textHeader 
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.textHeader
   },
-  viewAll: { 
-    color: COLORS.primary, 
+  viewAll: {
+    color: COLORS.primary,
     fontWeight: '700',
     fontSize: 13
   },
-  appointmentCard: { 
-    backgroundColor: '#FFFFFF', 
-    borderRadius: 20, 
+  appointmentCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
@@ -1341,24 +1371,24 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
-  docAvatar: { 
-    width: 60, 
-    height: 60, 
-    borderRadius: 16, 
+  docAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 16,
     marginRight: 14,
     backgroundColor: '#EEE'
   },
-  docInfo: { 
-    flex: 1 
+  docInfo: {
+    flex: 1
   },
-  docName: { 
-    fontSize: 15, 
-    fontWeight: '700', 
+  docName: {
+    fontSize: 15,
+    fontWeight: '700',
     color: COLORS.textHeader,
     marginBottom: 4
   },
-  docSpecialty: { 
-    fontSize: 12, 
+  docSpecialty: {
+    fontSize: 12,
     color: COLORS.textSecondary,
     marginBottom: 6
   },
@@ -1466,11 +1496,12 @@ const styles = StyleSheet.create({
     color: COLORS.textMain,
     textAlign: 'center'
   },
-  navText: { 
-    fontSize: 10, 
-    marginTop: 6, 
-    fontWeight: '600', 
-    color: COLORS.textSecondary   },
+  navText: {
+    fontSize: 10,
+    marginTop: 6,
+    fontWeight: '600',
+    color: COLORS.textSecondary
+  },
   fabWrapper: {
     position: 'absolute',
     bottom: 100, // Just above the bottom nav
