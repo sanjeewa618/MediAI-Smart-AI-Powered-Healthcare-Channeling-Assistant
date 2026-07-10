@@ -469,11 +469,12 @@ const styles = StyleSheet.create({
   illustrationWrap: {
     flex: 1,
     width: '100%',
-    maxHeight: height * 0.36,
+    maxHeight: height * 0.30,
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
-    marginVertical: 15,
+    marginVertical: 10,
+    marginTop: 18,
   },
   blob1: {
     position: 'absolute',
@@ -506,9 +507,9 @@ const styles = StyleSheet.create({
     opacity: 0.35,
   },
   illustration: {
-    width: 270,
-    height: 270,
-    borderRadius: 135,
+    width: 230,
+    height: 230,
+    borderRadius: 115,
     zIndex: 10,
     borderWidth: 4,
     borderColor: 'rgba(255, 255, 255, 0.3)',
@@ -530,7 +531,7 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   slide1BottomSpacer: {
-    height: 160,
+    height: 210,
   },
   slideBottomSpacer: {
     height: 180,
@@ -684,20 +685,20 @@ const styles = StyleSheet.create({
   },
   slide3ContentContainer: {
     width: '100%',
-    height: height * 0.68,
+    height: height * 0.58,
     position: 'relative',
     marginTop: -10,
   },
   slide3DoctorImage: {
     position: 'absolute',
-    bottom: 40,
+    bottom: 10,
     right: -width * 0.12,
     width: width * 0.9,
-    height: height * 0.68,
+    height: height * 0.58,
   },
   slide3CardsContainer: {
     position: 'absolute',
-    bottom: 70,
+    bottom: 40,
     left: 20,
     zIndex: 10,
     gap: 15,

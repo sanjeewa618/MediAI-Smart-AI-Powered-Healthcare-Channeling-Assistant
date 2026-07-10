@@ -111,6 +111,49 @@ const AdminRequestsScreen = () => {
     );
   };
 
+  const getCategoryColors = (role: 'doctor' | 'nurse', category: string) => {
+    const normalized = (category || '').trim();
+    if (role === 'doctor') {
+      switch (normalized) {
+        case 'Cardiology':
+          return { bg: '#FFF1F2', text: '#E11D48' };
+        case 'Paediatrics':
+          return { bg: '#E0F2FE', text: '#0EA5E9' };
+        case 'Urology':
+          return { bg: '#F0FDF4', text: '#22C55E' };
+        case 'Oncology':
+          return { bg: '#FFF7ED', text: '#F97316' };
+        case 'Dermatology':
+          return { bg: '#F5F3FF', text: '#724CF9' };
+        case 'Neurology':
+          return { bg: '#FDF2F8', text: '#DB2777' };
+        case 'Orthopedics':
+          return { bg: '#F1F5F9', text: '#475569' };
+        case 'Ophthalmology':
+          return { bg: '#FFF7ED', text: '#EA580C' };
+        default:
+          return { bg: '#F3F4F6', text: '#374151' };
+      }
+    } else {
+      switch (normalized) {
+        case 'Blood Test':
+          return { bg: '#FEE2E2', text: '#EF4444' };
+        case 'Urine Test':
+          return { bg: '#FEF3C7', text: '#D97706' };
+        case 'Diabetes':
+          return { bg: '#E0F2FE', text: '#0EA5E9' };
+        case 'Heart':
+          return { bg: '#FCE7F3', text: '#DB2777' };
+        case 'Liver':
+          return { bg: '#F0FDF4', text: '#16A34A' };
+        case 'Pregnancy':
+          return { bg: '#FFF1F2', text: '#E11D48' };
+        default:
+          return { bg: '#EFF6FF', text: '#3B82F6' };
+      }
+    }
+  };
+
   const renderRequestCard = ({ item }: { item: any }) => {
     const isDoctor = item.role === 'doctor';
     const Icon = isDoctor ? Stethoscope : BriefcaseMedical;
@@ -135,6 +178,26 @@ const AdminRequestsScreen = () => {
           <Text style={styles.detailText}><Text style={styles.detailLabel}>Phone: </Text>{item.phone}</Text>
           {item.staffId && (
             <Text style={styles.detailText}><Text style={styles.detailLabel}>Staff ID: </Text>{item.staffId}</Text>
+          )}
+          {(item.specialization || item.specialty) && isDoctor && (
+            (() => {
+              const colors = getCategoryColors('doctor', item.specialization || item.specialty);
+              return (
+                <View style={[styles.categoryBadge, { backgroundColor: colors.bg }]}>
+                  <Text style={[styles.categoryBadgeText, { color: colors.text }]}>🩺 {item.specialization || item.specialty}</Text>
+                </View>
+              );
+            })()
+          )}
+          {!isDoctor && item.department && (
+            (() => {
+              const colors = getCategoryColors('nurse', item.department);
+              return (
+                <View style={[styles.categoryBadge, { backgroundColor: colors.bg }]}>
+                  <Text style={[styles.categoryBadgeText, { color: colors.text }]}>🏥 {item.department}</Text>
+                </View>
+              );
+            })()
           )}
         </View>
 
@@ -363,7 +426,20 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: COLORS.textSecondary,
     fontWeight: '600',
-  }
+  },
+  categoryBadge: {
+    marginTop: 8,
+    backgroundColor: '#ECFDF5',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  categoryBadgeText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#10B981',
+  },
 });
 
 export default AdminRequestsScreen;

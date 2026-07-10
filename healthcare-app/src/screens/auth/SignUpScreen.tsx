@@ -15,6 +15,28 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:40
 type SignUpScreenProp = StackNavigationProp<RootStackParamList, 'SignUp'>;
 type SignUpRouteProp = RouteProp<RootStackParamList, 'SignUp'>;
 
+// Doctor Specialties (matches PatientDashboard categories)
+const DOCTOR_SPECIALTIES = [
+  { name: 'Cardiology', bg: '#FFF1F2', text: '#E11D48' },
+  { name: 'Paediatrics', bg: '#E0F2FE', text: '#0EA5E9' },
+  { name: 'Urology', bg: '#F0FDF4', text: '#22C55E' },
+  { name: 'Oncology', bg: '#FFF7ED', text: '#F97316' },
+  { name: 'Dermatology', bg: '#F5F3FF', text: '#724CF9' },
+  { name: 'Neurology', bg: '#FDF2F8', text: '#DB2777' },
+  { name: 'Orthopedics', bg: '#F1F5F9', text: '#475569' },
+  { name: 'Ophthalmology', bg: '#FFF7ED', text: '#EA580C' },
+];
+
+// Nurse/Lab Departments / Categories
+const NURSE_DEPARTMENTS = [
+  { name: 'Blood Test', bg: '#FEE2E2', text: '#EF4444' },
+  { name: 'Urine Test', bg: '#FEF3C7', text: '#D97706' },
+  { name: 'Diabetes', bg: '#E0F2FE', text: '#0EA5E9' },
+  { name: 'Heart', bg: '#FCE7F3', text: '#DB2777' },
+  { name: 'Liver', bg: '#F0FDF4', text: '#16A34A' },
+  { name: 'Pregnancy', bg: '#FFF1F2', text: '#E11D48' },
+];
+
 // Staggered Entrance Animation Wrapper
 const StaggeredView = ({ children, delay = 0, style }: { children: React.ReactNode; delay: number; style?: any }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -77,6 +99,8 @@ const SignUpScreen = () => {
   const [nurseId, setNurseId] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [otpLoading, setOtpLoading] = React.useState(false);
+  const [selectedSpecialty, setSelectedSpecialty] = React.useState('');
+  const [selectedDepartment, setSelectedDepartment] = React.useState('');
 
   const handleSendOtp = async () => {
     if (!email) {
@@ -156,16 +180,40 @@ const SignUpScreen = () => {
   };
 
   const handleSignUpStaff = async () => {
-    if (!name || !email || !phone || !password || !confirmPassword) {
-      alert('Please fill in all fields.');
+    if (!name.trim()) {
+      alert('Full Name is required.');
       return;
     }
-    if (role === 'doctor' && !doctorId) {
-      alert('Please enter your Doctor ID.');
+    if (!email.trim()) {
+      alert('Email is required.');
       return;
     }
-    if (role === 'nurse' && !nurseId) {
-      alert('Please enter your Nurse ID.');
+    if (!phone.trim()) {
+      alert('Phone Number is required.');
+      return;
+    }
+    if (role === 'doctor' && !selectedSpecialty) {
+      alert('Please select your medical specialty.');
+      return;
+    }
+    if (role === 'nurse' && !selectedDepartment) {
+      alert('Please select your lab category.');
+      return;
+    }
+    if (role === 'doctor' && !doctorId.trim()) {
+      alert('Doctor ID is required.');
+      return;
+    }
+    if (role === 'nurse' && !nurseId.trim()) {
+      alert('Nurse ID is required.');
+      return;
+    }
+    if (!password) {
+      alert('Password is required.');
+      return;
+    }
+    if (!confirmPassword) {
+      alert('Please confirm your password.');
       return;
     }
     if (password !== confirmPassword) {
@@ -190,7 +238,9 @@ const SignUpScreen = () => {
           phone,
           password,
           role: role,
-          staffId: role === 'doctor' ? doctorId : nurseId
+          staffId: role === 'doctor' ? doctorId : nurseId,
+          specialty: role === 'doctor' ? selectedSpecialty : undefined,
+          department: role === 'nurse' ? selectedDepartment : undefined,
         }),
       });
 
@@ -275,6 +325,96 @@ const SignUpScreen = () => {
             
             <CustomInput label="Phone Number" placeholder="Enter your phone number" keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
             
+            {/* Doctor Specialty Selector */}
+            {role === 'doctor' && (
+              <View style={styles.categorySection}>
+                <Text style={styles.categoryLabel}>Select Your Specialty <Text style={styles.requiredStar}>*</Text></Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.chipsContainer}
+                >
+                  {DOCTOR_SPECIALTIES.map((item) => (
+                    <TouchableOpacity
+                      key={item.name}
+                      style={[
+                        styles.chip,
+                        selectedSpecialty === item.name 
+                          ? { backgroundColor: item.bg, borderColor: item.text } 
+                          : { backgroundColor: '#FFFFFF', borderColor: '#E5E7EB' }
+                      ]}
+                      onPress={() => setSelectedSpecialty(item.name)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={[
+                        styles.chipText,
+                        selectedSpecialty === item.name 
+                          ? { color: item.text, fontWeight: '700' } 
+                          : { color: '#6B7280' }
+                      ]}>
+                        {item.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                {selectedSpecialty ? (
+                  (() => {
+                    const matched = DOCTOR_SPECIALTIES.find(d => d.name === selectedSpecialty);
+                    return (
+                      <View style={[styles.selectedBadge, matched ? { backgroundColor: matched.bg } : {}]}>
+                        <Text style={[styles.selectedBadgeText, matched ? { color: matched.text } : {}]}>✓ {selectedSpecialty}</Text>
+                      </View>
+                    );
+                  })()
+                ) : null}
+              </View>
+            )}
+
+            {/* Nurse Department Selector */}
+            {role === 'nurse' && (
+              <View style={styles.categorySection}>
+                <Text style={styles.categoryLabel}>Select Your Lab Category <Text style={styles.requiredStar}>*</Text></Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.chipsContainer}
+                >
+                  {NURSE_DEPARTMENTS.map((item) => (
+                    <TouchableOpacity
+                      key={item.name}
+                      style={[
+                        styles.chip,
+                        selectedDepartment === item.name 
+                          ? { backgroundColor: item.bg, borderColor: item.text } 
+                          : { backgroundColor: '#FFFFFF', borderColor: '#E5E7EB' }
+                      ]}
+                      onPress={() => setSelectedDepartment(item.name)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={[
+                        styles.chipText,
+                        selectedDepartment === item.name 
+                          ? { color: item.text, fontWeight: '700' } 
+                          : { color: '#6B7280' }
+                      ]}>
+                        {item.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                {selectedDepartment ? (
+                  (() => {
+                    const matched = NURSE_DEPARTMENTS.find(n => n.name === selectedDepartment);
+                    return (
+                      <View style={[styles.selectedBadge, matched ? { backgroundColor: matched.bg } : {}]}>
+                        <Text style={[styles.selectedBadgeText, matched ? { color: matched.text } : {}]}>✓ {selectedDepartment}</Text>
+                      </View>
+                    );
+                  })()
+                ) : null}
+              </View>
+            )}
+
             {role === 'doctor' && (
               <CustomInput label="Doctor ID" placeholder="Enter your Doctor ID" value={doctorId} onChangeText={setDoctorId} />
             )}
@@ -421,6 +561,72 @@ const styles = StyleSheet.create({
     color: COLORS.white, 
     fontSize: 12, 
     fontWeight: '600' 
+  },
+  // Category / Chip selector styles
+  categorySection: {
+    marginBottom: 16,
+    marginTop: 4,
+  },
+  categoryLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#374151',
+    marginBottom: 10,
+  },
+  requiredStar: {
+    color: '#EF4444',
+  },
+  chipsContainer: {
+    flexDirection: 'row',
+    paddingBottom: 6,
+    gap: 8,
+  },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: COLORS.primary,
+    backgroundColor: '#FAF5FF',
+  },
+  chipSelected: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  chipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.primary,
+  },
+  chipTextSelected: {
+    color: '#FFFFFF',
+  },
+  chipNurse: {
+    borderColor: '#3B82F6',
+    backgroundColor: '#EFF6FF',
+  },
+  chipNurseSelected: {
+    backgroundColor: '#3B82F6',
+    borderColor: '#3B82F6',
+  },
+  chipTextNurse: {
+    color: '#3B82F6',
+  },
+  chipTextNurseSelected: {
+    color: '#FFFFFF',
+  },
+  selectedBadge: {
+    marginTop: 8,
+    backgroundColor: '#ECFDF5',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 10,
+  },
+  selectedBadgeText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#10B981',
   },
   passwordWrapper: { position: 'relative' },
   eyeIcon: { position: 'absolute', right: 16, top: 46 },

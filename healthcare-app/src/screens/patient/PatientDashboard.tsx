@@ -10,6 +10,7 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:40
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/types';
+import { useAuth } from '../../context/AuthContext';
 
 const { width, height } = Dimensions.get('window');
 
@@ -134,9 +135,37 @@ const PatientDashboard = () => {
     }, [])
   );
 
+  const { token } = useAuth();
+  const [userName, setUserName] = useState('Sarah Johnson');
+  const [userEmail, setUserEmail] = useState('sarah.j@example.com');
   const [moreModalVisible, setMoreModalVisible] = useState(false);
   const [menuModalVisible, setMenuModalVisible] = useState(false);
   const [appointmentModalVisible, setAppointmentModalVisible] = useState(false);
+
+  const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const data = await response.json();
+        if (response.ok && data) {
+          if (data.name) setUserName(data.name);
+          if (data.email) setUserEmail(data.email);
+        }
+      } catch (err) {
+        console.error('Failed to fetch patient profile:', err);
+      }
+    };
+
+    if (token) {
+      fetchProfile();
+    }
+  }, [token]);
   const [aiCardPressed, setAiCardPressed] = useState(false);
   const [aiCardHovered, setAiCardHovered] = useState(false);
   const aiCardScale = useRef(new Animated.Value(1)).current;
@@ -339,7 +368,7 @@ const PatientDashboard = () => {
               </TouchableOpacity>
 
               <View style={styles.headerTextContainer}>
-                <Text style={styles.greeting}>Hello, {patientName} 👋</Text>
+                <Text style={styles.greeting}>Hello, {userName.split(' ')[0]} 👋</Text>
                 <Text style={styles.subGreeting}>Take care of your health</Text>
               </View>
 
@@ -689,9 +718,9 @@ const PatientDashboard = () => {
                 source={require('../../../assets/signup-image2.png')}
                 style={styles.menuAvatar}
               />
-              <Text style={styles.menuUserName}>{patientFullName}</Text>
-              <Text style={styles.menuUserEmail}>{patientEmail}</Text>
-
+              <Text style={styles.menuUserName}>{userName}</Text>
+              <Text style={styles.menuUserEmail}>{userEmail}</Text>
+              
               <View style={styles.membershipBadge}>
                 <Sparkles size={12} color="#FFD700" fill="#FFD700" />
                 <Text style={styles.membershipText}>Premium Member</Text>
