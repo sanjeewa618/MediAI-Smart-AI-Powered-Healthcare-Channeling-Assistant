@@ -83,8 +83,8 @@ const DoctorAvailability = () => {
           doctorId: item._id,
           doctorName: item.name,
           specialty: item.specialization || 'General Physician',
-          date: 'TBD',
-          time: 'TBD'
+          date: '2026-05-20',
+          time: '10:00 AM'
         })}
       >
         <LinearGradient

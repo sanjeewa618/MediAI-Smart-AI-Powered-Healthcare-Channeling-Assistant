@@ -1,11 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Platform, SafeAreaView, Dimensions, Alert, StatusBar } from 'react-native';
 import { ChevronLeft, CheckCircle2, User, Calendar, CreditCard, Download, FileText, Upload, Stethoscope, FilePlus2, Receipt } from 'lucide-react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/types';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useAuth } from '../../context/AuthContext';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
 
 const { width } = Dimensions.get('window');
 
@@ -17,12 +22,42 @@ const STEPS = ['Patient Info', 'Medical Details', 'Review & Pay', 'Receipt'];
 const BookAppointmentScreen = () => {
   const navigation = useNavigation<NavProp>();
   const route = useRoute<BookAppRouteProp>();
-  const { doctorName = 'Dr. Emma Watson', specialty = 'Cardiology', date = 'May 20, 2024', time = '10:00 AM' } = (route.params as any) || {};
+  const { doctorId, doctorName = 'Dr. Emma Watson', specialty = 'Cardiology', date = 'May 20, 2024', time = '10:00 AM' } = (route.params as any) || {};
 
   const [currentStep, setCurrentStep] = useState(0);
+  const { token } = useAuth();
 
   // Form States
   const [patientInfo, setPatientInfo] = useState({ name: '', nic: '', dob: '', gender: 'Male', mobile: '', email: '', address: '', emContact: '' });
+
+  useEffect(() => {
+    const fetchPatientData = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const user = await response.json();
+        if (response.ok && user) {
+          setPatientInfo(prev => ({
+            ...prev,
+            name: user.name || prev.name,
+            email: user.email || prev.email,
+            mobile: user.phone || prev.mobile,
+            nic: user.nic || prev.nic,
+            dob: user.dob || prev.dob,
+            gender: user.gender || prev.gender,
+          }));
+        }
+      } catch (err) {
+        console.error('Failed to fetch patient data:', err);
+      }
+    };
+    if (token) {
+      fetchPatientData();
+    }
+  }, [token]);
   const [medicalInfo, setMedicalInfo] = useState({ visitType: 'New Patient', consultation: 'Physical Visit', symptoms: '', conditions: '', medications: '', allergies: '' });
   const [paymentInfo, setPaymentInfo] = useState({ method: 'Card', insuranceProvider: '', promo: '', notes: '' });
   const [cardInfo, setCardInfo] = useState({ number: '', expiry: '', cvv: '', name: '' });
@@ -39,10 +74,65 @@ const BookAppointmentScreen = () => {
     else navigation.goBack();
   };
 
-  const handleConfirmBooking = () => {
-    // Navigate to receipt
-    setCurrentStep(3);
-    Alert.alert('Success', 'Appointment booked successfully! Notifications have been sent to your email and SMS.');
+  const handleConfirmBooking = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/appointments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          doctor: doctorId,
+          date,
+          timeSlot: time,
+          symptoms: medicalInfo.symptoms,
+          notes: medicalInfo.conditions
+        })
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setCurrentStep(3);
+        Alert.alert('Success', 'Appointment booked successfully!');
+      } else {
+        Alert.alert('Booking Failed', data.message || 'Something went wrong.');
+      }
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Error', 'Failed to connect to the server.');
+    }
+  };
+
+  const handleDownloadReceipt = async () => {
+    try {
+      const htmlContent = `
+        <html>
+          <body style="font-family: Arial, sans-serif; padding: 20px;">
+            <h1 style="color: #10B981; text-align: center;">MediAI E-Receipt</h1>
+            <p style="text-align: center; color: #6B7280;">Booking Reference: BK-9824X</p>
+            <hr />
+            <table style="width: 100%; margin-top: 20px; border-collapse: collapse;">
+              <tr><td style="padding: 10px; border-bottom: 1px solid #E5E7EB;"><strong>Patient Name:</strong></td><td style="padding: 10px; border-bottom: 1px solid #E5E7EB;">${patientInfo.name || 'John Doe'}</td></tr>
+              <tr><td style="padding: 10px; border-bottom: 1px solid #E5E7EB;"><strong>Doctor:</strong></td><td style="padding: 10px; border-bottom: 1px solid #E5E7EB;">${doctorName}</td></tr>
+              <tr><td style="padding: 10px; border-bottom: 1px solid #E5E7EB;"><strong>Date & Time:</strong></td><td style="padding: 10px; border-bottom: 1px solid #E5E7EB;">${date} | ${time}</td></tr>
+              <tr><td style="padding: 10px; border-bottom: 1px solid #E5E7EB;"><strong>Total Amount:</strong></td><td style="padding: 10px; border-bottom: 1px solid #E5E7EB; font-weight: bold;">LKR ${TOTAL_AMOUNT.toFixed(2)}</td></tr>
+            </table>
+            <p style="text-align: center; margin-top: 40px; color: #9CA3AF; font-size: 12px;">Thank you for choosing MediAI Healthcare Assistant.</p>
+          </body>
+        </html>
+      `;
+
+      const { uri } = await Print.printToFileAsync({ html: htmlContent });
+      
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri);
+      } else {
+        Alert.alert('Saved', 'Receipt saved to your documents.');
+      }
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Error', 'Failed to generate receipt.');
+    }
   };
 
   const renderStepIndicator = () => (
@@ -218,7 +308,7 @@ const BookAppointmentScreen = () => {
           <View style={styles.receiptRow}><Text style={styles.rLabel}>Amount Paid</Text><Text style={[styles.rValue, { fontWeight: '700' }]}>LKR {TOTAL_AMOUNT.toFixed(2)}</Text></View>
         </View>
 
-        <TouchableOpacity style={styles.downloadBtn}>
+        <TouchableOpacity style={styles.downloadBtn} onPress={handleDownloadReceipt}>
           <Download size={20} color="#FFF" />
           <Text style={styles.downloadText}>Download E-Receipt</Text>
         </TouchableOpacity>
