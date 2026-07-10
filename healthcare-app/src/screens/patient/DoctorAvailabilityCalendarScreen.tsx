@@ -23,11 +23,17 @@ interface Slot {
   type: string;
   consultType: string;
   notes?: string;
+  // The queue number that will be assigned to the NEXT patient who
+  // books this slot. This is the same for every slot on the same
+  // date for a given doctor (queue resets daily), but we store it on
+  // the slot for convenience in the UI.
+  nextQueueNumber?: number;
 }
 
 interface DayData {
   date: string;
   dayName: string;
+  nextQueueNumber?: number;
   slots: Slot[];
 }
 
@@ -160,8 +166,16 @@ const DoctorAvailabilityCalendarScreen = () => {
       </View>
 
       <ScrollView contentContainerStyle={styles.slotsList} showsVerticalScrollIndicator={false}>
-        <Text style={styles.sectionTitle}>Available Time Slots</Text>
-        
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>Available Time Slots</Text>
+          {selectedDayData?.nextQueueNumber ? (
+            <View style={styles.queuePill}>
+              <Text style={styles.queuePillLabel}>Next Queue</Text>
+              <Text style={styles.queuePillNumber}>#{selectedDayData.nextQueueNumber}</Text>
+            </View>
+          ) : null}
+        </View>
+
         {!loading && displaySlots.length === 0 ? (
           <View style={styles.emptyBox}>
             <Clock size={48} color={COLORS.border} />
@@ -169,33 +183,61 @@ const DoctorAvailabilityCalendarScreen = () => {
             <Text style={styles.emptySub}>Dr. {doctorName.split(' ')[1] || doctorName} is not available on this date.</Text>
           </View>
         ) : (
-          displaySlots.map(slot => (
-            <View key={slot.id} style={styles.slotCard}>
-              <View style={styles.slotInfo}>
-                <Text style={styles.slotTime}>{slot.timeSlot}</Text>
-                <View style={styles.capacityBadge}>
-                  <Users size={14} color={slot.isFull ? '#EF4444' : '#10B981'} />
-                  <Text style={[styles.capacityText, slot.isFull && { color: '#EF4444' }]}>
-                    {slot.bookedCount} / {slot.maxPatients} Booked
-                  </Text>
-                </View>
-              </View>
+          displaySlots.map(slot => {
+            // Queue number for this slot: if a date-level value exists
+            // (preferred because the queue is per-day-per-doctor), use
+            // it. Otherwise fall back to a per-slot hint. If the slot is
+            // full, show a dash so the patient knows the slot is closed.
+            const assignedQueue =
+              slot.isFull
+                ? null
+                : slot.nextQueueNumber ?? selectedDayData?.nextQueueNumber ?? null;
 
-              <TouchableOpacity 
-                style={[styles.bookBtn, slot.isFull && styles.bookBtnDisabled]}
-                disabled={slot.isFull}
-                onPress={() => navigation.navigate('BookAppointment', {
-                  doctorId,
-                  doctorName,
-                  specialty,
-                  date: selectedDate,
-                  time: slot.timeSlot
-                })}
-              >
-                <Text style={styles.bookBtnText}>{slot.isFull ? 'Full' : 'Book'}</Text>
-              </TouchableOpacity>
-            </View>
-          ))
+            return (
+              <View key={slot.id} style={styles.slotCard}>
+                <View style={styles.slotInfo}>
+                  <View style={styles.slotTopRow}>
+                    <Text style={styles.slotTime}>{slot.timeSlot}</Text>
+                    {assignedQueue !== null ? (
+                      <View style={styles.queueBadge}>
+                        <Text style={styles.queueBadgeText}>Queue #{assignedQueue}</Text>
+                      </View>
+                    ) : (
+                      <View style={[styles.queueBadge, styles.queueBadgeFull]}>
+                        <Text style={[styles.queueBadgeText, styles.queueBadgeTextFull]}>Full</Text>
+                      </View>
+                    )}
+                  </View>
+                  <View style={styles.capacityBadge}>
+                    <Users size={14} color={slot.isFull ? '#EF4444' : '#10B981'} />
+                    <Text style={[styles.capacityText, slot.isFull && { color: '#EF4444' }]}>
+                      {slot.bookedCount} / {slot.maxPatients} Booked
+                    </Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.bookBtn, slot.isFull && styles.bookBtnDisabled]}
+                  disabled={slot.isFull}
+                  onPress={() => navigation.navigate('BookAppointment', {
+                    doctorId,
+                    doctorName,
+                    specialty,
+                    date: selectedDate,
+                    time: slot.timeSlot,
+                    // Pass the queue number hint to the next screen.
+                    // The server is the source of truth and will assign
+                    // the final queue number when the appointment is
+                    // actually created (to avoid two patients seeing the
+                    // same number in a race condition).
+                    queueNumber: assignedQueue
+                  })}
+                >
+                  <Text style={styles.bookBtnText}>{slot.isFull ? 'Full' : 'Book'}</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })
         )}
       </ScrollView>
     </SafeAreaView>
@@ -243,8 +285,25 @@ const styles = StyleSheet.create({
   dayDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.primary, marginTop: 6 },
   
   slotsList: { padding: 20, paddingBottom: 40 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#1F2937', marginBottom: 16 },
-  
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16
+  },
+  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#1F2937' },
+  queuePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999
+  },
+  queuePillLabel: { color: '#E0E7FF', fontSize: 12, fontWeight: '600' },
+  queuePillNumber: { color: '#FFF', fontSize: 13, fontWeight: '800' },
+
   slotCard: {
     backgroundColor: '#FFF',
     borderRadius: 16,
@@ -255,8 +314,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...SHADOWS.small
   },
-  slotInfo: { gap: 6 },
+  slotInfo: { gap: 6, flex: 1 },
+  slotTopRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
   slotTime: { fontSize: 16, fontWeight: '700', color: '#1F2937' },
+  queueBadge: {
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999
+  },
+  queueBadgeFull: { backgroundColor: '#FEE2E2' },
+  queueBadgeText: { color: COLORS.primary, fontSize: 12, fontWeight: '700' },
+  queueBadgeTextFull: { color: '#EF4444' },
   capacityBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   capacityText: { fontSize: 13, fontWeight: '600', color: '#10B981' },
   

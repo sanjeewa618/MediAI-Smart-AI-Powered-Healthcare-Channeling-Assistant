@@ -258,7 +258,9 @@ export const getDoctorAvailabilityForPatient = async (req, res) => {
       status: { $in: ['pending', 'confirmed'] }
     });
 
-    // Group appointments by date string (YYYY-MM-DD) and timeSlot
+    // Group appointments by date string (YYYY-MM-DD) and timeSlot so we
+    // can compute the per-slot queue number. Queue numbers are per
+    // doctor, per date, per time slot, and reset daily.
     const appointmentCounts = {};
     appointments.forEach(app => {
       const dateStr = new Date(app.date).toISOString().split('T')[0];
@@ -288,6 +290,12 @@ export const getDoctorAvailabilityForPatient = async (req, res) => {
         const key = `${dateStr}_${timeSlotStr}`;
         const bookedCount = appointmentCounts[key] || 0;
         const maxPatients = s.maxPatients || 1;
+        // The next queue number for this slot = bookedCount + 1, but
+        // never more than maxPatients. When the slot is full, show
+        // maxPatients so the UI displays a sensible value.
+        const nextQueueNumber = bookedCount >= maxPatients
+          ? maxPatients
+          : bookedCount + 1;
 
         return {
           id: s._id,
@@ -299,7 +307,8 @@ export const getDoctorAvailabilityForPatient = async (req, res) => {
           isFull: bookedCount >= maxPatients,
           type: s.type,
           consultType: s.consultType,
-          notes: s.notes
+          notes: s.notes,
+          nextQueueNumber
         };
       });
 

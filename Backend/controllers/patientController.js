@@ -4,6 +4,61 @@ import Appointment from '../model/Appointment.js';
 import LabTest from '../model/LabTest.js';
 import MedicalRecord from '../model/MedicalRecord.js';
 
+// Helper: builds a live queue snapshot for a list of appointments.
+// For each appointment, the queue snapshot contains:
+//   - the patient's own queue number
+//   - the number of patients currently being served (or already finished) ahead of them
+//   - the total number of patients in the same slot on that day
+//   - the currently-being-served queue number for the doctor's slot
+//   - a derived estimated wait time in minutes
+const buildQueueSnapshots = async (appointments) => {
+  const snapshots = [];
+  for (const appt of appointments) {
+    const apptDate = new Date(appt.date);
+    const startOfDay = new Date(apptDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(apptDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    // Total active (non-cancelled) patients in the same doctor + time slot + day
+    const totalInSlot = await Appointment.countDocuments({
+      doctor: appt.doctor._id ?? appt.doctor,
+      timeSlot: appt.timeSlot,
+      date: { $gte: startOfDay, $lte: endOfDay },
+      status: { $ne: 'cancelled' }
+    });
+
+    // Find the lowest queue number that is still in 'pending' or 'confirmed'.
+    // That is the queue number currently being served (or about to be served).
+    const currentlyServing = await Appointment.findOne({
+      doctor: appt.doctor._id ?? appt.doctor,
+      timeSlot: appt.timeSlot,
+      date: { $gte: startOfDay, $lte: endOfDay },
+      status: { $in: ['pending', 'confirmed'] }
+    })
+      .sort({ queueNumber: 1 })
+      .select('queueNumber');
+
+    // How many patients are ahead of THIS patient (lower queue numbers,
+    // excluding cancelled). If currentlyServing is 5 and the patient is 7,
+    // they have 2 people ahead.
+    const ahead = Math.max(0, (appt.queueNumber || 1) - (currentlyServing?.queueNumber || 1));
+
+    // Rough estimate: 10 minutes per patient ahead (configurable heuristic).
+    const estimatedWaitMinutes = ahead * 10;
+
+    snapshots.push({
+      appointmentId: appt._id,
+      queueNumber: appt.queueNumber || 1,
+      totalInSlot,
+      patientsAhead: ahead,
+      currentlyServing: currentlyServing?.queueNumber || 1,
+      estimatedWaitMinutes
+    });
+  }
+  return snapshots;
+};
+
 // @desc    Get patient dashboard summary (Upcoming appointments & lab tests)
 // @route   GET /api/patient/dashboard
 // @access  Private (Patient only)
@@ -19,7 +74,7 @@ export const getDashboardData = async (req, res) => {
       status: { $in: ['pending', 'confirmed'] }
     })
       .populate('doctor', 'name specialization hospital')
-      .sort({ date: 1 })
+      .sort({ date: 1, timeSlot: 1 })
       .limit(5);
 
     // 2. Fetch upcoming lab tests
@@ -31,12 +86,41 @@ export const getDashboardData = async (req, res) => {
       .sort({ date: 1 })
       .limit(5);
 
+    // 3. Build live queue snapshots for the upcoming doctor appointments.
+    const liveQueue = await buildQueueSnapshots(doctorAppointments);
+
     res.json({
       success: true,
       data: {
         doctorAppointments,
         labAppointments,
+        liveQueue
       }
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+// @desc    Get live queue status for a specific appointment
+// @route   GET /api/patient/queue/:appointmentId
+// @access  Private (Patient only)
+export const getLiveQueueStatus = async (req, res) => {
+  try {
+    const appointment = await Appointment.findOne({
+      _id: req.params.appointmentId,
+      patient: req.user._id
+    });
+
+    if (!appointment) {
+      return res.status(404).json({ message: 'Appointment not found' });
+    }
+
+    const [snapshot] = await buildQueueSnapshots([appointment]);
+
+    res.json({
+      success: true,
+      data: snapshot
     });
   } catch (error) {
     res.status(500).json({ message: 'Server Error', error: error.message });
