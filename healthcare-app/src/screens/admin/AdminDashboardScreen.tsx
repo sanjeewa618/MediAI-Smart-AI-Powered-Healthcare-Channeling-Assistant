@@ -13,7 +13,9 @@ import {
   Animated,
   PanResponder,
   Pressable,
-  BackHandler
+  BackHandler,
+  ActivityIndicator,
+  RefreshControl
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -43,22 +45,100 @@ import {
   FlaskConical
 } from 'lucide-react-native';
 import AdminBottomNavBar from '../../components/AdminBottomNavBar';
+import { useAuth } from '../../context/AuthContext';
 
 const { width, height } = Dimensions.get('window');
 
-// Mock data representing a single hospital state
-const STATS = {
-  totalUsers: 1380,
-  totalPatients: 1250,
-  totalDoctors: 45,
-  totalNurses: 85,
-  todaysAppointments: 120,
-  activeAIRequests: 14,
-  pendingVerifications: 3
-};
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
 
 const AdminDashboardScreen = () => {
+  const { token } = useAuth();
+
+  // Live stats state
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    totalPatients: 0,
+    totalDoctors: 0,
+    totalNurses: 0,
+    totalAppointments: 0,
+    pendingVerifications: 0,
+  });
+  const [loadingStats, setLoadingStats] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Admin user info from /api/auth/me
+  const [adminUser, setAdminUser] = useState({ name: 'Hospital Admin', email: '' });
+
   const navigation = useNavigation<any>();
+
+  // ── Data fetching ────────────────────────────────────────────────────────────
+  const fetchStats = useCallback(async () => {
+    try {
+      const [statsRes, requestsRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/admin/stats`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch(`${API_BASE_URL}/api/admin/requests`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ]);
+
+      const statsData = await statsRes.json();
+      const requestsData = await requestsRes.json();
+
+      if (statsRes.ok && statsData.success) {
+        setStats(prev => ({
+          ...prev,
+          totalUsers: statsData.data.users ?? 0,
+          totalPatients: statsData.data.patients ?? 0,
+          totalDoctors: statsData.data.doctors ?? 0,
+          totalNurses: statsData.data.nurses ?? 0,
+          totalAppointments: statsData.data.appointments ?? 0,
+        }));
+      }
+
+      if (requestsRes.ok && requestsData.success) {
+        setStats(prev => ({ ...prev, pendingVerifications: requestsData.count ?? 0 }));
+      }
+    } catch (err) {
+      console.warn('AdminDashboard: failed to fetch stats', err);
+    } finally {
+      setLoadingStats(false);
+      setRefreshing(false);
+    }
+  }, [token]);
+
+  const fetchAdminUser = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setAdminUser({ name: data.data.name ?? 'Hospital Admin', email: data.data.email ?? '' });
+      }
+    } catch (err) {
+      console.warn('AdminDashboard: failed to fetch user info', err);
+    }
+  }, [token]);
+
+  // Initial load
+  useEffect(() => {
+    fetchStats();
+    fetchAdminUser();
+  }, [fetchStats, fetchAdminUser]);
+
+  // Re-fetch stats every time screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchStats();
+    }, [fetchStats])
+  );
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchStats();
+  }, [fetchStats]);
   const isLoggingOut = useRef(false);
 
   useEffect(() => {
@@ -201,8 +281,8 @@ const AdminDashboardScreen = () => {
                 source={{ uri: 'https://img.icons8.com/bubbles/100/000000/administrator-male.png' }} 
                 style={styles.menuAvatar} 
               />
-              <Text style={styles.menuUserName}>City Hospital Admin</Text>
-              <Text style={styles.menuUserEmail}>admin@cityhospital.lk</Text>
+              <Text style={styles.menuUserName}>{adminUser.name}</Text>
+              <Text style={styles.menuUserEmail}>{adminUser.email || 'admin@hospital.lk'}</Text>
               
               <View style={styles.membershipBadge}>
                 <Sparkles size={12} color="#FFD700" fill="#FFD700" />
@@ -302,9 +382,18 @@ const AdminDashboardScreen = () => {
               <Text style={styles.headerSubtitle}>Super Admin Dashboard</Text>
             </View>
             <View style={styles.headerActions}>
-              <TouchableOpacity style={styles.headerActionBtn}>
+              <TouchableOpacity
+                style={styles.headerActionBtn}
+                onPress={() => navigation.navigate('AdminRequests')}
+              >
                 <Bell size={20} color="#FFF" />
-                <View style={styles.bellBadge} />
+                {stats.pendingVerifications > 0 && (
+                  <View style={styles.bellBadge}>
+                    <Text style={styles.bellBadgeText}>
+                      {stats.pendingVerifications > 9 ? '9+' : stats.pendingVerifications}
+                    </Text>
+                  </View>
+                )}
               </TouchableOpacity>
               <TouchableOpacity 
                 style={[styles.headerActionBtn, { marginLeft: 10 }]} 
@@ -322,7 +411,19 @@ const AdminDashboardScreen = () => {
           </View>
         </LinearGradient>
 
-        <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContentContainer}>
+        <ScrollView
+          style={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContentContainer}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[COLORS.primary]}
+              tintColor={COLORS.primary}
+            />
+          }
+        >
           {/* Welcome Card */}
           <View style={[styles.welcomeCard, SHADOWS.medium]}>
             <View style={styles.welcomeInfo}>
@@ -336,12 +437,18 @@ const AdminDashboardScreen = () => {
 
           {/* Stats Overview */}
           <Text style={styles.sectionHeading}>Hospital Stats</Text>
+          {loadingStats ? (
+            <View style={styles.statsLoadingContainer}>
+              <ActivityIndicator size="large" color={COLORS.primary} />
+              <Text style={styles.statsLoadingText}>Fetching live stats...</Text>
+            </View>
+          ) : (
           <View style={styles.statsGrid}>
             <View style={[styles.statCard, SHADOWS.light]}>
               <View style={[styles.iconWrap, { backgroundColor: '#F3E8FF' }]}>
                 <Users size={22} color={COLORS.primary} />
               </View>
-              <Text style={styles.statVal}>{STATS.totalUsers}</Text>
+              <Text style={styles.statVal}>{stats.totalUsers}</Text>
               <Text style={styles.statLabel}>Total Users</Text>
             </View>
 
@@ -349,7 +456,7 @@ const AdminDashboardScreen = () => {
               <View style={[styles.iconWrap, { backgroundColor: '#EFF6FF' }]}>
                 <Users size={22} color="#3B82F6" />
               </View>
-              <Text style={styles.statVal}>{STATS.totalPatients}</Text>
+              <Text style={styles.statVal}>{stats.totalPatients}</Text>
               <Text style={styles.statLabel}>Patients</Text>
             </View>
 
@@ -357,7 +464,7 @@ const AdminDashboardScreen = () => {
               <View style={[styles.iconWrap, { backgroundColor: '#ECFDF5' }]}>
                 <Stethoscope size={22} color="#10B981" />
               </View>
-              <Text style={styles.statVal}>{STATS.totalDoctors}</Text>
+              <Text style={styles.statVal}>{stats.totalDoctors}</Text>
               <Text style={styles.statLabel}>Doctors</Text>
             </View>
 
@@ -365,7 +472,7 @@ const AdminDashboardScreen = () => {
               <View style={[styles.iconWrap, { backgroundColor: '#FFFBEB' }]}>
                 <BriefcaseMedical size={22} color="#F59E0B" />
               </View>
-              <Text style={styles.statVal}>{STATS.totalNurses}</Text>
+              <Text style={styles.statVal}>{stats.totalNurses}</Text>
               <Text style={styles.statLabel}>Nurses</Text>
             </View>
 
@@ -373,16 +480,16 @@ const AdminDashboardScreen = () => {
               <View style={[styles.iconWrap, { backgroundColor: '#FEE2E2' }]}>
                 <Calendar size={22} color="#EF4444" />
               </View>
-              <Text style={styles.statVal}>{STATS.todaysAppointments}</Text>
-              <Text style={styles.statLabel}>Today's Appointments</Text>
+              <Text style={styles.statVal}>{stats.totalAppointments}</Text>
+              <Text style={styles.statLabel}>Total Appointments</Text>
             </View>
 
             <View style={[styles.statCard, SHADOWS.light]}>
               <View style={[styles.iconWrap, { backgroundColor: '#EEF2FF' }]}>
                 <Brain size={22} color="#6366F1" />
               </View>
-              <Text style={styles.statVal}>{STATS.activeAIRequests}</Text>
-              <Text style={styles.statLabel}>Active AI Req.</Text>
+              <Text style={styles.statVal}>{stats.pendingVerifications > 0 ? stats.pendingVerifications : '—'}</Text>
+              <Text style={styles.statLabel}>Pending Requests</Text>
             </View>
 
             <View style={[styles.statCard, SHADOWS.light, { width: '100%' }]}>
@@ -391,7 +498,7 @@ const AdminDashboardScreen = () => {
                   <CheckSquare size={22} color="#D97706" />
                 </View>
                 <View>
-                  <Text style={styles.statVal}>{STATS.pendingVerifications}</Text>
+                  <Text style={styles.statVal}>{stats.pendingVerifications}</Text>
                   <Text style={styles.statLabel}>Pending Doctor Verifications</Text>
                 </View>
                 <TouchableOpacity 
@@ -404,6 +511,7 @@ const AdminDashboardScreen = () => {
               </View>
             </View>
           </View>
+          )}
 
           {/* Quick Actions */}
           <Text style={styles.sectionHeading}>Quick Actions</Text>
@@ -515,14 +623,38 @@ const styles = StyleSheet.create({
   },
   bellBadge: {
     position: 'absolute',
-    top: 12,
-    right: 12,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    top: 6,
+    right: 6,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
     backgroundColor: '#EF4444',
     borderWidth: 1.5,
     borderColor: '#7B2FF7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  bellBadgeText: {
+    color: '#FFF',
+    fontSize: 9,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  statsLoadingContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#EEEBFF',
+  },
+  statsLoadingText: {
+    marginTop: 10,
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    fontWeight: '600',
   },
   scrollContent: {
     flex: 1,
