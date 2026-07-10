@@ -1,5 +1,5 @@
 import express from 'express';
-import { getSystemStats, getAllUsers, updateUserRole, deleteUser, getPendingRequests, approveRequest, rejectRequest, requestAdditionalDocuments, addUser, updateUserDetails, updateUserStatus } from '../controllers/adminController.js';
+import { getSystemStats, getAllUsers, updateUserRole, deleteUser, getPendingRequests, approveRequest, rejectRequest, requestAdditionalDocuments, addUser, updateUserDetails, updateUserStatus, getAdminReport, exportAdminReport } from '../controllers/adminController.js';
 import { protect } from '../middlewares/authMiddleware.js';
 import { adminOnly } from '../middlewares/roleMiddleware.js';
 
@@ -11,6 +11,8 @@ router.use(adminOnly);
 
 // System Dashboard Stats
 router.get('/stats', getSystemStats);
+router.get('/reports', getAdminReport);
+router.get('/reports/export', exportAdminReport);
 
 // User Management
 router.get('/users', getAllUsers);
