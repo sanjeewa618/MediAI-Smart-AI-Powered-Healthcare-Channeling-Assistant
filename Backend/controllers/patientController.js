@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import User from '../model/User.js';
 import Appointment from '../model/Appointment.js';
 import LabTest from '../model/LabTest.js';
+import MedicalRecord from '../model/MedicalRecord.js';
 
 // @desc    Get patient dashboard summary (Upcoming appointments & lab tests)
 // @route   GET /api/patient/dashboard
@@ -47,24 +48,25 @@ export const updateProfile = async (req, res) => {
     const user = await User.findById(req.user._id);
 
     if (user) {
-      // Update fields if they were provided in the request body
       user.name = req.body.name || user.name;
       user.phone = req.body.phone || user.phone;
-      if (req.body.nic !== undefined) user.nic = req.body.nic;
-      if (req.body.dob !== undefined) user.dob = req.body.dob;
-      if (req.body.gender !== undefined) user.gender = req.body.gender;
-      if (req.body.address !== undefined) user.address = req.body.address;
-      if (req.body.bloodGroup !== undefined) user.bloodGroup = req.body.bloodGroup;
-      if (req.body.height !== undefined) user.height = req.body.height;
-      if (req.body.weight !== undefined) user.weight = req.body.weight;
-      if (req.body.bmi !== undefined) user.bmi = req.body.bmi;
-      if (req.body.allergies !== undefined) user.allergies = req.body.allergies;
-      if (req.body.chronicConditions !== undefined) user.chronicConditions = req.body.chronicConditions;
-      if (req.body.emergencyContacts !== undefined) user.emergencyContacts = req.body.emergencyContacts;
-      if (req.body.insurance !== undefined) user.insurance = req.body.insurance;
-
-      if (req.body.password) {
-        user.password = req.body.password;
+      user.dob = req.body.dob || user.dob;
+      user.gender = req.body.gender || user.gender;
+      user.address = req.body.address || user.address;
+      user.bloodGroup = req.body.bloodGroup || user.bloodGroup;
+      user.height = req.body.height || user.height;
+      user.weight = req.body.weight || user.weight;
+      user.bmi = req.body.bmi || user.bmi;
+      
+      // Since allergies and chronicConditions are arrays of strings, we can just replace them
+      if (req.body.allergies) {
+        user.allergies = req.body.allergies;
+      }
+      if (req.body.chronicConditions) {
+        user.chronicConditions = req.body.chronicConditions;
+      }
+      if (req.body.emergencyContacts) {
+        user.emergencyContacts = req.body.emergencyContacts;
       }
 
       const updatedUser = await user.save();
@@ -76,7 +78,16 @@ export const updateProfile = async (req, res) => {
           name: updatedUser.name,
           email: updatedUser.email,
           phone: updatedUser.phone,
-          role: updatedUser.role,
+          dob: updatedUser.dob,
+          gender: updatedUser.gender,
+          address: updatedUser.address,
+          bloodGroup: updatedUser.bloodGroup,
+          height: updatedUser.height,
+          weight: updatedUser.weight,
+          bmi: updatedUser.bmi,
+          allergies: updatedUser.allergies,
+          chronicConditions: updatedUser.chronicConditions,
+          emergencyContacts: updatedUser.emergencyContacts
         }
       });
     } else {
@@ -87,23 +98,35 @@ export const updateProfile = async (req, res) => {
   }
 };
 
-// @desc    Upload Insurance Document
+// @desc    Upload patient insurance document
 // @route   POST /api/patient/upload-insurance
 // @access  Private (Patient only)
 export const uploadInsuranceDocument = async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ message: 'No file uploaded' });
+      return res.status(400).json({ message: 'Please upload a file' });
     }
 
-    // req.file contains the uploaded file info from multer
-    // We return the relative static path, e.g., '/uploads/filename.ext'
-    const fileUrl = `/uploads/${req.file.filename}`;
-    
-    res.json({
+    // URL to access the uploaded file
+    const documentUrl = `/uploads/${req.file.filename}`;
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.insurance = {
+      ...user.insurance,
+      documentUrl: documentUrl
+    };
+
+    await user.save();
+
+    res.status(200).json({
       success: true,
+      message: 'Insurance document uploaded successfully',
       data: {
-        documentUrl: fileUrl
+        documentUrl: documentUrl
       }
     });
   } catch (error) {
@@ -131,3 +154,51 @@ export const getPatientStats = async (req, res) => {
   }
 };
 
+// @desc    Get patient reports
+// @route   GET /api/patient/reports
+// @access  Private (Patient only)
+export const getPatientReports = async (req, res) => {
+  try {
+    const reports = await MedicalRecord.find({ patient: req.user._id }).sort({ recordDate: -1 });
+    res.json({ success: true, data: reports });
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error fetching reports', error: error.message });
+  }
+};
+
+// @desc    Upload a patient report
+// @route   POST /api/patient/reports/upload
+// @access  Private (Patient only)
+export const uploadPatientReport = async (req, res) => {
+  try {
+    const { title, category, recordDate } = req.body;
+    
+    if (!title || !category) {
+      return res.status(400).json({ message: 'Title and category are required' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: 'Please upload a file' });
+    }
+
+    const documentUrl = `/uploads/${req.file.filename}`;
+
+    const newRecord = new MedicalRecord({
+      patient: req.user._id,
+      title,
+      category,
+      recordDate: recordDate ? new Date(recordDate) : Date.now(),
+      attachments: [documentUrl]
+    });
+
+    await newRecord.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Report uploaded successfully',
+      data: newRecord
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error uploading report', error: error.message });
+  }
+};

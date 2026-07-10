@@ -57,14 +57,16 @@ const styles = StyleSheet.create({
     borderTopColor: '#F3F4F6',
   },
   item: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center'
   },
   label: {
-    fontSize: 10,
+    fontSize: 9,
     color: '#9CA3AF',
     marginTop: 4,
-    fontWeight: '600'
+    fontWeight: '600',
+    textAlign: 'center'
   }
 });
 
