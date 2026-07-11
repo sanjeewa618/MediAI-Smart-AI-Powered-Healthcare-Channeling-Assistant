@@ -17,6 +17,7 @@ import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/types';
 import { useAuth } from '../../context/AuthContext';
+import moment from 'moment';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
 
@@ -196,6 +197,8 @@ const LabAvailabilityScreen = () => {
   const { token } = useAuth();
   const [dbNurses, setDbNurses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dbSlots, setDbSlots] = useState<any[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
 
   useEffect(() => {
     const fetchNurses = async () => {
@@ -215,6 +218,34 @@ const LabAvailabilityScreen = () => {
     };
     if (token) fetchNurses();
   }, [token]);
+
+  useEffect(() => {
+    const fetchDbSlots = async () => {
+      if (!selectedLabForAvailability) return;
+      setSlotsLoading(true);
+      try {
+        const fullDateStr = moment().date(parseInt(selectedDate, 10)).format('YYYY-MM-DD');
+        const res = await fetch(`${API_BASE_URL}/api/labs/${selectedLabForAvailability.id}/schedule?date=${fullDateStr}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          setDbSlots(data.data || []);
+        } else {
+          setDbSlots([]);
+        }
+      } catch (err) {
+        console.error(err);
+        setDbSlots([]);
+      } finally {
+        setSlotsLoading(false);
+      }
+    };
+
+    if (token && selectedLabForAvailability) {
+      fetchDbSlots();
+    }
+  }, [selectedLabForAvailability, selectedDate, token]);
 
   const selectedCategoryName = labCategories.find(c => c.id === selectedCategory)?.name || '';
 
@@ -244,7 +275,16 @@ const LabAvailabilityScreen = () => {
       image: nurse.profileImage || 'https://img.freepik.com/free-photo/lab-technician-holding-blood-tube_23-2148166567.jpg'
     }));
 
-  const currentTimeSlots = timeSlotsData[selectedDate] || timeSlotsData['default'];
+  const displaySlots = dbSlots.length > 0
+    ? dbSlots.map(s => {
+        const isFull = s.booked >= s.maxPatients;
+        return {
+          time: s.startTime,
+          status: isFull ? 'Busy' : 'Available',
+          rawSlot: s
+        };
+      })
+    : (timeSlotsData[selectedDate] || timeSlotsData['default']);
 
   const openAvailability = (lab: any) => {
     setSelectedLabForAvailability(lab);
@@ -487,7 +527,7 @@ const LabAvailabilityScreen = () => {
               <View style={styles.modalSection}>
                 <Text style={styles.sectionLabel}>Available Slots for {selectedDate} May</Text>
                 <View style={styles.timeGrid}>
-                  {currentTimeSlots.map((slot: any, i: number) => (
+                  {displaySlots.map((slot: any, i: number) => (
                     <TouchableOpacity 
                       key={i} 
                       style={[
@@ -548,11 +588,13 @@ const LabAvailabilityScreen = () => {
               <TouchableOpacity 
                 style={styles.confirmBookingBtn}
                 onPress={() => {
+                  const selectedSlotObj = displaySlots.find((s: any) => s.time === selectedTimeSlot)?.rawSlot;
                   setIsModalVisible(false);
                   navigation.navigate('LabBookingFlow', { 
                     lab: selectedLabForAvailability,
                     initialDate: selectedDate,
-                    initialTime: selectedTimeSlot
+                    initialTime: selectedTimeSlot,
+                    scheduleSlotId: selectedSlotObj ? selectedSlotObj._id : undefined
                   });
                 }}
               >

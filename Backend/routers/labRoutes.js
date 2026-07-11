@@ -3,7 +3,7 @@ import {
   getCategories, getLabs, getLabById, getLabAvailability,
   createBooking, getBookingByRef, listBookings, updateBookingStatus,
   getDashboardStats, updateLabStatus, getSchedule, createScheduleSlot, updateScheduleSlot,
-  deleteScheduleSlot, listReports, createReport, updateReport,
+  deleteScheduleSlot, listReports, createReport, updateReport, sendBookingReminder
 } from '../controllers/labController.js';
 
 import { protect } from '../middlewares/authMiddleware.js';
@@ -21,6 +21,7 @@ router.get('/bookings', authorizeRoles('nurse', 'lab', 'admin'), listBookings);
 router.post('/bookings', authorizeRoles('patient'), createBooking);
 router.get('/bookings/:bookingRef', authorizeRoles('patient', 'nurse', 'lab', 'admin'), getBookingByRef);
 router.patch('/bookings/:id/status', authorizeRoles('nurse', 'lab', 'admin'), updateBookingStatus);
+router.post('/bookings/:id/remind', authorizeRoles('nurse', 'lab', 'admin'), sendBookingReminder);
 router.patch('/:id/status', authorizeRoles('nurse', 'lab', 'admin'), updateLabStatus);
 router.get('/reports', authorizeRoles('nurse', 'lab', 'admin'), listReports);
 router.post('/reports', authorizeRoles('nurse', 'lab', 'admin'), createReport);

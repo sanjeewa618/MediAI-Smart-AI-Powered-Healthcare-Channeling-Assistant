@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, ScrollView,
   TouchableOpacity, Image, Platform, Switch,
-  Dimensions, Modal, TextInput, FlatList
+  Dimensions, Modal, TextInput, FlatList, Alert
 } from 'react-native';
 import { 
   ChevronLeft, Bell, Calendar as CalendarIcon, 
@@ -12,11 +12,14 @@ import {
   AlertTriangle, Filter, Settings, FlaskConical,
   Microscope, Droplets, Heart, Baby, Dna, Sparkles, X, MapPin
 } from 'lucide-react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { COLORS, SHADOWS, SIZES } from '../../theme/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import NurseBottomNavBar from '../../components/NurseBottomNavBar';
+import { useAuth } from '../../context/AuthContext';
 import moment from 'moment';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
 
 const { width } = Dimensions.get('window');
 
@@ -65,12 +68,16 @@ const TIMELINE = [
 ];
 
 const LabSchedulingScreen: React.FC = () => {
+  const { token } = useAuth();
   const navigation = useNavigation<any>();
-  const [selectedLab, setSelectedLab] = useState('1');
-  const [selectedDate, setSelectedDate] = useState(24);
-  const [currentMonthYear, setCurrentMonthYear] = useState('October 2023');
+  const [userName, setUserName] = useState('');
+  const [department, setDepartment] = useState('');
+  const [myLabId, setMyLabId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [slots, setSlots] = useState<any[]>([]);
+  const [selectedDate, setSelectedDate] = useState(moment().format('YYYY-MM-DD'));
+  const [currentMonthYear, setCurrentMonthYear] = useState(moment().format('MMMM YYYY'));
   const [showCalendarModal, setShowCalendarModal] = useState(false);
-  const [slots, setSlots] = useState(SCHEDULE_SLOTS);
   const [showAddModal, setShowAddModal] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
   const [editingSlot, setEditingSlot] = useState<any>(null);
@@ -84,45 +91,185 @@ const LabSchedulingScreen: React.FC = () => {
     nurse: ''
   });
 
+  const fetchProfileAndLab = async () => {
+    try {
+      const profRes = await fetch(`${API_BASE_URL}/api/auth/me`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const profData = await profRes.json();
+      if (profRes.ok && profData.success) {
+        const user = profData.data;
+        setUserName(user.name);
+        setDepartment(user.department || 'Blood Test');
+
+        const labsRes = await fetch(`${API_BASE_URL}/api/labs?limit=100`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const labsData = await labsRes.json();
+        if (labsRes.ok && labsData.success) {
+          const list = labsData.data || [];
+          let foundLab = list.find((l: any) => l.assignedNurse?._id === user._id);
+          if (!foundLab) {
+            foundLab = list.find((l: any) => l.name?.toLowerCase() === user.department?.toLowerCase());
+          }
+          if (foundLab) {
+            setMyLabId(foundLab._id);
+            fetchSchedule(foundLab._id, selectedDate);
+          } else {
+            setMyLabId(user._id);
+            fetchSchedule(user._id, selectedDate);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch profile and lab:', err);
+    }
+  };
+
+  const fetchSchedule = async (labId: string, date: string) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/labs/${labId}/schedule?date=${date}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSlots(data.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch schedule slots:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (token) {
+      fetchProfileAndLab();
+    }
+  }, [token]);
+
+  useEffect(() => {
+    if (myLabId) {
+      fetchSchedule(myLabId, selectedDate);
+      setCurrentMonthYear(moment(selectedDate).format('MMMM YYYY'));
+    }
+  }, [selectedDate, myLabId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (myLabId) {
+        fetchSchedule(myLabId, selectedDate);
+      }
+    }, [myLabId, selectedDate])
+  );
+
   const handleEdit = (slot: any) => {
     setEditingSlot(slot);
     setFormData({
-      type: slot.type,
-      startTime: slot.time.split(' - ')[0],
-      endTime: slot.time.split(' - ')[1],
+      type: slot.type || department,
+      startTime: slot.startTime,
+      endTime: slot.endTime,
       capacity: slot.maxPatients.toString(),
-      nurse: slot.nurse
+      nurse: slot.nurse || userName
     });
     setShowAddModal(true);
   };
 
-  const handleDelete = (id: string) => {
-    setSlots(slots.filter(s => s.id !== id));
+  const handleDelete = async (slotId: string) => {
+    Alert.alert(
+      'Delete Slot',
+      'Are you sure you want to delete this schedule slot?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const res = await fetch(`${API_BASE_URL}/api/labs/schedule/${slotId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+              });
+              const data = await res.json();
+              if (res.ok) {
+                Alert.alert('Success', 'Slot deleted successfully');
+                if (myLabId) fetchSchedule(myLabId, selectedDate);
+              } else {
+                Alert.alert('Error', data.message || 'Failed to delete slot');
+              }
+            } catch (err) {
+              console.error(err);
+              Alert.alert('Error', 'Could not delete slot');
+            }
+          }
+        }
+      ]
+    );
   };
 
-  const saveSlot = () => {
-    if (editingSlot) {
-      setSlots(slots.map(s => s.id === editingSlot.id ? {
-        ...s,
-        time: `${formData.startTime} - ${formData.endTime}`,
-        type: formData.type,
-        maxPatients: parseInt(formData.capacity),
-        nurse: formData.nurse
-      } : s));
-    } else {
-      const newSlot = {
-        id: Math.random().toString(36).substr(2, 9),
-        time: `${formData.startTime} - ${formData.endTime}`,
-        maxPatients: parseInt(formData.capacity),
-        booked: 0,
-        nurse: formData.nurse,
-        status: 'Active',
-        room: 'Room 01',
-        type: formData.type
-      };
-      setSlots([...slots, newSlot]);
+  const saveSlot = async () => {
+    if (!formData.startTime || !formData.endTime || !formData.capacity) {
+      Alert.alert('Validation Error', 'Please fill all required fields');
+      return;
     }
-    closeModal();
+
+    try {
+      if (editingSlot) {
+        const res = await fetch(`${API_BASE_URL}/api/labs/schedule/${editingSlot._id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            startTime: formData.startTime,
+            endTime: formData.endTime,
+            maxPatients: parseInt(formData.capacity, 10),
+            nurse: formData.nurse || userName
+          })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          Alert.alert('Success', 'Slot updated successfully');
+          if (myLabId) fetchSchedule(myLabId, selectedDate);
+          closeModal();
+        } else {
+          Alert.alert('Error', data.message || 'Failed to update slot');
+        }
+      } else {
+        if (!myLabId) return;
+        const res = await fetch(`${API_BASE_URL}/api/labs/${myLabId}/schedule`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            date: selectedDate,
+            startTime: formData.startTime,
+            endTime: formData.endTime,
+            maxPatients: parseInt(formData.capacity, 10),
+            nurse: userName,
+            room: 'Room 01',
+            type: department
+          })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          Alert.alert('Success', 'Slot added successfully');
+          if (myLabId) fetchSchedule(myLabId, selectedDate);
+          closeModal();
+        } else {
+          Alert.alert('Error', data.message || 'Failed to add slot');
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Error', 'Could not save slot details');
+    }
   };
 
   const closeModal = () => {
@@ -131,38 +278,14 @@ const LabSchedulingScreen: React.FC = () => {
     setFormData({ type: '', startTime: '', endTime: '', capacity: '', nurse: '' });
   };
 
-  const renderLabTypeItem = ({ item }: { item: any }) => {
-    const isSelected = selectedLab === item.id;
-    return (
-      <TouchableOpacity 
-        style={[
-          styles.labTypeCard, 
-          isSelected ? styles.labTypeSelected : styles.labTypeUnselected,
-          greyShadow
-        ]}
-        onPress={() => setSelectedLab(item.id)}
-      >
-        <View style={[styles.labIconCircle, { backgroundColor: item.color }]}>
-          <item.icon size={20} color={item.iconColor} />
-        </View>
-        <Text style={styles.labTypeName}>{item.name}</Text>
-        <View style={styles.labStatsMini}>
-          <Text style={styles.labStatText}>{item.bookings} Booked</Text>
-          <Text style={styles.labStatText}>{item.slots} Available</Text>
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
-  const DAYS = [
-    { day: 'Mon', date: 21, status: 'available' },
-    { day: 'Tue', date: 22, status: 'limited' },
-    { day: 'Wed', date: 23, status: 'full' },
-    { day: 'Thu', date: 24, status: 'available' },
-    { day: 'Fri', date: 25, status: 'available' },
-    { day: 'Sat', date: 26, status: 'limited' },
-    { day: 'Sun', date: 27, status: 'available' },
-  ];
+  const DAYS = Array.from({ length: 7 }, (_, i) => {
+    const d = moment().add(i, 'days');
+    return {
+      day: d.format('ddd'),
+      dateStr: d.format('YYYY-MM-DD'),
+      dateNum: d.date(),
+    };
+  });
 
   return (
     <SafeAreaView style={styles.container}>
@@ -209,10 +332,10 @@ const LabSchedulingScreen: React.FC = () => {
         {/* Quick Stats */}
         <View style={styles.statsRow}>
           { [
-            { label: 'Total Slots', value: '48', icon: CalendarIcon, color: COLORS.primary },
-            { label: 'Available', value: '12', icon: CheckCircle, color: COLORS.success },
-            { label: 'Fully Booked', value: '05', icon: AlertTriangle, color: COLORS.error },
-            { label: 'Nurses', value: '08', icon: Users, color: '#6366F1' },
+            { label: 'Total Slots', value: slots.length.toString().padStart(2, '0'), icon: CalendarIcon, color: COLORS.primary },
+            { label: 'Available', value: slots.filter(s => s.booked < s.maxPatients).length.toString().padStart(2, '0'), icon: CheckCircle, color: COLORS.success },
+            { label: 'Fully Booked', value: slots.filter(s => s.booked >= s.maxPatients).length.toString().padStart(2, '0'), icon: AlertTriangle, color: COLORS.error },
+            { label: 'Assigned', value: '01', icon: Users, color: '#6366F1' },
           ].map((stat, idx) => (
             <View key={idx} style={[styles.statCard, greyShadow]}>
               <View style={[styles.statIconBox, { backgroundColor: stat.color + '1A' }]}>
@@ -225,23 +348,6 @@ const LabSchedulingScreen: React.FC = () => {
             </View>
           ))}
         </View>
-
-        {/* Lab Type Selector */}
-        <View style={styles.sectionHeader}>
-          <View>
-            <Text style={styles.sectionTitle}>Lab Categories</Text>
-            <Text style={styles.sectionSub}>Manage schedules by lab type</Text>
-          </View>
-          <TouchableOpacity><Text style={styles.viewAllText}>Manage All</Text></TouchableOpacity>
-        </View>
-        <FlatList
-          data={LAB_TYPES}
-          renderItem={renderLabTypeItem}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.labTypeList}
-          keyExtractor={(item) => item.id}
-        />
 
         {/* Calendar / Date Picker Area */}
         <View style={styles.calendarSection}>
@@ -260,16 +366,16 @@ const LabSchedulingScreen: React.FC = () => {
                 key={idx} 
                 style={[
                   styles.dateCard, 
-                  selectedDate === d.date && styles.dateCardActive,
+                  selectedDate === d.dateStr && styles.dateCardActive,
                   greyShadow
                 ]}
-                onPress={() => setSelectedDate(d.date)}
+                onPress={() => setSelectedDate(d.dateStr)}
               >
-                <Text style={[styles.dayText, selectedDate === d.date && styles.whiteText]}>{d.day}</Text>
-                <Text style={[styles.dateText, selectedDate === d.date && styles.whiteText]}>{d.date}</Text>
+                <Text style={[styles.dayText, selectedDate === d.dateStr && styles.whiteText]}>{d.day}</Text>
+                <Text style={[styles.dateText, selectedDate === d.dateStr && styles.whiteText]}>{d.dateNum}</Text>
                 <View style={[
                   styles.statusDot, 
-                  { backgroundColor: d.status === 'available' ? COLORS.success : d.status === 'limited' ? COLORS.warning : COLORS.error }
+                  { backgroundColor: COLORS.success }
                 ]} />
               </TouchableOpacity>
             ))}
@@ -284,59 +390,67 @@ const LabSchedulingScreen: React.FC = () => {
           </View>
         </View>
         
-        {slots.map((slot) => (
-          <View key={slot.id} style={[styles.slotCard, greyShadow]}>
-            <View style={styles.slotHeader}>
-              <View style={styles.slotInfoMain}>
-                <View style={styles.timeIconBox}>
-                  <Clock size={18} color={COLORS.primary} />
-                </View>
-                <View>
-                  <Text style={styles.slotTime}>{slot.time}</Text>
-                  <Text style={styles.slotSubText}>{slot.type} • {slot.room}</Text>
-                </View>
-              </View>
-              <View style={[styles.statusPill, { backgroundColor: slot.status === 'Full' ? COLORS.error + '15' : COLORS.success + '15' }]}>
-                <Text style={[styles.statusPillText, { color: slot.status === 'Full' ? COLORS.error : COLORS.success }]}>{slot.status}</Text>
-              </View>
-            </View>
-            
-            <View style={styles.capacityBarContainer}>
-              <View style={styles.capacityHeader}>
-                <Text style={styles.capacityLabel}>Current Capacity Load</Text>
-                <Text style={styles.capacityValue}>{slot.booked}/{slot.maxPatients} Patients</Text>
-              </View>
-              <View style={styles.progressBarBg}>
-                <View style={[styles.progressBarFill, { width: `${(slot.booked / slot.maxPatients) * 100}%`, backgroundColor: (slot.booked / slot.maxPatients) > 0.8 ? COLORS.error : COLORS.primary }]} />
-              </View>
-            </View>
-
-            <View style={styles.slotFooter}>
-              <View style={styles.nurseInfo}>
-                <View style={styles.nurseAvatarMini}>
-                  <User size={12} color={COLORS.textSecondary} />
-                </View>
-                <Text style={styles.nurseName}>{slot.nurse}</Text>
-              </View>
-              <View style={styles.slotActions}>
-                <TouchableOpacity 
-                   style={styles.slotActionBtn}
-                   onPress={() => handleEdit(slot)}
-                >
-                   <Edit2 size={16} color={COLORS.primary} />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.slotActionBtn}><Copy size={16} color="#6366F1" /></TouchableOpacity>
-                <TouchableOpacity style={styles.slotActionBtn}><Pause size={16} color={COLORS.warning} /></TouchableOpacity>
-                <TouchableOpacity 
-                   style={styles.slotActionBtn}
-                   onPress={() => handleDelete(slot.id)}
-                >
-                   <Trash2 size={16} color={COLORS.error} />
-                </TouchableOpacity>
-              </View>
-            </View>
+        {slots.length === 0 ? (
+          <View style={{ padding: 30, alignItems: 'center', backgroundColor: '#FFF', borderRadius: 20, marginHorizontal: 20, marginBottom: 20 }}>
+            <Text style={{ color: COLORS.textSecondary, fontWeight: '600' }}>No schedule slots for this day</Text>
           </View>
-        ))}
+        ) : (
+          slots.map((slot) => {
+            const isFull = slot.booked >= slot.maxPatients;
+            const statusText = isFull ? 'Full' : 'Active';
+            return (
+              <View key={slot._id} style={[styles.slotCard, greyShadow]}>
+                <View style={styles.slotHeader}>
+                  <View style={styles.slotInfoMain}>
+                    <View style={styles.timeIconBox}>
+                      <Clock size={18} color={COLORS.primary} />
+                    </View>
+                    <View>
+                      <Text style={styles.slotTime}>{slot.startTime} - {slot.endTime}</Text>
+                      <Text style={styles.slotSubText}>{slot.type} • {slot.room}</Text>
+                    </View>
+                  </View>
+                  <View style={[styles.statusPill, { backgroundColor: isFull ? COLORS.error + '15' : COLORS.success + '15' }]}>
+                    <Text style={[styles.statusPillText, { color: isFull ? COLORS.error : COLORS.success }]}>{statusText}</Text>
+                  </View>
+                </View>
+                
+                <View style={styles.capacityBarContainer}>
+                  <View style={styles.capacityHeader}>
+                    <Text style={styles.capacityLabel}>Current Capacity Load</Text>
+                    <Text style={styles.capacityValue}>{slot.booked || 0}/{slot.maxPatients} Patients</Text>
+                  </View>
+                  <View style={styles.progressBarBg}>
+                    <View style={[styles.progressBarFill, { width: `${Math.min(100, ((slot.booked || 0) / slot.maxPatients) * 100)}%`, backgroundColor: ((slot.booked || 0) / slot.maxPatients) > 0.8 ? COLORS.error : COLORS.primary }]} />
+                  </View>
+                </View>
+
+                <View style={styles.slotFooter}>
+                  <View style={styles.nurseInfo}>
+                    <View style={styles.nurseAvatarMini}>
+                      <User size={12} color={COLORS.textSecondary} />
+                    </View>
+                    <Text style={styles.nurseName}>{slot.nurse || userName}</Text>
+                  </View>
+                  <View style={styles.slotActions}>
+                    <TouchableOpacity 
+                       style={styles.slotActionBtn}
+                       onPress={() => handleEdit(slot)}
+                    >
+                       <Edit2 size={16} color={COLORS.primary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                       style={styles.slotActionBtn}
+                       onPress={() => handleDelete(slot._id)}
+                    >
+                       <Trash2 size={16} color={COLORS.error} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            );
+          })
+        )}
 
         {/* Staff Management */}
         <View style={styles.sectionHeader}>
@@ -347,7 +461,10 @@ const LabSchedulingScreen: React.FC = () => {
           <TouchableOpacity><Text style={styles.viewAllText}>View Roster</Text></TouchableOpacity>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.nurseScroll}>
-          {NURSES.map((nurse) => (
+          {[
+            { id: 'n1', name: userName || 'Nurse', dept: department, shift: '08:00 AM - 04:00 PM', status: 'Available', photo: 'https://img.icons8.com/bubbles/100/000000/user-female.png' },
+            { id: 'n2', name: 'Nurse Nimali', dept: department, shift: '10:00 AM - 06:00 PM', status: 'On Duty', photo: 'https://img.icons8.com/bubbles/100/000000/user-female.png' },
+          ].map((nurse) => (
             <View key={nurse.id} style={[styles.nurseCard, greyShadow]}>
               <View style={styles.nursePhotoContainer}>
                 <Image source={{ uri: nurse.photo }} style={styles.nursePhoto} />
@@ -374,22 +491,35 @@ const LabSchedulingScreen: React.FC = () => {
           </View>
         </View>
         <View style={styles.timelineContainer}>
-          {TIMELINE.map((item, idx) => (
-            <View key={idx} style={styles.timelineItem}>
-              <View style={styles.timelineLeft}>
-                <Text style={styles.timelineTime}>{item.time}</Text>
-                <View style={styles.timelineDot} />
-                {idx !== TIMELINE.length - 1 && <View style={styles.timelineLine} />}
-              </View>
-              <View style={[styles.timelineContent, greyShadow]}>
-                <View style={styles.timelineHeader}>
-                  <Text style={styles.timelineLabel}>{item.label}</Text>
-                  <Info size={14} color={COLORS.primary} />
-                </View>
-                <Text style={styles.timelineSubText}>Assigned Staff: {item.nurse}</Text>
-              </View>
+          {slots.length === 0 ? (
+            <View style={{ padding: 20, alignItems: 'center' }}>
+              <Text style={{ color: COLORS.textSecondary, fontSize: 13 }}>No timeline activities scheduled</Text>
             </View>
-          ))}
+          ) : (
+            slots
+              .map(s => ({
+                time: s.startTime,
+                label: `${department} Session`,
+                nurse: s.nurse || userName
+              }))
+              .sort((a, b) => a.time.localeCompare(b.time))
+              .map((item, idx, arr) => (
+                <View key={idx} style={styles.timelineItem}>
+                  <View style={styles.timelineLeft}>
+                    <Text style={styles.timelineTime}>{item.time}</Text>
+                    <View style={styles.timelineDot} />
+                    {idx !== arr.length - 1 && <View style={styles.timelineLine} />}
+                  </View>
+                  <View style={[styles.timelineContent, greyShadow]}>
+                    <View style={styles.timelineHeader}>
+                      <Text style={styles.timelineLabel}>{item.label}</Text>
+                      <Info size={14} color={COLORS.primary} />
+                    </View>
+                    <Text style={styles.timelineSubText}>Assigned Staff: {item.nurse}</Text>
+                  </View>
+                </View>
+              ))
+          )}
         </View>
       </ScrollView>
 
@@ -422,19 +552,6 @@ const LabSchedulingScreen: React.FC = () => {
             </View>
             
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalForm}>
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Lab Category</Text>
-                <View style={styles.inputWrapper}>
-                  <FlaskConical size={20} color={COLORS.primary} style={styles.inputIcon} />
-                  <TextInput 
-                    placeholder="Select Lab Type (e.g. PCR, Blood)" 
-                    style={styles.textInput} 
-                    placeholderTextColor="#94A3B8"
-                    value={formData.type}
-                    onChangeText={(val) => setFormData({...formData, type: val})}
-                  />
-                </View>
-              </View>
 
               <View style={styles.rowInputs}>
                 <View style={{ flex: 1, marginRight: 12 }}>
@@ -551,13 +668,14 @@ const LabSchedulingScreen: React.FC = () => {
               ))}
               {Array.from({ length: moment(currentMonthYear, 'MMMM YYYY').daysInMonth() }).map((_, i) => {
                 const day = i + 1;
-                const isSelected = selectedDate === day;
+                const dateStr = moment(currentMonthYear, 'MMMM YYYY').date(day).format('YYYY-MM-DD');
+                const isSelected = selectedDate === dateStr;
                 return (
                   <TouchableOpacity 
                     key={day} 
                     style={[styles.dayCell, isSelected && styles.dayCellActive]}
                     onPress={() => {
-                      setSelectedDate(day);
+                      setSelectedDate(dateStr);
                       setShowCalendarModal(false);
                     }}
                   >
@@ -640,7 +758,7 @@ const styles = StyleSheet.create({
   },
   searchInputHeader: { flex: 1, marginLeft: 12, fontSize: 14, color: COLORS.textHeader },
   scrollContent: { paddingBottom: 120 },
-  statsRow: { flexDirection: 'row', padding: 20, gap: 12, flexWrap: 'wrap' },
+  statsRow: { flexDirection: 'row', padding: 20, gap: 12, flexWrap: 'wrap', justifyContent: 'space-between' },
   statCard: {
     backgroundColor: '#FFF',
     padding: 15,

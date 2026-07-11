@@ -9,6 +9,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
+
+import moment from 'moment';
+
 const LabDashboard = () => {
   const navigation = useNavigation<any>();
   const isLoggingOut = useRef(false);
@@ -38,8 +42,74 @@ const LabDashboard = () => {
     }, [])
   );
 
-  const { role } = useAuth();
+  const { role, token } = useAuth();
   const [selectedLab, setSelectedLab] = useState<any>(null);
+  const [userName, setUserName] = useState('');
+  const [department, setDepartment] = useState('');
+  const [stats, setStats] = useState({ todayTotal: 0, pending: 0, processing: 0, completed: 0 });
+  const [activeQueue, setActiveQueue] = useState<any[]>([]);
+  const [recentActivities, setRecentActivities] = useState<any[]>([]);
+
+  const fetchDashboardData = async () => {
+    try {
+      const statsRes = await fetch(`${API_BASE_URL}/api/labs/dashboard/stats`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const statsData = await statsRes.json();
+      if (statsRes.ok && statsData.success) {
+        setStats(statsData.data);
+      }
+
+      const bookingsRes = await fetch(`${API_BASE_URL}/api/labs/bookings`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const bookingsData = await bookingsRes.json();
+      if (bookingsRes.ok && bookingsData.success) {
+        const allBookings = bookingsData.data || [];
+        const processingList = allBookings.filter((b: any) => 
+          ['Confirmed', 'Checked-In', 'Sample-Collected', 'Testing'].includes(b.status)
+        );
+        setActiveQueue(processingList);
+        setRecentActivities(allBookings.slice(0, 3));
+      }
+    } catch (err) {
+      console.error('Failed to fetch dashboard stats/bookings:', err);
+    }
+  };
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const data = await response.json();
+        if (response.ok && data) {
+          setUserName(data.name || '');
+          setDepartment(data.department || '');
+        }
+      } catch (err) {
+        console.error('Failed to fetch profile in LabDashboard:', err);
+      }
+    };
+
+    if (token) {
+      fetchProfile();
+      fetchDashboardData();
+    }
+  }, [token]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (token) {
+        fetchDashboardData();
+      }
+    }, [token])
+  );
+
+  const firstName = userName ? userName.split(' ')[0] : 'User';
   const panY = useRef(new Animated.Value(0)).current;
 
   const panResponder = useRef(
@@ -75,10 +145,10 @@ const LabDashboard = () => {
   };
 
   const taskStats = [
-    { label: 'Today\'s Tests', value: '42', icon: <FlaskConical size={20} color="#FFF" />, bg: COLORS.primary },
-    { label: 'Pending', value: '12', icon: <Clock size={20} color="#FFF" />, bg: COLORS.warning },
-    { label: 'Processing', value: '08', icon: <Activity size={20} color="#FFF" />, bg: '#60A5FA' },
-    { label: 'Completed', value: '22', icon: <CheckCircle size={20} color="#FFF" />, bg: COLORS.success },
+    { label: 'Today\'s Tests', value: String(stats.todayTotal).padStart(2, '0'), icon: <FlaskConical size={20} color="#FFF" />, bg: COLORS.primary },
+    { label: 'Pending', value: String(stats.pending).padStart(2, '0'), icon: <Clock size={20} color="#FFF" />, bg: COLORS.warning },
+    { label: 'Processing', value: String(stats.processing).padStart(2, '0'), icon: <Activity size={20} color="#FFF" />, bg: '#60A5FA' },
+    { label: 'Completed', value: String(stats.completed).padStart(2, '0'), icon: <CheckCircle size={20} color="#FFF" />, bg: COLORS.success },
   ];
 
   const laboratorySections = [
@@ -142,7 +212,7 @@ const LabDashboard = () => {
         <LinearGradient colors={COLORS.screenHeaderGradient as any} style={styles.headerGradient}>
           <View style={styles.headerContent}>
             <View>
-              <Text style={styles.welcomeText}>Hospital-Wide Management</Text>
+              <Text style={styles.welcomeText}>Hello {firstName} 👋</Text>
               <Text style={styles.headerTitle}>{role === 'nurse' ? 'Nurse Portal' : 'Lab Portal'}</Text>
             </View>
             <View style={styles.headerActions}>
@@ -204,17 +274,9 @@ const LabDashboard = () => {
             ))}
           </View>
 
-          {/* Laboratory Sections - Mirroring Patient Dashboard Lab Types */}
-          <View style={[styles.sectionHeader, { marginTop: 24 }]}>
-            <Text style={styles.sectionTitle}>Laboratory Sections</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('LabScheduling')}>
-              <Text style={styles.viewAllText}>Manage Schedule</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* New Schedule Management Quick Access Card */}
+          {/* Schedule Management Quick Access Card */}
           <TouchableOpacity 
-            style={styles.scheduleFastCard}
+            style={[styles.scheduleFastCard, { marginTop: 20 }]}
             onPress={() => navigation.navigate('LabScheduling')}
           >
             <LinearGradient
@@ -235,73 +297,74 @@ const LabDashboard = () => {
               <ChevronRight size={20} color="#FFF" />
             </LinearGradient>
           </TouchableOpacity>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false} 
-            contentContainerStyle={styles.labCategoriesContainer}
-          >
-            {laboratorySections.map((lab) => (
-              <TouchableOpacity 
-                key={lab.id} 
-                style={styles.labSectionCard}
-                onPress={() => setSelectedLab(lab)}
-              >
-                <View style={[styles.labIconCircle, { backgroundColor: lab.color }]}>
-                  {lab.icon}
-                </View>
-                <Text style={styles.labIdText} numberOfLines={1}>{lab.name}</Text>
-                <Text style={styles.labTypeText} numberOfLines={1}>{lab.type}</Text>
-                <View style={styles.labBadgeContainer}>
-                  <Users size={12} color={COLORS.textSecondary} />
-                  <Text style={styles.queueCount}>{lab.queue} In Queue</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
 
           {/* Urgent Queue Management */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Processing Queue</Text>
-            <TouchableOpacity><Text style={styles.viewAllText}>View Queue</Text></TouchableOpacity>
-          </View>
-
-          <View style={[styles.queueCard, { borderLeftColor: COLORS.error, borderLeftWidth: 4 }]}>
-            <View style={styles.queueInfo}>
-              <View style={styles.patientRow}>
-                <Text style={styles.patientName}>John Doe</Text>
-                <View style={styles.urgentBadge}><Text style={styles.urgentText}>URGENT</Text></View>
-              </View>
-              <Text style={styles.testType}>Full Blood Count + CRP</Text>
-              <View style={styles.timeRow}>
-                <Clock size={14} color={COLORS.textSecondary} />
-                <Text style={styles.timeText}>Sample collected 15 mins ago</Text>
-              </View>
-            </View>
-            <TouchableOpacity style={styles.processBtn}>
-              <Text style={styles.processBtnText}>Process</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('LabAppointments')}>
+              <Text style={styles.viewAllText}>View All</Text>
             </TouchableOpacity>
           </View>
 
+          {activeQueue.length === 0 ? (
+            <View style={[styles.queueCard, { padding: 20, alignItems: 'center' }]}>
+              <Text style={{ color: COLORS.textSecondary, fontWeight: '600' }}>No active queue bookings</Text>
+            </View>
+          ) : (
+            <View style={[styles.queueCard, { borderLeftColor: activeQueue[0].status === 'Confirmed' ? COLORS.primary : COLORS.error, borderLeftWidth: 4 }]}>
+              <View style={styles.queueInfo}>
+                <View style={styles.patientRow}>
+                  <Text style={styles.patientName}>{activeQueue[0].patient?.fullName}</Text>
+                  <View style={[styles.urgentBadge, { backgroundColor: activeQueue[0].status === 'Confirmed' ? COLORS.primaryLight : '#FEE2E2' }]}>
+                    <Text style={[styles.urgentText, { color: activeQueue[0].status === 'Confirmed' ? COLORS.primary : COLORS.error }]}>
+                      {activeQueue[0].status.toUpperCase()}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.testType}>{activeQueue[0].lab?.name || 'Lab Test'}</Text>
+                <View style={styles.timeRow}>
+                  <Clock size={14} color={COLORS.textSecondary} />
+                  <Text style={styles.timeText}>{moment(activeQueue[0].appointmentDate).format('MMM DD, YYYY')} • {activeQueue[0].scheduleSlot?.startTime}</Text>
+                </View>
+              </View>
+              <TouchableOpacity 
+                style={styles.processBtn}
+                onPress={() => navigation.navigate('LabAppointments')}
+              >
+                <Text style={styles.processBtnText}>Manage</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {/* Active Tasks List */}
           <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Recent Activities</Text>
-          {[
-            { id: '1025', test: 'Lipid Profile', status: 'Processing', color: '#60A5FA' },
-            { id: '1026', test: 'Liver Function Test', status: 'Pending', color: COLORS.warning },
-            { id: '1027', test: 'Blood Glucose', status: 'Completed', color: COLORS.success },
-          ].map((item) => (
-            <View key={item.id} style={styles.activityItem}>
-              <View style={[styles.activityIcon, { backgroundColor: item.color + '15' }]}>
-                <ClipboardList size={22} color={item.color} />
-              </View>
-              <View style={styles.activityDetails}>
-                <Text style={styles.activityTitle}>{item.test}</Text>
-                <Text style={styles.activitySub}>ID: #{item.id} • Lab Station 02</Text>
-              </View>
-              <View style={[styles.statusPill, { backgroundColor: item.color + '15' }]}>
-                <Text style={[styles.statusPillText, { color: item.color }]}>{item.status}</Text>
-              </View>
+          {recentActivities.length === 0 ? (
+            <View style={[styles.activityItem, { justifyContent: 'center', padding: 20 }]}>
+              <Text style={{ color: COLORS.textSecondary, fontWeight: '600' }}>No recent activities</Text>
             </View>
-          ))}
+          ) : (
+            recentActivities.map((item) => {
+              let statusColor = COLORS.warning;
+              if (item.status === 'Completed') statusColor = COLORS.success;
+              else if (['Confirmed', 'Checked-In', 'Testing'].includes(item.status)) statusColor = '#60A5FA';
+              else if (item.status === 'Cancelled') statusColor = COLORS.error;
+
+              return (
+                <View key={item._id} style={styles.activityItem}>
+                  <View style={[styles.activityIcon, { backgroundColor: statusColor + '15' }]}>
+                    <ClipboardList size={22} color={statusColor} />
+                  </View>
+                  <View style={styles.activityDetails}>
+                    <Text style={styles.activityTitle}>{item.patient?.fullName}</Text>
+                    <Text style={styles.activitySub}>ID: {item.bookingRef} • Room {item.scheduleSlot?.room || 'N/A'}</Text>
+                  </View>
+                  <View style={[styles.statusPill, { backgroundColor: statusColor + '15' }]}>
+                    <Text style={[styles.statusPillText, { color: statusColor }]}>{item.status}</Text>
+                  </View>
+                </View>
+              );
+            })
+          )}
         </ScrollView>
         
         <NurseBottomNavBar />

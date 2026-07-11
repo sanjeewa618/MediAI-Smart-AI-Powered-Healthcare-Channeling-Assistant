@@ -16,6 +16,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/types';
+import { useAuth } from '../../context/AuthContext';
+import moment from 'moment';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
 
 type BookingFlowRouteProp = RouteProp<RootStackParamList, 'LabBookingFlow'>;
 type NavigationProp = StackNavigationProp<RootStackParamList, 'LabBookingFlow'>;
@@ -99,9 +103,59 @@ const LabBookingFlowScreen = () => {
     'Done'
   ];
 
-  const handleNext = () => {
-    if (currentStep < 10) {
-      setCurrentStep(currentStep + 1);
+  const { token } = useAuth();
+  const [bookingLoading, setBookingLoading] = useState(false);
+  const [bookingRefId, setBookingRefId] = useState('MED-LAB-2026-482');
+  const [queueTokenNum, setQueueTokenNum] = useState(22);
+
+  const handleNext = async () => {
+    if (currentStep === 5) {
+      setBookingLoading(true);
+      try {
+        const scheduleSlotId = (route.params as any)?.scheduleSlotId;
+        const payload = {
+          labId: lab.id,
+          scheduleSlotId,
+          appointmentDate: moment().date(parseInt(selectedDate, 10)).toDate(),
+          timeSlot: selectedTime || '09:00 AM',
+          patient: {
+            fullName: patientDetails.fullName || 'Patient Name',
+            nic: patientDetails.nic || '981234567V',
+            gender: patientDetails.gender || 'Male',
+            mobile: patientDetails.mobile || '077 123 4567'
+          },
+          collectionMethod,
+          homeAddress: patientDetails.address || 'Colombo, Sri Lanka',
+          paymentMethod,
+        };
+
+        const res = await fetch(`${API_BASE_URL}/api/labs/bookings`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+          setBookingRefId(data.data.bookingRef);
+          setQueueTokenNum(data.data.queueToken);
+          setCurrentStep(6);
+        } else {
+          Alert.alert('Booking Error', data.message || 'Failed to create booking.');
+        }
+      } catch (err) {
+        console.error(err);
+        Alert.alert('Network Error', 'Could not connect to the server.');
+      } finally {
+        setBookingLoading(false);
+      }
+    } else {
+      if (currentStep < 10) {
+        setCurrentStep(currentStep + 1);
+      }
     }
   };
 
@@ -447,13 +501,13 @@ const LabBookingFlowScreen = () => {
         <View style={[styles.ticketCard, SHADOWS.medium]}>
           <View style={styles.ticketHeader}>
             <Text style={styles.ticketLabel}>Booking ID</Text>
-            <Text style={styles.ticketID}>#MED-LAB-2026-482</Text>
+            <Text style={styles.ticketID}>#{bookingRefId}</Text>
           </View>
           
           <View style={styles.ticketRow}>
             <View style={styles.ticketItem}>
               <Text style={styles.ticketLabel}>Token</Text>
-              <Text style={styles.tokenValue}>22</Text>
+              <Text style={styles.tokenValue}>{queueTokenNum}</Text>
             </View>
             <View style={styles.ticketItem}>
               <Text style={styles.ticketLabel}>Room</Text>
@@ -466,7 +520,7 @@ const LabBookingFlowScreen = () => {
           <View style={styles.ticketDetails}>
             <View style={styles.ticketDetailRow}>
               <Text style={styles.ticketDetailLabel}>Date</Text>
-              <Text style={styles.ticketDetailValue}>{selectedDate} May, 2026</Text>
+              <Text style={styles.ticketDetailValue}>{selectedDate} {moment().format('MMMM, YYYY')}</Text>
             </View>
             <View style={styles.ticketDetailRow}>
               <Text style={styles.ticketDetailLabel}>Time</Text>
@@ -482,8 +536,8 @@ const LabBookingFlowScreen = () => {
         <View style={[styles.queueInfoCard, SHADOWS.small]}>
           <Activity size={20} color={COLORS.primary} />
           <View style={styles.queueTextSection}>
-            <Text style={styles.queueMainText}>Queue Status: 18 People Ahead</Text>
-            <Text style={styles.queueSubText}>Estimated Wait: 25 mins</Text>
+            <Text style={styles.queueMainText}>Queue Status: {Math.max(0, queueTokenNum - 1)} People Ahead</Text>
+            <Text style={styles.queueSubText}>Estimated Wait: {Math.max(0, queueTokenNum - 1) * 5} mins</Text>
           </View>
         </View>
 

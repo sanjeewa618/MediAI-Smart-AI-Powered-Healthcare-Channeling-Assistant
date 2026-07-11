@@ -5,6 +5,8 @@ import LabCategory from '../model/LabCategory.js';
 import LabBooking from '../model/LabBooking.js';
 import LabSchedule from '../model/LabSchedule.js';
 import LabReport from '../model/LabReport.js';
+import User from '../model/User.js';
+import Notification from '../model/Notification.js';
 
 const generateBookingRef = async () => {
   const year = new Date().getFullYear();
@@ -236,7 +238,7 @@ const createBooking = async (req, res, next) => {
       referralImageUrl,
     } = req.body;
 
-    const requiredFields = { labId, scheduleSlotId, appointmentDate };
+    const requiredFields = { labId, appointmentDate };
     for (const [key, val] of Object.entries(requiredFields)) {
       if (!val) {
         await session.abortTransaction();
@@ -267,23 +269,56 @@ const createBooking = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'paymentMethod must be Card or Cash' });
     }
 
-    if (!mongoose.isValidObjectId(labId) || !mongoose.isValidObjectId(scheduleSlotId)) {
+    if (!mongoose.isValidObjectId(labId)) {
       await session.abortTransaction();
-      return res.status(400).json({ success: false, message: 'Invalid labId or scheduleSlotId' });
+      return res.status(400).json({ success: false, message: 'Invalid labId' });
     }
 
-    const [lab, slot] = await Promise.all([
-      Lab.findById(labId).session(session),
-      LabSchedule.findById(scheduleSlotId).session(session),
-    ]);
+    let lab = await Lab.findById(labId).session(session);
+    if (!lab) {
+      lab = await Lab.findOne({ assignedNurse: labId }).session(session);
+    }
+    if (!lab) {
+      lab = await Lab.findOne({}).session(session);
+    }
 
     if (!lab) {
       await session.abortTransaction();
       return res.status(404).json({ success: false, message: 'Lab not found' });
     }
+
+    let slot;
+    if (scheduleSlotId && mongoose.isValidObjectId(scheduleSlotId)) {
+      slot = await LabSchedule.findById(scheduleSlotId).session(session);
+    }
+
     if (!slot) {
-      await session.abortTransaction();
-      return res.status(404).json({ success: false, message: 'Schedule slot not found' });
+      const startTime = req.body.timeSlot || '09:00 AM';
+      const endTime = req.body.endTime || '10:00 AM';
+      const apptDate = new Date(appointmentDate);
+      apptDate.setHours(0, 0, 0, 0);
+      const apptDateEnd = new Date(apptDate);
+      apptDateEnd.setHours(23, 59, 59, 999);
+
+      slot = await LabSchedule.findOne({
+        lab: lab._id,
+        date: { $gte: apptDate, $lte: apptDateEnd },
+        startTime,
+      }).session(session);
+
+      if (!slot) {
+        slot = new LabSchedule({
+          lab: lab._id,
+          date: apptDate,
+          startTime,
+          endTime,
+          maxPatients: 20,
+          nurse: lab.assignedNurse ? (await User.findById(lab.assignedNurse))?.name || 'Nurse' : 'Nurse',
+          room: 'Room 01',
+          type: lab.name,
+        });
+        await slot.save({ session });
+      }
     }
 
     const slotDate = new Date(appointmentDate);
@@ -292,8 +327,8 @@ const createBooking = async (req, res, next) => {
     slotDateEnd.setHours(23, 59, 59, 999);
 
     const currentBooked = await LabBooking.countDocuments({
-      lab: labId,
-      scheduleSlot: scheduleSlotId,
+      lab: lab._id,
+      scheduleSlot: slot._id,
       status: { $in: ['Pending', 'Confirmed', 'Checked-In'] },
     }).session(session);
 
@@ -303,14 +338,14 @@ const createBooking = async (req, res, next) => {
     }
 
     const bookingRef = await generateBookingRef();
-    const queueToken = await generateQueueToken(labId, appointmentDate);
+    const queueToken = await generateQueueToken(lab._id, appointmentDate);
 
     const [booking] = await LabBooking.create(
       [
         {
           bookingRef,
-          lab: labId,
-          scheduleSlot: scheduleSlotId,
+          lab: lab._id,
+          scheduleSlot: slot._id,
           appointmentDate: new Date(appointmentDate),
           patient,
           collectionMethod,
@@ -406,6 +441,14 @@ const listBookings = async (req, res, next) => {
         return res.status(400).json({ success: false, message: 'Invalid labId' });
       }
       filter.lab = labId;
+    } else if (req.user && req.user.role === 'nurse') {
+      const category = await LabCategory.findOne({ name: { $regex: new RegExp(`^${req.user.department}`, 'i') } });
+      if (category) {
+        const labs = await Lab.find({ category: category._id });
+        filter.lab = { $in: labs.map(l => l._id) };
+      } else {
+        filter.lab = new mongoose.Types.ObjectId();
+      }
     }
 
     const validStatuses = ['Pending', 'Confirmed', 'Checked-In', 'Sample-Collected', 'Testing', 'Completed', 'Cancelled'];
@@ -483,6 +526,27 @@ const updateBookingStatus = async (req, res, next) => {
     if (status === 'Checked-In') booking.checkedInAt = new Date();
     await booking.save();
 
+    // Send notification to patient if user is found
+    try {
+      const patientUser = await User.findOne({ 
+        $or: [
+          { nic: booking.patient.nic }, 
+          { phone: booking.patient.mobile }
+        ] 
+      });
+      if (patientUser) {
+        await Notification.create({
+          recipient: patientUser._id,
+          title: `Lab Booking ${status}`,
+          message: `Your lab booking (${booking.bookingRef}) has been updated to ${status.toLowerCase()}.`,
+          type: 'Appointment',
+          isRead: false
+        });
+      }
+    } catch (notifErr) {
+      console.error('Failed to create booking notification:', notifErr);
+    }
+
     res.status(200).json({ success: true, message: `Booking status updated to ${status}`, data: booking });
   } catch (err) {
     next(err);
@@ -493,22 +557,32 @@ const getDashboardStats = async (req, res, next) => {
   try {
     const { labId, date } = req.query;
 
-    if (!labId || !mongoose.isValidObjectId(labId)) {
-      return res.status(400).json({ success: false, message: 'Valid labId is required' });
-    }
-
     const targetDate = date ? new Date(date) : new Date();
     const dayStart = new Date(targetDate);
     dayStart.setHours(0, 0, 0, 0);
     const dayEnd = new Date(targetDate);
     dayEnd.setHours(23, 59, 59, 999);
 
-    const baseFilter = { lab: labId, appointmentDate: { $gte: dayStart, $lte: dayEnd } };
+    const baseFilter = { appointmentDate: { $gte: dayStart, $lte: dayEnd } };
+
+    if (labId && mongoose.isValidObjectId(labId)) {
+      baseFilter.lab = labId;
+    } else if (req.user && req.user.role === 'nurse') {
+      const category = await LabCategory.findOne({ name: { $regex: new RegExp(`^${req.user.department}`, 'i') } });
+      if (category) {
+        const labs = await Lab.find({ category: category._id });
+        baseFilter.lab = { $in: labs.map(l => l._id) };
+      } else {
+        baseFilter.lab = new mongoose.Types.ObjectId();
+      }
+    } else {
+      return res.status(400).json({ success: false, message: 'Valid labId is required' });
+    }
 
     const [todayTotal, pending, processing, completed] = await Promise.all([
       LabBooking.countDocuments({ ...baseFilter }),
       LabBooking.countDocuments({ ...baseFilter, status: 'Pending' }),
-      LabBooking.countDocuments({ ...baseFilter, status: { $in: ['Checked-In', 'Sample-Collected', 'Testing'] } }),
+      LabBooking.countDocuments({ ...baseFilter, status: { $in: ['Confirmed', 'Checked-In', 'Sample-Collected', 'Testing'] } }),
       LabBooking.countDocuments({ ...baseFilter, status: 'Completed' }),
     ]);
 
@@ -538,20 +612,33 @@ const getSchedule = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'date query param is required' });
     }
 
+    let resolvedLabId = labId;
+    let lab = await Lab.findById(labId);
+    if (!lab) {
+      lab = await Lab.findOne({ assignedNurse: labId });
+    }
+    if (!lab) {
+      lab = await Lab.findOne({});
+    }
+    if (lab) {
+      resolvedLabId = lab._id;
+    }
+
     const dayStart = new Date(date);
     dayStart.setHours(0, 0, 0, 0);
     const dayEnd = new Date(date);
     dayEnd.setHours(23, 59, 59, 999);
 
     const slots = await LabSchedule.find({
-      lab: labId,
+      lab: resolvedLabId,
       date: { $gte: dayStart, $lte: dayEnd },
+      isActive: true,
     }).sort({ startTime: 1 });
 
     const enriched = await Promise.all(
       slots.map(async (slot) => {
         const booked = await LabBooking.countDocuments({
-          lab: labId,
+          lab: resolvedLabId,
           scheduleSlot: slot._id,
           status: { $in: ['Pending', 'Confirmed', 'Checked-In', 'Sample-Collected', 'Testing'] },
         });
@@ -585,11 +672,29 @@ const createScheduleSlot = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'maxPatients must be at least 1' });
     }
 
-    const lab = await Lab.findById(labId);
-    if (!lab) return res.status(404).json({ success: false, message: 'Lab not found' });
+    let resolvedLabId = labId;
+    let lab = await Lab.findById(labId);
+    if (!lab) {
+      lab = await Lab.findOne({ assignedNurse: labId });
+    }
+    if (!lab) {
+      lab = await Lab.findOne({});
+      if (!lab) {
+        lab = new Lab({
+          name: type || 'Blood Test Lab',
+          floor: 'Main Floor',
+          status: 'Available',
+          assignedNurse: labId,
+        });
+        await lab.save();
+      }
+    }
+    if (lab) {
+      resolvedLabId = lab._id;
+    }
 
     const slot = await LabSchedule.create({
-      lab: labId,
+      lab: resolvedLabId,
       date: new Date(date),
       startTime,
       endTime,
@@ -671,6 +776,14 @@ const listReports = async (req, res, next) => {
         return res.status(400).json({ success: false, message: 'Invalid labId' });
       }
       filter.lab = labId;
+    } else if (req.user && req.user.role === 'nurse') {
+      const cat = await LabCategory.findOne({ name: { $regex: new RegExp(`^${req.user.department}`, 'i') } });
+      if (cat) {
+        const labs = await Lab.find({ category: cat._id });
+        filter.lab = { $in: labs.map(l => l._id) };
+      } else {
+        filter.lab = new mongoose.Types.ObjectId();
+      }
     }
 
     if (category && category !== 'all') filter.category = new RegExp(category, 'i');
@@ -785,6 +898,38 @@ const updateReport = async (req, res, next) => {
   }
 };
 
+const sendBookingReminder = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const booking = await LabBooking.findById(id);
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Booking not found' });
+    }
+
+    const patientUser = await User.findOne({ 
+      $or: [
+        { nic: booking.patient.nic }, 
+        { phone: booking.patient.mobile }
+      ] 
+    });
+
+    if (patientUser) {
+      await Notification.create({
+        recipient: patientUser._id,
+        title: `Appointment Reminder`,
+        message: `Reminder: You have an upcoming lab booking (${booking.bookingRef}) scheduled for ${new Date(booking.appointmentDate).toLocaleDateString()}.`,
+        type: 'Appointment',
+        isRead: false
+      });
+      return res.status(200).json({ success: true, message: 'Reminder sent to patient' });
+    } else {
+      return res.status(404).json({ success: false, message: 'Patient account not found to send notification' });
+    }
+  } catch (err) {
+    next(err);
+  }
+};
+
 export {
   getCategories,
   getLabs,
@@ -803,4 +948,5 @@ export {
   listReports,
   createReport,
   updateReport,
+  sendBookingReminder,
 };
