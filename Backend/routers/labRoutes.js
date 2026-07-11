@@ -2,7 +2,7 @@ import express from 'express';
 import {
   getCategories, getLabs, getLabById, getLabAvailability,
   createBooking, getBookingByRef, listBookings, updateBookingStatus,
-  getDashboardStats, getSchedule, createScheduleSlot, updateScheduleSlot,
+  getDashboardStats, updateLabStatus, getSchedule, createScheduleSlot, updateScheduleSlot,
   deleteScheduleSlot, listReports, createReport, updateReport,
 } from '../controllers/labController.js';
 
@@ -21,6 +21,7 @@ router.get('/bookings', authorizeRoles('nurse', 'lab', 'admin'), listBookings);
 router.post('/bookings', authorizeRoles('patient'), createBooking);
 router.get('/bookings/:bookingRef', authorizeRoles('patient', 'nurse', 'lab', 'admin'), getBookingByRef);
 router.patch('/bookings/:id/status', authorizeRoles('nurse', 'lab', 'admin'), updateBookingStatus);
+router.patch('/:id/status', authorizeRoles('nurse', 'lab', 'admin'), updateLabStatus);
 router.get('/reports', authorizeRoles('nurse', 'lab', 'admin'), listReports);
 router.post('/reports', authorizeRoles('nurse', 'lab', 'admin'), createReport);
 router.patch('/reports/:id', authorizeRoles('nurse', 'lab', 'admin'), updateReport);

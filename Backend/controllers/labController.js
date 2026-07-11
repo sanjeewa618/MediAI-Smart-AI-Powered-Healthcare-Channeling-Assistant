@@ -49,7 +49,7 @@ const getLabs = async (req, res, next) => {
     }
 
     if (status) {
-      const validStatuses = ['Available', 'Busy', 'Overloaded', 'Closed'];
+      const validStatuses = ['Available', 'Busy', 'Overloaded', 'Closed', 'Maintenance'];
       if (!validStatuses.includes(status)) {
         return res.status(400).json({ success: false, message: `status must be one of: ${validStatuses.join(', ')}` });
       }
@@ -85,6 +85,36 @@ const getLabs = async (req, res, next) => {
         totalPages: Math.ceil(total / pageSize),
       },
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const updateLabStatus = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid lab id' });
+    }
+
+    if (!['Available', 'Busy', 'Overloaded', 'Closed', 'Maintenance'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'status must be one of: Available, Busy, Overloaded, Closed, Maintenance',
+      });
+    }
+
+    const lab = await Lab.findById(id);
+    if (!lab) {
+      return res.status(404).json({ success: false, message: 'Lab not found' });
+    }
+
+    lab.status = status;
+    const updatedLab = await lab.save();
+
+    res.status(200).json({ success: true, data: updatedLab });
   } catch (err) {
     next(err);
   }
@@ -765,6 +795,7 @@ export {
   listBookings,
   updateBookingStatus,
   getDashboardStats,
+  updateLabStatus,
   getSchedule,
   createScheduleSlot,
   updateScheduleSlot,

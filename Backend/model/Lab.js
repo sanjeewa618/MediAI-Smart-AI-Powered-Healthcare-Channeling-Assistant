@@ -8,7 +8,7 @@ const labSchema = new mongoose.Schema({
   description: { type: String },
   category: { type: mongoose.Schema.Types.ObjectId, ref: 'LabCategory' },
   assignedNurse: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  status: { type: String, enum: ['Available', 'Busy', 'Overloaded', 'Closed'], default: 'Available' }
+  status: { type: String, enum: ['Available', 'Busy', 'Overloaded', 'Closed', 'Maintenance'], default: 'Available' }
 }, { timestamps: true });
 
 export default mongoose.model('Lab', labSchema);
