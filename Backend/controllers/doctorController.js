@@ -231,3 +231,96 @@ export const getSpecialties = async (req, res) => {
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
+
+// @desc    Get dynamic calendar availability for a doctor
+// @route   GET /api/doctor/:id/availability
+// @access  Public
+export const getDoctorAvailabilityForPatient = async (req, res) => {
+  try {
+    const doctorId = req.params.id;
+    const { month, year } = req.query;
+
+    const targetDate = new Date();
+    const targetMonth = month !== undefined ? parseInt(month) : targetDate.getMonth();
+    const targetYear = year !== undefined ? parseInt(year) : targetDate.getFullYear();
+
+    // 1. Get doctor's availability template
+    const slots = await DoctorAvailability.find({ doctor: doctorId });
+
+    // 2. Find start and end of the month
+    const startDate = new Date(targetYear, targetMonth, 1);
+    const endDate = new Date(targetYear, targetMonth + 1, 0);
+
+    // 3. Fetch all active appointments for this doctor in this month
+    const appointments = await Appointment.find({
+      doctor: doctorId,
+      date: { $gte: startDate, $lte: endDate },
+      status: { $in: ['pending', 'confirmed'] }
+    });
+
+    // Group appointments by date string (YYYY-MM-DD) and timeSlot so we
+    // can compute the per-slot queue number. Queue numbers are per
+    // doctor, per date, per time slot, and reset daily.
+    const appointmentCounts = {};
+    appointments.forEach(app => {
+      const dateStr = new Date(app.date).toISOString().split('T')[0];
+      const key = `${dateStr}_${app.timeSlot}`;
+      appointmentCounts[key] = (appointmentCounts[key] || 0) + 1;
+    });
+
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const numDays = endDate.getDate();
+    const availabilityCalendar = [];
+
+    // 4. Generate calendar with slot capacities
+    for (let i = 1; i <= numDays; i++) {
+      const date = new Date(targetYear, targetMonth, i);
+      // Pad month and day for proper formatting (e.g. 2026-07-20)
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      const y = date.getFullYear();
+      const dateStr = `${y}-${m}-${d}`;
+      const dayOfWeekStr = dayNames[date.getDay()];
+
+      // Find slots applicable to this day
+      const applicableSlots = slots.filter(s => s.day === dayOfWeekStr || s.repeat === 'daily');
+
+      const daySlots = applicableSlots.map(s => {
+        const timeSlotStr = `${s.startTime} - ${s.endTime}`;
+        const key = `${dateStr}_${timeSlotStr}`;
+        const bookedCount = appointmentCounts[key] || 0;
+        const maxPatients = s.maxPatients || 1;
+        // The next queue number for this slot = bookedCount + 1, but
+        // never more than maxPatients. When the slot is full, show
+        // maxPatients so the UI displays a sensible value.
+        const nextQueueNumber = bookedCount >= maxPatients
+          ? maxPatients
+          : bookedCount + 1;
+
+        return {
+          id: s._id,
+          startTime: s.startTime,
+          endTime: s.endTime,
+          timeSlot: timeSlotStr,
+          maxPatients,
+          bookedCount,
+          isFull: bookedCount >= maxPatients,
+          type: s.type,
+          consultType: s.consultType,
+          notes: s.notes,
+          nextQueueNumber
+        };
+      });
+
+      availabilityCalendar.push({
+        date: dateStr,
+        dayName: dayOfWeekStr,
+        slots: daySlots
+      });
+    }
+
+    res.json({ success: true, data: availabilityCalendar });
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};

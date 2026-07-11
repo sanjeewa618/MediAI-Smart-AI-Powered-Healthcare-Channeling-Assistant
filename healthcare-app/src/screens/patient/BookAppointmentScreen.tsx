@@ -22,9 +22,10 @@ const STEPS = ['Patient Info', 'Medical Details', 'Review & Pay', 'Receipt'];
 const BookAppointmentScreen = () => {
   const navigation = useNavigation<NavProp>();
   const route = useRoute<BookAppRouteProp>();
-  const { doctorId, doctorName = 'Dr. Emma Watson', specialty = 'Cardiology', date = 'May 20, 2024', time = '10:00 AM' } = (route.params as any) || {};
+  const { doctorId, doctorName = 'Dr. Emma Watson', specialty = 'Cardiology', date = 'May 20, 2024', time = '10:00 AM', queueNumber: initialQueueNumber = null } = (route.params as any) || {};
 
   const [currentStep, setCurrentStep] = useState(0);
+  const [assignedQueueNumber, setAssignedQueueNumber] = useState<number | null>(initialQueueNumber);
   const { token } = useAuth();
 
   // Form States
@@ -92,6 +93,9 @@ const BookAppointmentScreen = () => {
       });
       const data = await response.json();
       if (response.ok && data.success) {
+        if (data.data && typeof data.data.queueNumber === 'number') {
+          setAssignedQueueNumber(data.data.queueNumber);
+        }
         setCurrentStep(3);
         Alert.alert('Success', 'Appointment booked successfully!');
       } else {
@@ -302,7 +306,7 @@ const BookAppointmentScreen = () => {
           <View style={styles.receiptRow}><Text style={styles.rLabel}>Patient Name</Text><Text style={styles.rValue}>{patientInfo.name || 'John Doe'}</Text></View>
           <View style={styles.receiptRow}><Text style={styles.rLabel}>Doctor</Text><Text style={styles.rValue}>{doctorName}</Text></View>
           <View style={styles.receiptRow}><Text style={styles.rLabel}>Date & Time</Text><Text style={styles.rValue}>{date} | {time}</Text></View>
-          <View style={styles.receiptRow}><Text style={styles.rLabel}>Queue No</Text><Text style={[styles.rValue, { fontSize: 18, color: COLORS.primary, fontWeight: '800' }]}>15</Text></View>
+          <View style={styles.receiptRow}><Text style={styles.rLabel}>Queue No</Text><Text style={[styles.rValue, { fontSize: 18, color: COLORS.primary, fontWeight: '800' }]}>{assignedQueueNumber ?? '-'}</Text></View>
           
           <View style={styles.divider} />
           <View style={styles.receiptRow}><Text style={styles.rLabel}>Amount Paid</Text><Text style={[styles.rValue, { fontWeight: '700' }]}>LKR {TOTAL_AMOUNT.toFixed(2)}</Text></View>

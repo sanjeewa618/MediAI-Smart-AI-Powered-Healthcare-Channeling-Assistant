@@ -38,6 +38,7 @@ import AvailabilitySelectionScreen from '../screens/patient/AvailabilitySelectio
 import LabAvailabilityScreen from '../screens/patient/LabAvailabilityScreen';
 import LabBookingFlowScreen from '../screens/patient/LabBookingFlowScreen';
 import DoctorAvailability from '../screens/patient/DoctorAvailability';
+import DoctorAvailabilityCalendarScreen from '../screens/patient/DoctorAvailabilityCalendarScreen';
 import SettingsScreen from '../screens/patient/SettingsScreen';
 
 // Admin Screens
@@ -92,6 +93,7 @@ const AppNavigator = () => {
       <Stack.Screen name="BookAppointment" component={BookAppointmentScreen} />
       <Stack.Screen name="PatientProfile" component={PatientProfileScreen} />
       <Stack.Screen name="DoctorAvailability" component={DoctorAvailability} />
+      <Stack.Screen name="DoctorAvailabilityCalendar" component={DoctorAvailabilityCalendarScreen} />
       <Stack.Screen name="SpecialtyDoctors" component={SpecialtyDoctorsScreen} />
       <Stack.Screen name="AvailabilitySelection" component={AvailabilitySelectionScreen} />
       <Stack.Screen name="LabAvailability" component={LabAvailabilityScreen} />

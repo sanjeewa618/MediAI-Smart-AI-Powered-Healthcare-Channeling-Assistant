@@ -29,25 +29,42 @@ export const createAppointment = async (req, res) => {
       $or: [{ day: dayOfWeek }, { repeat: 'daily' }]
     });
 
-    const maxLimit = slot ? slot.maxPatients : 1;
+    if (!slot) {
+      return res.status(400).json({ message: 'Selected time slot is not available for this doctor' });
+    }
 
-    // Count existing non-cancelled appointments for this specific slot instance
-    const existingCount = await Appointment.countDocuments({
-      doctor, 
-      date, 
-      timeSlot, 
-      status: { $ne: 'cancelled' } 
+    // Build a date range covering the whole selected day so the per-day
+    // queue number is calculated correctly regardless of the incoming
+    // date format.
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    // Count non-cancelled bookings already placed for this doctor in this
+    // specific time slot on this date. This is the queue number for the
+    // next patient in that slot. Queue numbers are per doctor, per date,
+    // per time slot, reset daily, and must never exceed the slot's
+    // maxPatients limit.
+    const existingInSlot = await Appointment.countDocuments({
+      doctor,
+      timeSlot,
+      date: { $gte: startOfDay, $lte: endOfDay },
+      status: { $ne: 'cancelled' }
     });
 
-    if (existingCount >= maxLimit) {
-      return res.status(400).json({ message: 'This time slot is fully booked. Please choose another.' });
+    if (existingInSlot >= slot.maxPatients) {
+      return res.status(400).json({ message: 'This time slot is fully booked. Please choose another slot.' });
     }
+
+    const nextQueueNumber = existingInSlot + 1;
 
     const appointment = await Appointment.create({
       patient: req.user._id, // Automatically attach the logged-in patient
       doctor,
       date,
       timeSlot,
+      queueNumber: nextQueueNumber,
       symptoms,
       notes
     });

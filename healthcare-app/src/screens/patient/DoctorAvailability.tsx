@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, Platform, Dimensions, TextInput, ActivityIndicator, ScrollView } from 'react-native';
-import { ChevronLeft, Search, ArrowRight, CheckCircle2 } from 'lucide-react-native';
+import { ChevronLeft, Search, ArrowRight } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/types';
@@ -20,16 +20,15 @@ interface Doctor {
   hospital?: string;
 }
 
-const categories = ['All', 'Cardiology', 'Paediatrics', 'Urology', 'Oncology', 'Dermatology'];
-
-const DoctorAvailability = () => {
-  const navigation = useNavigation<NavProp>();
-  const { token } = useAuth();
-  
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [doctors, setDoctors] = useState<Doctor[]>([]);
-  const [loading, setLoading] = useState(true);
+  const DoctorAvailability = () => {
+    const navigation = useNavigation<NavProp>();
+    const { token } = useAuth();
+    
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState('All');
+    const [categories, setCategories] = useState<string[]>(['All']);
+    const [doctors, setDoctors] = useState<Doctor[]>([]);
+    const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchDoctors = async () => {
@@ -49,17 +48,39 @@ const DoctorAvailability = () => {
         setLoading(false);
       }
     };
-    
-    if (token) {
-      fetchDoctors();
-    } else {
-      setLoading(false);
-    }
-  }, [token]);
+      const fetchSpecialties = async () => {
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/doctor/specialties`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const data = await res.json();
+          if (res.ok && data.success) {
+            const specNames = data.data.map((s: any) => s.name);
+            setCategories(['All', ...specNames]);
+          }
+        } catch (err) {
+          console.error('Failed to fetch specialties:', err);
+        }
+      };
+      
+      if (token) {
+        fetchDoctors();
+        fetchSpecialties();
+      } else {
+        setLoading(false);
+      }
+    }, [token]);
 
   const filteredDoctors = doctors.filter((doc) => {
-    return doc.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-           (doc.specialization && doc.specialization.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesSearch =
+      doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (doc.specialization && doc.specialization.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    const matchesCategory =
+      selectedCategory === 'All' ||
+      (doc.specialization && doc.specialization.toLowerCase() === selectedCategory.toLowerCase());
+
+    return matchesSearch && matchesCategory;
   });
 
   const renderDoctorCard = ({ item }: { item: Doctor }) => (
@@ -79,12 +100,10 @@ const DoctorAvailability = () => {
 
       <TouchableOpacity 
         style={styles.bookBtn}
-        onPress={() => navigation.navigate('BookAppointment', {
+        onPress={() => navigation.navigate('DoctorAvailabilityCalendar', {
           doctorId: item._id,
           doctorName: item.name,
-          specialty: item.specialization || 'General Physician',
-          date: '2026-05-20',
-          time: '10:00 AM'
+          specialty: item.specialization || 'General Physician'
         })}
       >
         <LinearGradient
@@ -150,13 +169,6 @@ const DoctorAvailability = () => {
 
         {loading ? (
           <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 50 }} />
-        ) : selectedCategory !== 'All' ? (
-          <View style={styles.upcomingFeatureContainer}>
-            <Text style={styles.upcomingFeatureText}>Upcoming Feature</Text>
-            <Text style={styles.upcomingFeatureSubText}>
-              Filtering doctors by {selectedCategory} will be available in a future update!
-            </Text>
-          </View>
         ) : (
           <FlatList
             data={filteredDoctors}
@@ -164,15 +176,14 @@ const DoctorAvailability = () => {
             renderItem={renderDoctorCard}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
-            ListHeaderComponent={() => (
-              <View style={styles.benefitSection}>
-                <View style={styles.benefitCard}>
-                  <CheckCircle2 size={24} color={COLORS.primary} />
-                  <View style={styles.benefitTextWrap}>
-                    <Text style={styles.benefitTitle}>No Overlaps</Text>
-                    <Text style={styles.benefitDesc}>Conflicts are automatically blocked</Text>
-                  </View>
-                </View>
+            ListEmptyComponent={() => (
+              <View style={styles.upcomingFeatureContainer}>
+                <Text style={styles.upcomingFeatureText}>No Doctors Found</Text>
+                <Text style={styles.upcomingFeatureSubText}>
+                  {searchQuery
+                    ? `No doctors match "${searchQuery}"${selectedCategory !== 'All' ? ` in ${selectedCategory}` : ''}.`
+                    : `There are no doctors available in ${selectedCategory} right now.`}
+                </Text>
               </View>
             )}
           />
@@ -264,19 +275,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   listContent: { padding: 20, paddingBottom: 100 },
-  benefitSection: { marginBottom: 20 },
-  benefitCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#EEF2FF',
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E0E7FF'
-  },
-  benefitTextWrap: { marginLeft: 12, flex: 1 },
-  benefitTitle: { fontSize: 15, fontWeight: '700', color: '#1E1B4B', marginBottom: 2 },
-  benefitDesc: { fontSize: 12, color: '#4338CA' },
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 24,

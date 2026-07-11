@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, Dimensions, Animated, PanResponder, Pressable, StatusBar, Modal, BackHandler } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, Dimensions, Animated, PanResponder, Pressable, StatusBar, Modal, BackHandler, Easing } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
-import { Search, Calendar, User, FileText, Activity, MoreHorizontal, Home, Heart, Shield, MessageCircle, FileEdit, FlaskConical, ChevronRight, Baby, Droplets, Sparkles, Plus, Bell, LogOut, Pill, Truck, Settings, X, LifeBuoy, Stethoscope, Dna, Brain, Bone, Eye, Smile, Wallet, Clock, AlertCircle } from 'lucide-react-native';
+import { Search, Calendar, User, FileText, Activity, MoreHorizontal, Home, Heart, Shield, MessageCircle, FileEdit, FlaskConical, ChevronRight, Baby, Droplets, Sparkles, Plus, Bell, LogOut, Pill, Truck, Settings, X, LifeBuoy, Stethoscope, Dna, Brain, Bone, Eye, Smile, Wallet, Clock, AlertCircle, Hourglass, Users } from 'lucide-react-native';
 import BottomNavBar from '../../components/BottomNavBar';
 import { useAuth } from '../../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -16,26 +16,6 @@ const { width, height } = Dimensions.get('window');
 
 type PatientDashboardProp = StackNavigationProp<RootStackParamList, 'PatientDashboard'>;
 
-// --- Countdown Timer Helpers ---
-const DOCTOR_APPT = new Date(2026, 4, 20, 10, 30, 0);  // 20 May 2026 10:30 AM
-const LAB_APPT = new Date(2026, 4, 22, 8, 0, 0);  // 22 May 2026 08:00 AM
-
-const calcCountdown = (target: Date): string => {
-  const diff = target.getTime() - Date.now();
-  if (diff <= 0) return 'Now!';
-  const totalSec = Math.floor(diff / 1000);
-  const s = totalSec % 60;
-  const m = Math.floor(totalSec / 60) % 60;
-  const h = Math.floor(totalSec / 3600) % 24;
-  const d = Math.floor(totalSec / 86400);
-  const ss = String(s).padStart(2, '0');
-  const mm = String(m).padStart(2, '0');
-  const hh = String(h).padStart(2, '0');
-  if (d > 0) return `${d}d ${hh}h ${mm}m ${ss}s`;
-  return `${hh}h ${mm}m ${ss}s`;
-};
-
-// Staggered Entrance Animation Wrapper
 const StaggeredView = ({ children, delay = 0, style }: { children: React.ReactNode; delay: number; style?: any }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const translateYAnim = useRef(new Animated.Value(-30)).current;
@@ -79,6 +59,161 @@ const StaggeredView = ({ children, delay = 0, style }: { children: React.ReactNo
   );
 };
 
+// =============================================================
+//  QueueAppointmentCard
+//  Beautifully redesigned card that prominently shows the
+//  patient's live queue number along with live status indicators
+//  (currently serving, patients ahead, estimated wait, etc.).
+// =============================================================
+const QueueAppointmentCard = ({
+  appointment,
+  queueInfo,
+  onPress,
+  lastRefresh
+}: {
+  appointment: any;
+  queueInfo?: any;
+  onPress: () => void;
+  lastRefresh?: Date | null;
+}) => {
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const progressAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.08, duration: 900, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 900, useNativeDriver: true })
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulseAnim]);
+
+  useEffect(() => {
+    if (queueInfo) {
+      Animated.timing(progressAnim, {
+        toValue: Math.min(1, Math.max(0, (queueInfo.currentlyServing || 1) / Math.max(1, queueInfo.queueNumber || 1))),
+        duration: 800,
+        useNativeDriver: false
+      }).start();
+    }
+  }, [queueInfo?.currentlyServing, queueInfo?.queueNumber]);
+
+  const queueNumber = queueInfo?.queueNumber ?? appointment?.queueNumber ?? '—';
+  const totalInSlot = queueInfo?.totalInSlot ?? 0;
+  const patientsAhead = queueInfo?.patientsAhead ?? 0;
+  const currentlyServing = queueInfo?.currentlyServing ?? 1;
+  const estimatedWait = queueInfo?.estimatedWaitMinutes ?? 0;
+  const isYourTurn = patientsAhead === 0;
+
+  const waitHours = Math.floor(estimatedWait / 60);
+  const waitMinutes = estimatedWait % 60;
+  const waitLabel = estimatedWait === 0
+    ? "It's your turn!"
+    : waitHours > 0
+      ? `~${waitHours}h ${waitMinutes}m wait`
+      : `~${waitMinutes}m wait`;
+
+  const statusColor = isYourTurn ? '#10B981' : patientsAhead <= 2 ? '#F59E0B' : COLORS.primary;
+  const statusBg = isYourTurn ? '#D1FAE5' : patientsAhead <= 2 ? '#FEF3C7' : '#F3F0FF';
+
+  const dateLabel = appointment?.date ? moment(appointment.date).format('ddd, DD MMM YYYY') : '';
+  const timeLabel = appointment?.timeSlot || '';
+  const doctorName = appointment?.doctor?.name || 'Doctor';
+  const specialization = appointment?.doctor?.specialization || 'Consultation';
+  const hospital = appointment?.doctor?.hospital || '';
+
+  return (
+    <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={styles.queueCardOuter}>
+      <LinearGradient
+        colors={isYourTurn ? ['#065F46', '#10B981'] : ['#5F0FFF', '#8B3DFF']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.queueCardGradient}
+      >
+        {/* Top Row: Doctor Info + Live Status Pill */}
+        <View style={styles.queueCardTopRow}>
+          <View style={styles.queueDoctorInfo}>
+            <View style={styles.queueDoctorAvatar}>
+              <Stethoscope size={20} color="#FFFFFF" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.queueDoctorName} numberOfLines={1}>{doctorName}</Text>
+              <Text style={styles.queueDoctorSpec} numberOfLines={1}>
+                {specialization}{hospital ? `  •  ${hospital}` : ''}
+              </Text>
+            </View>
+          </View>
+          <View style={[styles.livePill, isYourTurn && styles.livePillYourTurn]}>
+            <View style={[styles.liveDot, isYourTurn && styles.liveDotYourTurn]} />
+            <Text style={[styles.livePillText, isYourTurn && styles.livePillTextYourTurn]}>
+              {isYourTurn ? 'YOUR TURN' : 'LIVE'}
+            </Text>
+          </View>
+        </View>
+
+        {/* Big Queue Number Section */}
+        <View style={styles.queueNumberSection}>
+          <View>
+            <Text style={styles.queueLabel}>Your Queue Number</Text>
+            <Text style={styles.queueSubLabel}>{dateLabel}  •  {timeLabel}</Text>
+          </View>
+          <Animated.View style={[styles.queueNumberCircle, { transform: [{ scale: pulseAnim }] }]}>
+            <Text style={styles.queueNumberHash}>#</Text>
+            <Text style={styles.queueNumberDigit}>{queueNumber}</Text>
+          </Animated.View>
+        </View>
+
+        {/* Divider */}
+        <View style={styles.queueDivider} />
+
+        {/* Live Metrics Row */}
+        <View style={styles.queueMetricsRow}>
+          <View style={styles.queueMetric}>
+            <View style={styles.queueMetricIconWrap}>
+              <Users size={14} color="#FFFFFF" />
+            </View>
+            <Text style={styles.queueMetricValue}>{patientsAhead}</Text>
+            <Text style={styles.queueMetricLabel}>Ahead</Text>
+          </View>
+
+          <View style={styles.queueMetricDivider} />
+
+          <View style={styles.queueMetric}>
+            <View style={styles.queueMetricIconWrap}>
+              <Activity size={14} color="#FFFFFF" />
+            </View>
+            <Text style={styles.queueMetricValue}>{currentlyServing}</Text>
+            <Text style={styles.queueMetricLabel}>Now Serving</Text>
+          </View>
+
+          <View style={styles.queueMetricDivider} />
+
+          <View style={styles.queueMetric}>
+            <View style={styles.queueMetricIconWrap}>
+              <Hourglass size={14} color="#FFFFFF" />
+            </View>
+            <Text style={styles.queueMetricValue}>{totalInSlot}</Text>
+            <Text style={styles.queueMetricLabel}>In Slot</Text>
+          </View>
+        </View>
+
+        {/* Estimated Wait Banner */}
+        <View style={[styles.waitBanner, { backgroundColor: statusBg }]}>
+          <Hourglass size={14} color={statusColor} />
+          <Text style={[styles.waitBannerText, { color: statusColor }]}>{waitLabel}</Text>
+          {lastRefresh && (
+            <Text style={styles.refreshLabel}>
+              · Updated {moment(lastRefresh).format('HH:mm:ss')}
+            </Text>
+          )}
+        </View>
+      </LinearGradient>
+    </TouchableOpacity>
+  );
+};
+
 const PatientDashboard = () => {
   const navigation = useNavigation<PatientDashboardProp>();
   const isLoggingOut = useRef(false);
@@ -90,6 +225,39 @@ const PatientDashboard = () => {
   
   const [upcomingDoctorAppointment, setUpcomingDoctorAppointment] = useState<any>(null);
   const [upcomingLabAppointment, setUpcomingLabAppointment] = useState<any>(null);
+  const [liveQueue, setLiveQueue] = useState<any[]>([]);
+  const [lastQueueRefresh, setLastQueueRefresh] = useState<Date | null>(null);
+
+  // Polling for live queue updates every 30s when the screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      const fetchQueue = async () => {
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/patient/dashboard`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const json = await res.json();
+          if (res.ok && json.success) {
+            setUpcomingDoctorAppointment(json.data.doctorAppointments[0] || null);
+            setUpcomingLabAppointment(json.data.labAppointments[0] || null);
+            setLiveQueue(json.data.liveQueue || []);
+            setLastQueueRefresh(new Date());
+          }
+        } catch (e) {
+          console.error('Queue fetch error:', e);
+        }
+      };
+      if (token) {
+        fetchQueue();
+        const interval = setInterval(fetchQueue, 30000);
+        return () => clearInterval(interval);
+      }
+    }, [token])
+  );
+
+  const queueInfo = liveQueue.find(
+    (q) => q.appointmentId === upcomingDoctorAppointment?._id
+  );
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -235,23 +403,42 @@ const PatientDashboard = () => {
     })
   ).current;
 
-  // Live countdown state
-  const [doctorCountdown, setDoctorCountdown] = useState(() => calcCountdown(DOCTOR_APPT));
-  const [labCountdown, setLabCountdown] = useState(() => calcCountdown(LAB_APPT));
+  // Reminder state — based on actual fetched appointments
   const [reminderVisible, setReminderVisible] = useState(false);
   const [reminderMsg, setReminderMsg] = useState('');
 
   useEffect(() => {
+    const computeApptMs = (appt: any): number | null => {
+      if (!appt || !appt.date) return null;
+      const dateStr = moment(appt.date).format('YYYY-MM-DD');
+      const timeStr: string = appt.timeSlot || '';
+      // Try parsing timeSlot like "10:30 AM" or "14:30"
+      let time24 = timeStr;
+      const m12 = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+      if (m12) {
+        let h = parseInt(m12[1], 10);
+        const min = m12[2];
+        const ampm = m12[3].toUpperCase();
+        if (ampm === 'PM' && h < 12) h += 12;
+        if (ampm === 'AM' && h === 12) h = 0;
+        time24 = `${String(h).padStart(2, '0')}:${min}`;
+      }
+      const combined = moment(`${dateStr} ${time24}`, ['YYYY-MM-DD HH:mm', 'YYYY-MM-DD h:mm A']).valueOf();
+      return isNaN(combined) ? null : combined;
+    };
+
     const checkReminders = () => {
       const now = Date.now();
-      const labDiff = LAB_APPT.getTime() - now;
-      const docDiff = DOCTOR_APPT.getTime() - now;
+      const labMs = computeApptMs(upcomingLabAppointment);
+      const docMs = computeApptMs(upcomingDoctorAppointment);
 
-      // Check for 30 minutes (1800000 ms)
-      if (labDiff > 0 && labDiff <= 1800000) {
+      const labDiff = labMs !== null ? labMs - now : null;
+      const docDiff = docMs !== null ? docMs - now : null;
+
+      if (labDiff !== null && labDiff > 0 && labDiff <= 30 * 60 * 1000) {
         setReminderMsg('Your Lab Appointment is coming up in 30 minutes!');
         setReminderVisible(true);
-      } else if (docDiff > 0 && docDiff <= 1800000) {
+      } else if (docDiff !== null && docDiff > 0 && docDiff <= 30 * 60 * 1000) {
         setReminderMsg('Your Doctor Appointment is coming up in 30 minutes!');
         setReminderVisible(true);
       } else {
@@ -259,13 +446,10 @@ const PatientDashboard = () => {
       }
     };
 
-    const timer = setInterval(() => {
-      setDoctorCountdown(calcCountdown(DOCTOR_APPT));
-      setLabCountdown(calcCountdown(LAB_APPT));
-      checkReminders();
-    }, 1000);
+    checkReminders();
+    const timer = setInterval(checkReminders, 30000);
     return () => clearInterval(timer);
-  }, []);
+  }, [upcomingDoctorAppointment, upcomingLabAppointment]);
 
   useEffect(() => {
     const pulseLoop = Animated.loop(
@@ -563,27 +747,12 @@ const PatientDashboard = () => {
           {activeAppointmentTab === 'Doctor' ? (
             upcomingDoctorAppointment ? (
               <View style={styles.appointmentSubSection}>
-                <TouchableOpacity
-                  style={[styles.mainAppointmentCard, SHADOWS.small]}
+                <QueueAppointmentCard
+                  appointment={upcomingDoctorAppointment}
+                  queueInfo={queueInfo}
                   onPress={() => navigation.navigate('PatientAppointments')}
-                >
-                  <View style={[styles.mainAppIconWrap, { backgroundColor: '#F3F0FF' }]}>
-                    <Stethoscope size={28} color={COLORS.primary} />
-                  </View>
-                  <View style={styles.mainAppInfo}>
-                    <Text style={styles.mainAppTitle}>
-                      {upcomingDoctorAppointment.doctor?.name || 'Doctor Appointment'}
-                    </Text>
-                    <Text style={styles.mainAppSub}>
-                      {upcomingDoctorAppointment.doctor?.specialization || 'Consultation'}  •  {moment(upcomingDoctorAppointment.date).format('DD MMM')}  •  {upcomingDoctorAppointment.timeSlot || 'TBD'}
-                    </Text>
-                    <View style={styles.countdownPill}>
-                      <Activity size={11} color={COLORS.primary} />
-                      <Text style={styles.countdownText}>Upcoming</Text>
-                    </View>
-                  </View>
-                  <ChevronRight size={20} color="#9CA3AF" />
-                </TouchableOpacity>
+                  lastRefresh={lastQueueRefresh}
+                />
               </View>
             ) : (
               <View style={[styles.mainAppointmentCard, SHADOWS.small, { alignItems: 'center', justifyContent: 'center', padding: 30 }]}>
@@ -609,7 +778,11 @@ const PatientDashboard = () => {
                     </Text>
                     <View style={[styles.countdownPill, { backgroundColor: '#ECFDF5' }]}>
                       <Activity size={11} color="#10B981" />
-                      <Text style={[styles.countdownText, { color: '#10B981' }]}>Upcoming</Text>
+                      <Text style={[styles.countdownText, { color: '#10B981' }]}>
+                        {upcomingLabAppointment.queueNumber
+                          ? `Queue #${upcomingLabAppointment.queueNumber}`
+                          : 'Upcoming'}
+                      </Text>
                     </View>
                   </View>
                   <ChevronRight size={20} color="#9CA3AF" />
@@ -621,46 +794,6 @@ const PatientDashboard = () => {
               </View>
             )
           )}
-
-          {/* Two Info Cards Box */}
-          <View style={styles.infoCardsRow}>
-            {/* Live Queue Card */}
-            <LinearGradient colors={['#9333EA', '#5F0FFF']} style={styles.infoCard}>
-              <View style={styles.infoCardTop}>
-                <Text style={styles.infoCardTitle}>Live Queue</Text>
-                <View style={styles.smallArrowIndicator}>
-                  <ChevronRight size={14} color="#FFF" />
-                </View>
-              </View>
-              <Text style={styles.infoCardNumber}>12</Text>
-              <View style={styles.infoCardBottom}>
-                <View>
-                  <Text style={styles.infoCardSubtext}>Your Number</Text>
-                  <Text style={styles.infoCardSubtextSmall}>Estimated 25 min</Text>
-                </View>
-                <View style={styles.iconCircle}>
-                  <MessageCircle size={16} color={COLORS.primary} fill={COLORS.primary} />
-                </View>
-              </View>
-            </LinearGradient>
-
-            {/* Medicine Reminder Card */}
-            <LinearGradient colors={['#9333EA', '#5F0FFF']} style={styles.infoCard}>
-              <View style={styles.infoCardTop}>
-                <Text style={styles.infoCardTitle}>Medicine Reminder</Text>
-              </View>
-              <Text style={styles.infoCardNumber}>2</Text>
-              <View style={styles.infoCardBottom}>
-                <View>
-                  <Text style={styles.infoCardSubtext}>Medicines Today</Text>
-                  <Text style={styles.infoCardSubtextSmall}>View All</Text>
-                </View>
-                <View style={styles.iconCircle}>
-                  <Shield size={16} color={COLORS.primary} fill={COLORS.primary} />
-                </View>
-              </View>
-            </LinearGradient>
-          </View>
 
           {/* Quick Actions */}
           <Text style={[styles.sectionTitle, { marginTop: 24, marginBottom: 16 }]}>Quick Actions</Text>
@@ -1728,6 +1861,187 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.primary,
     marginTop: 6,
+  },
+  // =============================================================
+  //  QueueAppointmentCard styles
+  // =============================================================
+  queueCardOuter: {
+    borderRadius: 28,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.35,
+    shadowRadius: 18,
+    elevation: 12,
+  },
+  queueCardGradient: {
+    borderRadius: 28,
+    padding: 20,
+    overflow: 'hidden',
+  },
+  queueCardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 18,
+  },
+  queueDoctorInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+  },
+  queueDoctorAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  queueDoctorName: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  queueDoctorSpec: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.82)',
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  livePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    gap: 6,
+  },
+  livePillYourTurn: {
+    backgroundColor: '#FFFFFF',
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FFFFFF',
+  },
+  liveDotYourTurn: {
+    backgroundColor: '#10B981',
+  },
+  livePillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  livePillTextYourTurn: {
+    color: '#065F46',
+  },
+  queueNumberSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginVertical: 8,
+  },
+  queueLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.85)',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  queueSubLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.78)',
+    fontWeight: '600',
+    marginTop: 6,
+  },
+  queueNumberCircle: {
+    width: 86,
+    height: 86,
+    borderRadius: 43,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+  },
+  queueNumberHash: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: 'rgba(255,255,255,0.7)',
+    marginTop: -8,
+  },
+  queueNumberDigit: {
+    fontSize: 38,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    fontVariant: ['tabular-nums'],
+    marginLeft: 1,
+  },
+  queueDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    marginVertical: 16,
+  },
+  queueMetricsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  queueMetric: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+  },
+  queueMetricIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  queueMetricValue: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    fontVariant: ['tabular-nums'],
+  },
+  queueMetricLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.78)',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  queueMetricDivider: {
+    width: 1,
+    height: 38,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+  },
+  waitBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    gap: 8,
+  },
+  waitBannerText: {
+    fontSize: 13,
+    fontWeight: '800',
+    flex: 1,
+  },
+  refreshLabel: {
+    fontSize: 10,
+    color: '#6B7280',
+    fontWeight: '600',
   }
 });
 
