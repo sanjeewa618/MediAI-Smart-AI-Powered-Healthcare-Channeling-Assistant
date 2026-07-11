@@ -31,7 +31,7 @@ export type RootStackParamList = {
   SpecialtyDoctors: { specialty: string };
   AvailabilitySelection: undefined;
   LabAvailability: undefined;
-  LabBookingFlow: { lab: any; initialDate?: string; initialTime?: string };
+  LabBookingFlow: { lab: any; initialDate?: string; initialTime?: string; scheduleSlotId?: string };
   Settings: undefined;
   // Admin screens
   AdminDashboard: undefined;

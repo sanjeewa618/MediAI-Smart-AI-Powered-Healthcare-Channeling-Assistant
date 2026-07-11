@@ -1,6 +1,7 @@
 import User from '../model/User.js';
 import Appointment from '../model/Appointment.js';
 import AIAnalysisLog from '../model/AIAnalysisLog.js';
+import LabBooking from '../model/LabBooking.js';
 import PDFDocument from 'pdfkit';
 import ExcelJS from 'exceljs';
 
@@ -547,6 +548,7 @@ export const getSystemStats = async (req, res) => {
     const totalDoctors = await User.countDocuments({ role: 'doctor' });
     const totalNurses = await User.countDocuments({ role: 'nurse' });
     const totalAppointments = await Appointment.countDocuments();
+    const totalLabBookings = await LabBooking.countDocuments();
 
     res.json({
       success: true,
@@ -555,7 +557,8 @@ export const getSystemStats = async (req, res) => {
         patients: totalPatients,
         doctors: totalDoctors,
         nurses: totalNurses,
-        appointments: totalAppointments
+        appointments: totalAppointments + totalLabBookings,
+        labBookings: totalLabBookings
       }
     });
   } catch (error) {

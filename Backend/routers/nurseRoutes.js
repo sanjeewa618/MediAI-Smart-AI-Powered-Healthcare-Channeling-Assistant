@@ -1,5 +1,5 @@
 import express from 'express';
-import { getTodayAppointments, updateAppointmentStatus, createMedicalRecord, getAllNurses, getLabDepartments } from '../controllers/nurseController.js';
+import { getTodayAppointments, updateAppointmentStatus, createMedicalRecord, getAllNurses, getLabDepartments, updateNurseProfile } from '../controllers/nurseController.js';
 import { protect } from '../middlewares/authMiddleware.js';
 import { nurseOnly } from '../middlewares/roleMiddleware.js';
 
@@ -16,6 +16,9 @@ router.get('/', getAllNurses);
 
 // Require Nurse role for the routes below
 router.use(nurseOnly);
+
+// Profile management
+router.put('/profile', updateNurseProfile);
 
 // Appointment Management (Queue tracking)
 router.get('/appointments/today', getTodayAppointments);
