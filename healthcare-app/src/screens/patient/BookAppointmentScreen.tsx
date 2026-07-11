@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Platform, SafeAreaView, Dimensions, Alert, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Platform, SafeAreaView, Dimensions, Alert, StatusBar, KeyboardAvoidingView } from 'react-native';
 import { ChevronLeft, CheckCircle2, User, Calendar, CreditCard, Download, FileText, Upload, Stethoscope, FilePlus2, Receipt } from 'lucide-react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -339,12 +339,18 @@ const BookAppointmentScreen = () => {
 
       {currentStep < 3 && renderStepIndicator()}
 
-      <ScrollView style={styles.scrollContainer} contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
-        {currentStep === 0 && renderPatientInfo()}
-        {currentStep === 1 && renderMedicalDetails()}
-        {currentStep === 2 && renderReviewAndPay()}
-        {currentStep === 3 && renderReceipt()}
-      </ScrollView>
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <ScrollView style={styles.scrollContainer} contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+          {currentStep === 0 && renderPatientInfo()}
+          {currentStep === 1 && renderMedicalDetails()}
+          {currentStep === 2 && renderReviewAndPay()}
+          {currentStep === 3 && renderReceipt()}
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       {currentStep < 3 && (
         <View style={styles.bottomBar}>

@@ -251,65 +251,63 @@ const LabBookingFlowScreen = () => {
   const renderStep3 = () => (
     <View style={styles.stepContent}>
       <Text style={styles.stepTitle}>Patient Information</Text>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Full Name</Text>
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>Full Name</Text>
+        <TextInput 
+          style={styles.input} 
+          placeholder="Enter your full name"
+          value={patientDetails.fullName}
+          onChangeText={(v) => setPatientDetails({...patientDetails, fullName: v})}
+        />
+      </View>
+      <View style={styles.row}>
+        <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
+          <Text style={styles.inputLabel}>NIC / Passport</Text>
           <TextInput 
             style={styles.input} 
-            placeholder="Enter your full name"
-            value={patientDetails.fullName}
-            onChangeText={(v) => setPatientDetails({...patientDetails, fullName: v})}
+            placeholder="Ex: 981234567V"
+            value={patientDetails.nic}
+            onChangeText={(v) => setPatientDetails({...patientDetails, nic: v})}
           />
         </View>
-        <View style={styles.row}>
-          <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
-            <Text style={styles.inputLabel}>NIC / Passport</Text>
-            <TextInput 
-              style={styles.input} 
-              placeholder="Ex: 981234567V"
-              value={patientDetails.nic}
-              onChangeText={(v) => setPatientDetails({...patientDetails, nic: v})}
-            />
-          </View>
-          <View style={[styles.inputGroup, { flex: 1 }]}>
-            <Text style={styles.inputLabel}>Gender</Text>
-            <View style={styles.genderRow}>
-              <TouchableOpacity 
-                style={[styles.genderBtn, patientDetails.gender === 'Male' && styles.genderBtnActive]}
-                onPress={() => setPatientDetails({...patientDetails, gender: 'Male'})}
-              >
-                <Text style={[styles.genderBtnText, patientDetails.gender === 'Male' && styles.genderBtnTextActive]}>Male</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.genderBtn, patientDetails.gender === 'Female' && styles.genderBtnActive]}
-                onPress={() => setPatientDetails({...patientDetails, gender: 'Female'})}
-              >
-                <Text style={[styles.genderBtnText, patientDetails.gender === 'Female' && styles.genderBtnTextActive]}>Female</Text>
-              </TouchableOpacity>
-            </View>
+        <View style={[styles.inputGroup, { flex: 1 }]}>
+          <Text style={styles.inputLabel}>Gender</Text>
+          <View style={styles.genderRow}>
+            <TouchableOpacity 
+              style={[styles.genderBtn, patientDetails.gender === 'Male' && styles.genderBtnActive]}
+              onPress={() => setPatientDetails({...patientDetails, gender: 'Male'})}
+            >
+              <Text style={[styles.genderBtnText, patientDetails.gender === 'Male' && styles.genderBtnTextActive]}>Male</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.genderBtn, patientDetails.gender === 'Female' && styles.genderBtnActive]}
+              onPress={() => setPatientDetails({...patientDetails, gender: 'Female'})}
+            >
+              <Text style={[styles.genderBtnText, patientDetails.gender === 'Female' && styles.genderBtnTextActive]}>Female</Text>
+            </TouchableOpacity>
           </View>
         </View>
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Mobile Number</Text>
-          <TextInput 
-            style={styles.input} 
-            placeholder="Ex: 077 123 4567"
-            keyboardType="phone-pad"
-            value={patientDetails.mobile}
-            onChangeText={(v) => setPatientDetails({...patientDetails, mobile: v})}
-          />
-        </View>
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Medical Notes (Optional)</Text>
-          <TextInput 
-            style={[styles.input, { height: 80, paddingTop: 12 }]} 
-            placeholder="Existing diseases, allergies..."
-            multiline
-            value={patientDetails.medicalNotes}
-            onChangeText={(v) => setPatientDetails({...patientDetails, medicalNotes: v})}
-          />
-        </View>
-      </KeyboardAvoidingView>
+      </View>
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>Mobile Number</Text>
+        <TextInput 
+          style={styles.input} 
+          placeholder="Ex: 077 123 4567"
+          keyboardType="phone-pad"
+          value={patientDetails.mobile}
+          onChangeText={(v) => setPatientDetails({...patientDetails, mobile: v})}
+        />
+      </View>
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>Medical Notes (Optional)</Text>
+        <TextInput 
+          style={[styles.input, { height: 80, paddingTop: 12 }]} 
+          placeholder="Existing diseases, allergies..."
+          multiline
+          value={patientDetails.medicalNotes}
+          onChangeText={(v) => setPatientDetails({...patientDetails, medicalNotes: v})}
+        />
+      </View>
     </View>
   );
 
@@ -616,17 +614,23 @@ const LabBookingFlowScreen = () => {
 
       {currentStep < 6 && renderStepIndicator()}
 
-      <ScrollView 
-        showsVerticalScrollIndicator={false} 
-        contentContainerStyle={styles.scrollContent}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
-        {currentStep === 1 && renderStep1()}
-        {currentStep === 2 && renderStep3()}
-        {currentStep === 3 && renderStep4()}
-        {currentStep === 4 && renderStep5()}
-        {currentStep === 5 && renderStep6()}
-        {currentStep === 6 && renderSuccess()}
-      </ScrollView>
+        <ScrollView 
+          showsVerticalScrollIndicator={false} 
+          contentContainerStyle={styles.scrollContent}
+        >
+          {currentStep === 1 && renderStep1()}
+          {currentStep === 2 && renderStep3()}
+          {currentStep === 3 && renderStep4()}
+          {currentStep === 4 && renderStep5()}
+          {currentStep === 5 && renderStep6()}
+          {currentStep === 6 && renderSuccess()}
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       {currentStep < 6 && (
         <View style={styles.footer}>

@@ -228,7 +228,6 @@ const PatientDashboard = () => {
   const [liveQueue, setLiveQueue] = useState<any[]>([]);
   const [lastQueueRefresh, setLastQueueRefresh] = useState<Date | null>(null);
 
-  // Polling for live queue updates every 30s when the screen is focused
   useFocusEffect(
     useCallback(() => {
       const fetchQueue = async () => {
@@ -244,8 +243,17 @@ const PatientDashboard = () => {
               if (!appts) return [];
               return appts.filter(appt => moment(appt.date).isBetween(startOfToday, endOfTwoDays, null, '[]'));
             };
-            setUpcomingDoctorAppointments(filterNextTwoDays(json.data.doctorAppointments));
-            setUpcomingLabAppointments(filterNextTwoDays(json.data.labAppointments));
+            const filterUnique = (appts: any[]) => {
+              const seen = new Set();
+              return appts.filter(a => {
+                if (!a || !a._id) return true;
+                const dup = seen.has(a._id);
+                seen.add(a._id);
+                return !dup;
+              });
+            };
+            setUpcomingDoctorAppointments(filterUnique(filterNextTwoDays(json.data.doctorAppointments)));
+            setUpcomingLabAppointments(filterUnique(filterNextTwoDays(json.data.labAppointments)));
             setLiveQueue(json.data.liveQueue || []);
             setLastQueueRefresh(new Date());
           }
@@ -286,34 +294,7 @@ const PatientDashboard = () => {
     }
   }, [token]);
 
-  useFocusEffect(
-    useCallback(() => {
-      const fetchDashboardData = async () => {
-        try {
-          const response = await fetch(`${API_BASE_URL}/api/patient/dashboard`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          const data = await response.json();
-          if (response.ok && data.success) {
-            const startOfToday = moment().startOf('day');
-            const endOfTwoDays = moment().add(2, 'days').endOf('day');
-            const filterNextTwoDays = (appts: any[]) => {
-              if (!appts) return [];
-              return appts.filter(appt => moment(appt.date).isBetween(startOfToday, endOfTwoDays, null, '[]'));
-            };
-            setUpcomingDoctorAppointments(filterNextTwoDays(data.data.doctorAppointments));
-            setUpcomingLabAppointments(filterNextTwoDays(data.data.labAppointments));
-          }
-        } catch (err) {
-          console.error('Failed to fetch dashboard data:', err);
-        }
-      };
 
-      if (token) {
-        fetchDashboardData();
-      }
-    }, [token])
-  );
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (e) => {
@@ -584,7 +565,7 @@ const PatientDashboard = () => {
               </TouchableOpacity>
 
               <View style={styles.headerTextContainer}>
-                <Text style={styles.greeting}>Hello, {patientName} 👋</Text>
+                <Text style={styles.greeting} numberOfLines={1}>Hello, {patientName} 👋</Text>
                 <Text style={styles.subGreeting}>Take care of your health</Text>
               </View>
 
@@ -1217,7 +1198,7 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   greeting: {
-    fontSize: 22,
+    fontSize: 16,
     fontWeight: '700',
     color: '#FFFFFF'
   },
