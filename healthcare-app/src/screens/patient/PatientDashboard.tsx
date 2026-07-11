@@ -223,8 +223,8 @@ const PatientDashboard = () => {
   const [patientEmail, setPatientEmail] = useState('patient@example.com');
   const [activeAppointmentTab, setActiveAppointmentTab] = useState<'Doctor' | 'Lab'>('Doctor');
   
-  const [upcomingDoctorAppointment, setUpcomingDoctorAppointment] = useState<any>(null);
-  const [upcomingLabAppointment, setUpcomingLabAppointment] = useState<any>(null);
+  const [upcomingDoctorAppointments, setUpcomingDoctorAppointments] = useState<any[]>([]);
+  const [upcomingLabAppointments, setUpcomingLabAppointments] = useState<any[]>([]);
   const [liveQueue, setLiveQueue] = useState<any[]>([]);
   const [lastQueueRefresh, setLastQueueRefresh] = useState<Date | null>(null);
 
@@ -238,8 +238,14 @@ const PatientDashboard = () => {
           });
           const json = await res.json();
           if (res.ok && json.success) {
-            setUpcomingDoctorAppointment(json.data.doctorAppointments[0] || null);
-            setUpcomingLabAppointment(json.data.labAppointments[0] || null);
+            const startOfToday = moment().startOf('day');
+            const endOfTwoDays = moment().add(2, 'days').endOf('day');
+            const filterNextTwoDays = (appts: any[]) => {
+              if (!appts) return [];
+              return appts.filter(appt => moment(appt.date).isBetween(startOfToday, endOfTwoDays, null, '[]'));
+            };
+            setUpcomingDoctorAppointments(filterNextTwoDays(json.data.doctorAppointments));
+            setUpcomingLabAppointments(filterNextTwoDays(json.data.labAppointments));
             setLiveQueue(json.data.liveQueue || []);
             setLastQueueRefresh(new Date());
           }
@@ -255,9 +261,7 @@ const PatientDashboard = () => {
     }, [token])
   );
 
-  const queueInfo = liveQueue.find(
-    (q) => q.appointmentId === upcomingDoctorAppointment?._id
-  );
+  // queueInfo is computed inline during rendering now
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -291,8 +295,14 @@ const PatientDashboard = () => {
           });
           const data = await response.json();
           if (response.ok && data.success) {
-            setUpcomingDoctorAppointment(data.data.doctorAppointments[0] || null);
-            setUpcomingLabAppointment(data.data.labAppointments[0] || null);
+            const startOfToday = moment().startOf('day');
+            const endOfTwoDays = moment().add(2, 'days').endOf('day');
+            const filterNextTwoDays = (appts: any[]) => {
+              if (!appts) return [];
+              return appts.filter(appt => moment(appt.date).isBetween(startOfToday, endOfTwoDays, null, '[]'));
+            };
+            setUpcomingDoctorAppointments(filterNextTwoDays(data.data.doctorAppointments));
+            setUpcomingLabAppointments(filterNextTwoDays(data.data.labAppointments));
           }
         } catch (err) {
           console.error('Failed to fetch dashboard data:', err);
@@ -429,19 +439,39 @@ const PatientDashboard = () => {
 
     const checkReminders = () => {
       const now = Date.now();
-      const labMs = computeApptMs(upcomingLabAppointment);
-      const docMs = computeApptMs(upcomingDoctorAppointment);
+      let reminderFound = false;
 
-      const labDiff = labMs !== null ? labMs - now : null;
-      const docDiff = docMs !== null ? docMs - now : null;
+      // Check Lab Appointments
+      for (const appt of upcomingLabAppointments) {
+        const ms = computeApptMs(appt);
+        if (ms !== null) {
+          const diff = ms - now;
+          if (diff > 0 && diff <= 30 * 60 * 1000) {
+            setReminderMsg('Your Lab Appointment is coming up in 30 minutes!');
+            setReminderVisible(true);
+            reminderFound = true;
+            break;
+          }
+        }
+      }
 
-      if (labDiff !== null && labDiff > 0 && labDiff <= 30 * 60 * 1000) {
-        setReminderMsg('Your Lab Appointment is coming up in 30 minutes!');
-        setReminderVisible(true);
-      } else if (docDiff !== null && docDiff > 0 && docDiff <= 30 * 60 * 1000) {
-        setReminderMsg('Your Doctor Appointment is coming up in 30 minutes!');
-        setReminderVisible(true);
-      } else {
+      if (!reminderFound) {
+        // Check Doctor Appointments
+        for (const appt of upcomingDoctorAppointments) {
+          const ms = computeApptMs(appt);
+          if (ms !== null) {
+            const diff = ms - now;
+            if (diff > 0 && diff <= 30 * 60 * 1000) {
+              setReminderMsg('Your Doctor Appointment is coming up in 30 minutes!');
+              setReminderVisible(true);
+              reminderFound = true;
+              break;
+            }
+          }
+        }
+      }
+
+      if (!reminderFound) {
         setReminderVisible(false);
       }
     };
@@ -449,7 +479,7 @@ const PatientDashboard = () => {
     checkReminders();
     const timer = setInterval(checkReminders, 30000);
     return () => clearInterval(timer);
-  }, [upcomingDoctorAppointment, upcomingLabAppointment]);
+  }, [upcomingDoctorAppointments, upcomingLabAppointments]);
 
   useEffect(() => {
     const pulseLoop = Animated.loop(
@@ -745,52 +775,59 @@ const PatientDashboard = () => {
           </View>
 
           {activeAppointmentTab === 'Doctor' ? (
-            upcomingDoctorAppointment ? (
+            upcomingDoctorAppointments.length > 0 ? (
               <View style={styles.appointmentSubSection}>
-                <QueueAppointmentCard
-                  appointment={upcomingDoctorAppointment}
-                  queueInfo={queueInfo}
-                  onPress={() => navigation.navigate('PatientAppointments')}
-                  lastRefresh={lastQueueRefresh}
-                />
+                {upcomingDoctorAppointments.map((appt, idx) => (
+                  <View key={idx} style={{ marginBottom: 15 }}>
+                    <QueueAppointmentCard
+                      appointment={appt}
+                      queueInfo={liveQueue.find((q) => q.appointmentId === appt._id)}
+                      onPress={() => navigation.navigate('PatientAppointments')}
+                      lastRefresh={lastQueueRefresh}
+                    />
+                  </View>
+                ))}
               </View>
             ) : (
               <View style={[styles.mainAppointmentCard, SHADOWS.small, { alignItems: 'center', justifyContent: 'center', padding: 30 }]}>
-                <Text style={{ color: COLORS.textSecondary, fontWeight: '500' }}>No upcoming doctor appointments</Text>
+                <Text style={{ color: COLORS.textSecondary, fontWeight: '500' }}>No upcoming doctor appointments in next 2 days</Text>
               </View>
             )
           ) : (
-            upcomingLabAppointment ? (
+            upcomingLabAppointments.length > 0 ? (
               <View style={styles.appointmentSubSection}>
-                <TouchableOpacity
-                  style={[styles.mainAppointmentCard, SHADOWS.small]}
-                  onPress={() => navigation.navigate('Reports')}
-                >
-                  <View style={[styles.mainAppIconWrap, { backgroundColor: '#ECFDF5' }]}>
-                    <FlaskConical size={28} color="#10B981" />
-                  </View>
-                  <View style={styles.mainAppInfo}>
-                    <Text style={styles.mainAppTitle}>
-                      {upcomingLabAppointment.testName || 'Lab Test'}
-                    </Text>
-                    <Text style={styles.mainAppSub}>
-                      Lab Visit  •  {moment(upcomingLabAppointment.date).format('DD MMM')}  •  {upcomingLabAppointment.timeSlot || 'TBD'}
-                    </Text>
-                    <View style={[styles.countdownPill, { backgroundColor: '#ECFDF5' }]}>
-                      <Activity size={11} color="#10B981" />
-                      <Text style={[styles.countdownText, { color: '#10B981' }]}>
-                        {upcomingLabAppointment.queueNumber
-                          ? `Queue #${upcomingLabAppointment.queueNumber}`
-                          : 'Upcoming'}
-                      </Text>
+                {upcomingLabAppointments.map((appt, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    style={[styles.mainAppointmentCard, SHADOWS.small, { marginBottom: 15 }]}
+                    onPress={() => navigation.navigate('Reports')}
+                  >
+                    <View style={[styles.mainAppIconWrap, { backgroundColor: '#ECFDF5' }]}>
+                      <FlaskConical size={28} color="#10B981" />
                     </View>
-                  </View>
-                  <ChevronRight size={20} color="#9CA3AF" />
-                </TouchableOpacity>
+                    <View style={styles.mainAppInfo}>
+                      <Text style={styles.mainAppTitle}>
+                        {appt.testName || 'Lab Test'}
+                      </Text>
+                      <Text style={styles.mainAppSub}>
+                        Lab Visit  •  {moment(appt.date).format('DD MMM')}  •  {appt.timeSlot || 'TBD'}
+                      </Text>
+                      <View style={[styles.countdownPill, { backgroundColor: '#ECFDF5' }]}>
+                        <Activity size={11} color="#10B981" />
+                        <Text style={[styles.countdownText, { color: '#10B981' }]}>
+                          {appt.queueNumber
+                            ? `Queue #${appt.queueNumber}`
+                            : 'Upcoming'}
+                        </Text>
+                      </View>
+                    </View>
+                    <ChevronRight size={20} color="#9CA3AF" />
+                  </TouchableOpacity>
+                ))}
               </View>
             ) : (
               <View style={[styles.mainAppointmentCard, SHADOWS.small, { alignItems: 'center', justifyContent: 'center', padding: 30 }]}>
-                <Text style={{ color: COLORS.textSecondary, fontWeight: '500' }}>No upcoming lab appointments</Text>
+                <Text style={{ color: COLORS.textSecondary, fontWeight: '500' }}>No upcoming lab appointments in next 2 days</Text>
               </View>
             )
           )}
