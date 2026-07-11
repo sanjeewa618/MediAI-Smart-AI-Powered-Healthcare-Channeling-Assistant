@@ -214,6 +214,176 @@ const QueueAppointmentCard = ({
   );
 };
 
+// =============================================================
+//  QueueLabAppointmentCard
+//  Beautifully redesigned card for lab tests that matches
+//  the size and layout structure of doctor queue cards,
+//  using a vibrant teal gradient.
+// =============================================================
+const QueueLabAppointmentCard = ({
+  appointment,
+  onPress
+}: {
+  appointment: any;
+  onPress: () => void;
+}) => {
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.08, duration: 900, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 900, useNativeDriver: true })
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulseAnim]);
+
+  const queueNumber = appointment?.queueNumber ?? '—';
+  const status = appointment?.status || 'Pending';
+  const method = appointment?.collectionMethod || 'Hospital';
+  const payment = appointment?.paymentStatus || 'Pending';
+
+  const dateLabel = appointment?.date ? moment(appointment.date).format('ddd, DD MMM YYYY') : '';
+  const timeLabel = appointment?.timeSlot || '';
+  const testName = appointment?.testName || 'Lab Test';
+  const roomLabel = appointment?.room || 'Room 01';
+
+  const isConfirmed = status.toLowerCase() === 'confirmed';
+  const isPending = status.toLowerCase() === 'pending';
+
+  const pillBgColor = isConfirmed 
+    ? 'rgba(16, 185, 129, 0.25)' 
+    : isPending 
+      ? 'rgba(245, 158, 11, 0.35)' 
+      : 'rgba(255, 255, 255, 0.25)';
+
+  const dotColor = isConfirmed 
+    ? '#10B981' 
+    : isPending 
+      ? '#F59E0B' 
+      : '#FFFFFF';
+
+  return (
+    <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={styles.queueCardOuter}>
+      <LinearGradient
+        colors={['#0F766E', '#14B8A6']} // Premium Teal/Turquoise gradient
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.queueCardGradient}
+      >
+        {/* Top Row: Lab Info + Live Status Pill */}
+        <View style={styles.queueCardTopRow}>
+          <View style={styles.queueDoctorInfo}>
+            <View style={styles.queueDoctorAvatar}>
+              <FlaskConical size={20} color="#FFFFFF" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.queueDoctorName} numberOfLines={1}>{testName}</Text>
+              <Text style={styles.queueDoctorSpec} numberOfLines={1}>
+                Lab Test  •  {roomLabel}
+              </Text>
+            </View>
+          </View>
+          <View style={[styles.livePill, { backgroundColor: pillBgColor }]}>
+            <View style={[styles.liveDot, { backgroundColor: dotColor }]} />
+            <Text style={styles.livePillText}>
+              {status.toUpperCase()}
+            </Text>
+          </View>
+        </View>
+
+        {/* Big Queue Number Section */}
+        <View style={styles.queueNumberSection}>
+          <View>
+            <Text style={styles.queueLabel}>Your Token Number</Text>
+            <Text style={styles.queueSubLabel}>{dateLabel}  •  {timeLabel}</Text>
+          </View>
+          <Animated.View style={[styles.queueNumberCircle, { transform: [{ scale: pulseAnim }] }]}>
+            <Text style={styles.queueNumberHash}>#</Text>
+            <Text style={styles.queueNumberDigit}>{queueNumber}</Text>
+          </Animated.View>
+        </View>
+
+        {/* Divider */}
+        <View style={styles.queueDivider} />
+
+        {/* Live Metrics Row */}
+        <View style={styles.queueMetricsRow}>
+          <View style={styles.queueMetric}>
+            <View style={styles.queueMetricIconWrap}>
+              <Activity size={14} color="#FFFFFF" />
+            </View>
+            <Text style={styles.queueMetricValue}>{status}</Text>
+            <Text style={styles.queueMetricLabel}>Status</Text>
+          </View>
+
+          <View style={styles.queueMetricDivider} />
+
+          <View style={styles.queueMetric}>
+            <View style={styles.queueMetricIconWrap}>
+              <Home size={14} color="#FFFFFF" />
+            </View>
+            <Text style={styles.queueMetricValue}>{method === 'Home' ? 'Home' : 'Lab'}</Text>
+            <Text style={styles.queueMetricLabel}>Method</Text>
+          </View>
+
+          <View style={styles.queueMetricDivider} />
+
+          <View style={styles.queueMetric}>
+            <View style={styles.queueMetricIconWrap}>
+              <Wallet size={14} color="#FFFFFF" />
+            </View>
+            <Text style={styles.queueMetricValue}>{payment}</Text>
+            <Text style={styles.queueMetricLabel}>Payment</Text>
+          </View>
+        </View>
+      </LinearGradient>
+    </TouchableOpacity>
+  );
+};
+
+const isApptExpiredFrontend = (apptDateStr: string, timeSlotStr: string) => {
+  if (!apptDateStr) return true;
+  if (!timeSlotStr) return false;
+
+  try {
+    let timePart = timeSlotStr;
+    if (timeSlotStr.includes('-')) {
+      timePart = timeSlotStr.split('-')[1].trim();
+    }
+
+    let hours = 0;
+    let minutes = 0;
+    const match = timePart.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+    if (match) {
+      hours = parseInt(match[1], 10);
+      minutes = parseInt(match[2], 10);
+      const ampm = match[3].toUpperCase();
+      if (ampm === 'PM' && hours < 12) hours += 12;
+      if (ampm === 'AM' && hours === 12) hours = 0;
+    } else {
+      const match24 = timePart.match(/(\d{1,2}):(\d{2})/);
+      if (match24) {
+        hours = parseInt(match24[1], 10);
+        minutes = parseInt(match24[2], 10);
+      }
+    }
+
+    const apptDateLocal = moment(apptDateStr).startOf('day');
+    apptDateLocal.hours(hours);
+    apptDateLocal.minutes(minutes);
+    apptDateLocal.seconds(0);
+    apptDateLocal.milliseconds(0);
+
+    return moment().isAfter(apptDateLocal);
+  } catch (err) {
+    console.error('Error checking expiry in frontend:', err);
+    return false;
+  }
+};
+
 const PatientDashboard = () => {
   const navigation = useNavigation<PatientDashboardProp>();
   const isLoggingOut = useRef(false);
@@ -228,6 +398,11 @@ const PatientDashboard = () => {
   const [liveQueue, setLiveQueue] = useState<any[]>([]);
   const [lastQueueRefresh, setLastQueueRefresh] = useState<Date | null>(null);
 
+  // Lab Availability
+  const [labCategories, setLabCategories] = useState<any[]>([]);
+  const [labSlotCounts, setLabSlotCounts] = useState<{[catId: string]: number}>({});
+  const [labSlotsLoading, setLabSlotsLoading] = useState(false);
+
   useFocusEffect(
     useCallback(() => {
       const fetchQueue = async () => {
@@ -241,7 +416,11 @@ const PatientDashboard = () => {
             const endOfTwoDays = moment().add(2, 'days').endOf('day');
             const filterNextTwoDays = (appts: any[]) => {
               if (!appts) return [];
-              return appts.filter(appt => moment(appt.date).isBetween(startOfToday, endOfTwoDays, null, '[]'));
+              return appts.filter(appt => {
+                const dateInRange = moment(appt.date).isBetween(startOfToday, endOfTwoDays, null, '[]');
+                if (!dateInRange) return false;
+                return !isApptExpiredFrontend(appt.date, appt.timeSlot);
+              });
             };
             const filterUnique = (appts: any[]) => {
               const seen = new Set();
@@ -269,7 +448,56 @@ const PatientDashboard = () => {
     }, [token])
   );
 
-  // queueInfo is computed inline during rendering now
+  useFocusEffect(
+    useCallback(() => {
+      const fetchLabAvailability = async () => {
+        setLabSlotsLoading(true);
+        try {
+          const today = moment().format('YYYY-MM-DD');
+          const [catsRes, labsRes] = await Promise.all([
+            fetch(`${API_BASE_URL}/api/labs/categories`),
+            fetch(`${API_BASE_URL}/api/labs?limit=100`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            })
+          ]);
+          const catsData = await catsRes.json();
+          const labsData = await labsRes.json();
+          if (!catsData.success || !labsData.success) return;
+          const cats = catsData.data || [];
+          const labs = labsData.data || [];
+          setLabCategories(cats);
+          // For each category, sum available slots across all labs in that category
+          const counts: {[catId: string]: number} = {};
+          await Promise.all(cats.map(async (cat: any) => {
+            const catLabs = labs.filter((l: any) => {
+              const catId = l.category?._id || l.category;
+              return catId?.toString() === cat._id?.toString();
+            });
+            let total = 0;
+            await Promise.all(catLabs.map(async (lab: any) => {
+              try {
+                const r = await fetch(`${API_BASE_URL}/api/labs/${lab._id}/schedule?date=${today}`, {
+                  headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const d = await r.json();
+                if (r.ok && d.success) {
+                  const slots: any[] = d.data || [];
+                  total += slots.filter((s: any) => (s.booked || 0) < s.maxPatients).length;
+                }
+              } catch (_) {}
+            }));
+            counts[cat._id] = total;
+          }));
+          setLabSlotCounts(counts);
+        } catch (e) {
+          console.error('Lab availability fetch error:', e);
+        } finally {
+          setLabSlotsLoading(false);
+        }
+      };
+      if (token) fetchLabAvailability();
+    }, [token])
+  );
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -778,32 +1006,12 @@ const PatientDashboard = () => {
             upcomingLabAppointments.length > 0 ? (
               <View style={styles.appointmentSubSection}>
                 {upcomingLabAppointments.map((appt, idx) => (
-                  <TouchableOpacity
-                    key={idx}
-                    style={[styles.mainAppointmentCard, SHADOWS.small, { marginBottom: 15 }]}
-                    onPress={() => navigation.navigate('Reports')}
-                  >
-                    <View style={[styles.mainAppIconWrap, { backgroundColor: '#ECFDF5' }]}>
-                      <FlaskConical size={28} color="#10B981" />
-                    </View>
-                    <View style={styles.mainAppInfo}>
-                      <Text style={styles.mainAppTitle}>
-                        {appt.testName || 'Lab Test'}
-                      </Text>
-                      <Text style={styles.mainAppSub}>
-                        Lab Visit  •  {moment(appt.date).format('DD MMM')}  •  {appt.timeSlot || 'TBD'}
-                      </Text>
-                      <View style={[styles.countdownPill, { backgroundColor: '#ECFDF5' }]}>
-                        <Activity size={11} color="#10B981" />
-                        <Text style={[styles.countdownText, { color: '#10B981' }]}>
-                          {appt.queueNumber
-                            ? `Queue #${appt.queueNumber}`
-                            : 'Upcoming'}
-                        </Text>
-                      </View>
-                    </View>
-                    <ChevronRight size={20} color="#9CA3AF" />
-                  </TouchableOpacity>
+                  <View key={idx} style={{ marginBottom: 15 }}>
+                    <QueueLabAppointmentCard
+                      appointment={appt}
+                      onPress={() => navigation.navigate('Reports')}
+                    />
+                  </View>
                 ))}
               </View>
             ) : (
@@ -846,6 +1054,79 @@ const PatientDashboard = () => {
               </View>
               <Text style={styles.quickActionText}>More</Text>
             </TouchableOpacity>
+          </View>
+
+          {/* Lab Availability Section */}
+          <View style={{ marginTop: 28, marginBottom: 8 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <Text style={[styles.sectionTitle, { fontSize: 18, color: '#000000' }]}>Lab Availability</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('LabAvailability')}>
+                <Text style={{ color: COLORS.primary, fontWeight: '600', fontSize: 13 }}>See All</Text>
+              </TouchableOpacity>
+            </View>
+
+            {labSlotsLoading ? (
+              <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+                <Text style={{ color: COLORS.textSecondary, fontSize: 13 }}>Loading availability...</Text>
+              </View>
+            ) : labCategories.length === 0 ? (
+              <View style={{ alignItems: 'center', paddingVertical: 20, backgroundColor: '#F8F9FA', borderRadius: 16 }}>
+                <FlaskConical size={32} color="#CBD5E1" />
+                <Text style={{ color: COLORS.textSecondary, marginTop: 8, fontSize: 13 }}>No lab categories found</Text>
+              </View>
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 2, paddingBottom: 4 }}>
+                {labCategories.map((cat: any) => {
+                  const slotCount = labSlotCounts[cat._id] ?? null;
+                  const hasSlots = slotCount !== null && slotCount > 0;
+                  const catIcons: {[key: string]: string} = {
+                    'Blood Test': '🩸', 'Urine Test': '🧪', 'Diabetes': '🍬',
+                    'Heart': '❤️', 'Liver': '🧬', 'Pregnancy': '🤰',
+                    'X-Ray': '🦴', 'MRI': '🧲', 'CT Scan': '📡', 'Ultrasound': '🔊'
+                  };
+                  const emoji = catIcons[cat.name] || '🔬';
+                  return (
+                    <TouchableOpacity
+                      key={cat._id}
+                      style={{
+                        width: 130,
+                        marginRight: 12,
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: 16,
+                        padding: 14,
+                        shadowColor: '#8B3DFF',
+                        shadowOffset: { width: 0, height: 3 },
+                        shadowOpacity: 0.08,
+                        shadowRadius: 8,
+                        elevation: 4,
+                        borderWidth: hasSlots ? 1.5 : 1,
+                        borderColor: hasSlots ? '#A78BFA' : '#E5E7EB',
+                      }}
+                      onPress={() => navigation.navigate('LabAvailability')}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={{ fontSize: 28, marginBottom: 8 }}>{emoji}</Text>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#1E293B', marginBottom: 6 }} numberOfLines={2}>
+                        {cat.name}
+                      </Text>
+                      {slotCount === null ? (
+                        <View style={{ backgroundColor: '#F1F5F9', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, alignSelf: 'flex-start' }}>
+                          <Text style={{ fontSize: 10, color: '#94A3B8', fontWeight: '600' }}>Checking...</Text>
+                        </View>
+                      ) : hasSlots ? (
+                        <View style={{ backgroundColor: '#ECFDF5', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, alignSelf: 'flex-start' }}>
+                          <Text style={{ fontSize: 10, color: '#10B981', fontWeight: '700' }}>✓ {slotCount} slot{slotCount !== 1 ? 's' : ''} today</Text>
+                        </View>
+                      ) : (
+                        <View style={{ backgroundColor: '#F1F5F9', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, alignSelf: 'flex-start' }}>
+                          <Text style={{ fontSize: 10, color: '#94A3B8', fontWeight: '600' }}>No slots today</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            )}
           </View>
 
         </View>

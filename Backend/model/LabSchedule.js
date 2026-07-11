@@ -6,7 +6,7 @@ const labScheduleSchema = new mongoose.Schema({
   startTime: { type: String, required: true },
   endTime: { type: String, required: true },
   maxPatients: { type: Number, required: true },
-  nurse: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  nurse: { type: String },
   room: { type: String },
   type: { type: String },
   isActive: { type: Boolean, default: true }

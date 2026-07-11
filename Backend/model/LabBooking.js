@@ -4,6 +4,7 @@ const labBookingSchema = new mongoose.Schema({
   bookingRef: { type: String, required: true, unique: true },
   lab: { type: mongoose.Schema.Types.ObjectId, ref: 'Lab', required: true },
   scheduleSlot: { type: mongoose.Schema.Types.ObjectId, ref: 'LabSchedule', required: true },
+  patientUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   appointmentDate: { type: Date, required: true },
   patient: {
     fullName: { type: String, required: true },

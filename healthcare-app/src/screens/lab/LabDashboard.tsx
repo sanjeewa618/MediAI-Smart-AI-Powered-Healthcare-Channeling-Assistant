@@ -67,7 +67,7 @@ const LabDashboard = () => {
       if (bookingsRes.ok && bookingsData.success) {
         const allBookings = bookingsData.data || [];
         const processingList = allBookings.filter((b: any) => 
-          ['Confirmed', 'Checked-In', 'Sample-Collected', 'Testing'].includes(b.status)
+          ['Pending', 'Confirmed', 'Checked-In', 'Sample-Collected', 'Testing'].includes(b.status)
         );
         setActiveQueue(processingList);
         setRecentActivities(allBookings.slice(0, 3));
@@ -311,29 +311,62 @@ const LabDashboard = () => {
               <Text style={{ color: COLORS.textSecondary, fontWeight: '600' }}>No active queue bookings</Text>
             </View>
           ) : (
-            <View style={[styles.queueCard, { borderLeftColor: activeQueue[0].status === 'Confirmed' ? COLORS.primary : COLORS.error, borderLeftWidth: 4 }]}>
-              <View style={styles.queueInfo}>
-                <View style={styles.patientRow}>
-                  <Text style={styles.patientName}>{activeQueue[0].patient?.fullName}</Text>
-                  <View style={[styles.urgentBadge, { backgroundColor: activeQueue[0].status === 'Confirmed' ? COLORS.primaryLight : '#FEE2E2' }]}>
-                    <Text style={[styles.urgentText, { color: activeQueue[0].status === 'Confirmed' ? COLORS.primary : COLORS.error }]}>
-                      {activeQueue[0].status.toUpperCase()}
-                    </Text>
+            (() => {
+              const status = activeQueue[0].status || 'Pending';
+              let borderLeftColor = COLORS.primary;
+              let badgeBg = COLORS.primaryLight;
+              let badgeText = COLORS.primary;
+
+              if (status === 'Pending') {
+                borderLeftColor = COLORS.warning;
+                badgeBg = COLORS.warning + '1A';
+                badgeText = COLORS.warning;
+              } else if (['Checked-In', 'Sample-Collected', 'Testing'].includes(status)) {
+                borderLeftColor = '#60A5FA';
+                badgeBg = '#DBEAFE';
+                badgeText = '#2563EB';
+              } else if (status === 'Completed') {
+                borderLeftColor = COLORS.success;
+                badgeBg = COLORS.success + '1A';
+                badgeText = COLORS.success;
+              } else if (status === 'Cancelled') {
+                borderLeftColor = COLORS.error;
+                badgeBg = '#FEE2E2';
+                badgeText = COLORS.error;
+              }
+
+              const timeStr = activeQueue[0].scheduleSlot && activeQueue[0].scheduleSlot.startTime && activeQueue[0].scheduleSlot.endTime
+                ? `${activeQueue[0].scheduleSlot.startTime} - ${activeQueue[0].scheduleSlot.endTime}`
+                : activeQueue[0].scheduleSlot?.startTime || '09:00 AM';
+
+              return (
+                <View style={[styles.queueCard, { borderLeftColor, borderLeftWidth: 4 }]}>
+                  <View style={styles.queueInfo}>
+                    <View style={styles.patientRow}>
+                      <Text style={styles.patientName}>{activeQueue[0].patient?.fullName}</Text>
+                      <View style={[styles.urgentBadge, { backgroundColor: badgeBg }]}>
+                        <Text style={[styles.urgentText, { color: badgeText }]}>
+                          {status.toUpperCase()}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.testType}>{activeQueue[0].lab?.name || 'Lab Test'}</Text>
+                    <View style={styles.timeRow}>
+                      <Clock size={14} color={COLORS.textSecondary} />
+                      <Text style={styles.timeText}>
+                        {moment(activeQueue[0].appointmentDate).format('MMM DD, YYYY')} • {timeStr}
+                      </Text>
+                    </View>
                   </View>
+                  <TouchableOpacity 
+                    style={styles.processBtn}
+                    onPress={() => navigation.navigate('LabAppointments')}
+                  >
+                    <Text style={styles.processBtnText}>Manage</Text>
+                  </TouchableOpacity>
                 </View>
-                <Text style={styles.testType}>{activeQueue[0].lab?.name || 'Lab Test'}</Text>
-                <View style={styles.timeRow}>
-                  <Clock size={14} color={COLORS.textSecondary} />
-                  <Text style={styles.timeText}>{moment(activeQueue[0].appointmentDate).format('MMM DD, YYYY')} • {activeQueue[0].scheduleSlot?.startTime}</Text>
-                </View>
-              </View>
-              <TouchableOpacity 
-                style={styles.processBtn}
-                onPress={() => navigation.navigate('LabAppointments')}
-              >
-                <Text style={styles.processBtnText}>Manage</Text>
-              </TouchableOpacity>
-            </View>
+              );
+            })()
           )}
 
           {/* Active Tasks List */}

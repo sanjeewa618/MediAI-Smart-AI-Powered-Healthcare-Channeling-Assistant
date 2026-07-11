@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, 
   TextInput, SafeAreaView, Platform, StatusBar, Modal, Dimensions,
@@ -13,7 +13,7 @@ import {
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import BottomNavBar from '../../components/BottomNavBar';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/types';
 import { useAuth } from '../../context/AuthContext';
@@ -203,30 +203,37 @@ const LabAvailabilityScreen = () => {
   ).current;
 
   const { token } = useAuth();
-  const [dbNurses, setDbNurses] = useState<any[]>([]);
+  const [dbLabs, setDbLabs] = useState<any[]>([]);
+  const [dbCategories, setDbCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dbSlots, setDbSlots] = useState<any[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [availableSlotsCount, setAvailableSlotsCount] = useState<{[key: string]: number}>({});
 
-  useEffect(() => {
-    const fetchNurses = async () => {
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/nurse`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const data = await response.json();
-        if (response.ok && data.success) {
-          setDbNurses(data.data);
+  useFocusEffect(
+    useCallback(() => {
+      const fetchLabsAndCategories = async () => {
+        setLoading(true);
+        try {
+          const [catsRes, labsRes] = await Promise.all([
+            fetch(`${API_BASE_URL}/api/labs/categories`),
+            fetch(`${API_BASE_URL}/api/labs?limit=100`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            })
+          ]);
+          const catsData = await catsRes.json();
+          const labsData = await labsRes.json();
+          if (catsData.success) setDbCategories(catsData.data || []);
+          if (labsData.success) setDbLabs(labsData.data || []);
+        } catch (error) {
+          console.error('Error fetching labs:', error);
+        } finally {
+          setLoading(false);
         }
-      } catch (error) {
-        console.error('Error fetching nurses:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    if (token) fetchNurses();
-  }, [token]);
+      };
+      if (token) fetchLabsAndCategories();
+    }, [token])
+  );
 
   useEffect(() => {
     const fetchDbSlots = async () => {
@@ -234,12 +241,12 @@ const LabAvailabilityScreen = () => {
       setSlotsLoading(true);
       try {
         const fullDateStr = selectedDate;
-        const res = await fetch(`${API_BASE_URL}/api/labs/${selectedLabForAvailability.id}/schedule?date=${fullDateStr}`, {
+        const res = await fetch(`${API_BASE_URL}/api/labs/${selectedLabForAvailability.id}/availability?date=${fullDateStr}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await res.json();
         if (res.ok && data.success) {
-          setDbSlots(data.data || []);
+          setDbSlots(data.data?.slots || []);
         } else {
           setDbSlots([]);
         }
@@ -256,49 +263,97 @@ const LabAvailabilityScreen = () => {
     }
   }, [selectedLabForAvailability, selectedDate, token]);
 
-  const selectedCategoryName = labCategories.find(c => c.id === selectedCategory)?.name || '';
+  useEffect(() => {
+    setSelectedTimeSlot('');
+  }, [selectedDate, selectedLabForAvailability]);
 
-  const filteredLabs = dbNurses
-    .filter(nurse => nurse.department === selectedCategoryName)
-    .filter(nurse => 
-      nurse.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      (nurse.department || '').toLowerCase().includes(searchQuery.toLowerCase())
+  const selectedCategoryObj = dbCategories.find(c => c.name?.toLowerCase() === (labCategories.find(lc => lc.id === selectedCategory)?.name?.toLowerCase()));
+
+  const seenNurses = new Set();
+  const filteredLabs = dbLabs
+    .filter(lab => {
+      // Must have an assigned nurse
+      if (!lab.assignedNurse) return false;
+
+      const nurseId = (lab.assignedNurse?._id || lab.assignedNurse).toString();
+      
+      // If we've already displayed a lab card for this nurse, filter it out to prevent duplicates
+      if (seenNurses.has(nurseId)) {
+        return false;
+      }
+
+      if (!selectedCategoryObj) return false;
+      
+      let isMatch = false;
+
+      // Match by category ID
+      const catId = lab.category?._id || lab.category;
+      if (catId?.toString() === selectedCategoryObj._id?.toString()) {
+        isMatch = true;
+      }
+      
+      // Fallback 1: Match by category name
+      const catName = lab.category?.name;
+      if (!isMatch && catName && catName.toLowerCase() === selectedCategoryObj.name.toLowerCase()) {
+        isMatch = true;
+      }
+      
+      // Fallback 2: Match by assignedNurse department
+      const nurseDept = lab.assignedNurse?.department;
+      if (!isMatch && nurseDept && nurseDept.toLowerCase() === selectedCategoryObj.name.toLowerCase()) {
+        isMatch = true;
+      }
+      
+      // Fallback 3: Match by lab name containing the category name
+      const labName = lab.name || '';
+      if (!isMatch && labName.toLowerCase().includes(selectedCategoryObj.name.toLowerCase())) {
+        isMatch = true;
+      }
+      
+      if (isMatch) {
+        seenNurses.add(nurseId);
+        return true;
+      }
+      
+      return false;
+    })
+    .filter(lab =>
+      (lab.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (lab.description || '').toLowerCase().includes(searchQuery.toLowerCase())
     )
-    .map((nurse, index) => ({
-      id: nurse._id,
+    .map(lab => ({
+      id: lab._id,
       category: selectedCategory,
-      name: `Lab - ${nurse.name.split(' ')[0] || 'Unit'}`,
-      description: nurse.department || 'Lab Test',
-      floor: 'Main Floor',
+      name: lab.name,
+      description: lab.description || lab.category?.name || 'Lab Test',
+      floor: lab.floor || 'Main Floor',
       duration: '1-2 Hours',
       price: 'LKR 1500',
-      status: 'Available',
-      nurse: nurse.name,
+      status: lab.status || 'Available',
+      nurse: lab.assignedNurse?.name || 'Assigned Nurse',
       rating: 4.8,
-      queue: Math.floor(Math.random() * 5),
+      queue: 0,
       wait: '15 mins',
-      currentToken: 12,
-      yourToken: 15,
-      openTime: '08:00 AM',
-      closeTime: '06:00 PM',
-      image: nurse.profileImage || 'https://img.freepik.com/free-photo/lab-technician-holding-blood-tube_23-2148166567.jpg'
+      currentToken: 0,
+      yourToken: 0,
+      openTime: lab.openTime || '08:00 AM',
+      closeTime: lab.closeTime || '06:00 PM',
+      image: 'https://img.freepik.com/free-photo/lab-technician-holding-blood-tube_23-2148166567.jpg'
     }));
 
   useEffect(() => {
     const fetchAllAvailableSlots = async () => {
       if (filteredLabs.length === 0) return;
-      const fullDateStr = selectedDate;
-      
       const counts: {[key: string]: number} = {};
       await Promise.all(filteredLabs.map(async (lab) => {
         try {
-          const res = await fetch(`${API_BASE_URL}/api/labs/${lab.id}/schedule?date=${fullDateStr}`, {
+          const res = await fetch(`${API_BASE_URL}/api/labs/${lab.id}/availability`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
           const data = await res.json();
           if (res.ok && data.success) {
-            const slotsList = data.data || [];
-            const count = slotsList.filter((s: any) => s.booked < s.maxPatients).length;
+            const slotsList = data.data?.slots || [];
+            const count = slotsList.filter((s: any) => s.status === 'Available' || s.status === 'Busy').length;
             counts[lab.id] = count;
           } else {
             counts[lab.id] = 0;
@@ -314,15 +369,16 @@ const LabAvailabilityScreen = () => {
     if (token && filteredLabs.length > 0) {
       fetchAllAvailableSlots();
     }
-  }, [selectedDate, token, dbNurses, selectedCategory]);
+  }, [selectedDate, token, dbLabs, dbCategories, selectedCategory, searchQuery]);
 
   const displaySlots = dbSlots.length > 0
     ? dbSlots.map(s => {
-        const isFull = s.booked >= s.maxPatients;
+        const timeRange = s.endTime ? `${s.startTime} - ${s.endTime}` : s.startTime;
         return {
-          time: s.startTime,
-          status: isFull ? 'Busy' : 'Available',
-          rawSlot: s
+          time: timeRange,
+          status: s.status || 'Available',
+          rawSlot: s,
+          isExpired: s.isExpired
         };
       })
     : (timeSlotsData[selectedDate] || timeSlotsData['default']);
@@ -343,6 +399,9 @@ const LabAvailabilityScreen = () => {
       panY.setValue(0);
     });
   };
+
+  const selectedSlotObj = displaySlots.find((s: any) => s.time === selectedTimeSlot);
+  const isBookingEnabled = !!selectedTimeSlot && selectedSlotObj?.status !== 'Closed';
 
   return (
     <SafeAreaView style={styles.container}>
@@ -576,7 +635,12 @@ const LabAvailabilityScreen = () => {
               {/* Time Slots in Modal */}
               <View style={styles.modalSection}>
                 <Text style={styles.sectionLabel}>Available Slots for {moment(selectedDate).format('DD MMMM YYYY')}</Text>
-                {displaySlots.length === 0 ? (
+                {slotsLoading ? (
+                  <View style={{ paddingVertical: 30, alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+                    <ActivityIndicator size="large" color={COLORS.primary} />
+                    <Text style={{ color: COLORS.textSecondary, fontSize: 13, marginTop: 8 }}>Loading available slots...</Text>
+                  </View>
+                ) : displaySlots.length === 0 ? (
                   <View style={{ paddingVertical: 30, alignItems: 'center', justifyContent: 'center', width: '100%' }}>
                     <AlertCircle size={36} color={COLORS.textSecondary} style={{ marginBottom: 10 }} />
                     <Text style={{ color: COLORS.textHeader, fontSize: 15, fontWeight: '700' }}>No slots available</Text>
@@ -592,16 +656,18 @@ const LabAvailabilityScreen = () => {
                         style={[
                           styles.timeSlot, 
                           slot.status === 'Available' ? styles.timeSlotAvailable : 
-                          slot.status === 'Busy' ? styles.timeSlotBusy : styles.timeSlotClosed,
+                          slot.status === 'Busy' ? styles.timeSlotBusy : 
+                          (slot.status === 'Closed' || slot.isExpired) ? styles.timeSlotExpired : styles.timeSlotClosed,
                           selectedTimeSlot === slot.time && styles.timeSlotSelected
                         ]}
                         onPress={() => setSelectedTimeSlot(slot.time)}
-                        disabled={slot.status === 'Closed'}
+                        disabled={slot.status === 'Closed' || slot.isExpired}
                       >
                         <Text style={[
                           styles.timeText,
                           slot.status === 'Available' ? styles.timeTextAvailable : 
-                          slot.status === 'Busy' ? styles.statusFew : styles.statusFull,
+                          slot.status === 'Busy' ? styles.statusFew : 
+                          (slot.status === 'Closed' || slot.isExpired) ? styles.timeTextExpired : styles.statusFull,
                           selectedTimeSlot === slot.time && styles.timeTextSelected
                         ]}>
                           {slot.time}
@@ -646,15 +712,19 @@ const LabAvailabilityScreen = () => {
               </View>
 
               <TouchableOpacity 
-                style={styles.confirmBookingBtn}
+                style={[
+                  styles.confirmBookingBtn,
+                  !isBookingEnabled && { opacity: 0.4, shadowOpacity: 0, elevation: 0 }
+                ]}
+                disabled={!isBookingEnabled}
                 onPress={() => {
-                  const selectedSlotObj = displaySlots.find((s: any) => s.time === selectedTimeSlot)?.rawSlot;
+                  const rawSlotObj = selectedSlotObj?.rawSlot;
                   setIsModalVisible(false);
                   navigation.navigate('LabBookingFlow', { 
                     lab: selectedLabForAvailability,
                     initialDate: selectedDate,
                     initialTime: selectedTimeSlot,
-                    scheduleSlotId: selectedSlotObj ? selectedSlotObj._id : undefined
+                    scheduleSlotId: rawSlotObj ? rawSlotObj._id || rawSlotObj.slotId : undefined
                   });
                 }}
               >
@@ -1182,7 +1252,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   timeSlot: {
-    width: '31%',
+    width: '48%',
     paddingVertical: 14,
     borderRadius: 16,
     alignItems: 'center',
@@ -1201,6 +1271,11 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
     opacity: 0.6,
   },
+  timeSlotExpired: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#EF4444',
+    opacity: 0.4,
+  },
   timeSlotSelected: {
     backgroundColor: COLORS.primary,
     borderColor: COLORS.primary,
@@ -1212,6 +1287,7 @@ const styles = StyleSheet.create({
   timeTextAvailable: { color: '#166534' },
   timeTextBusy: { color: '#9A3412' },
   timeTextClosed: { color: '#6B7280' },
+  timeTextExpired: { color: '#EF4444' },
   timeTextSelected: { color: '#FFF' },
   statusFew: { color: '#9A3412' },
   statusFull: { color: '#6B7280' },

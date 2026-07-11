@@ -23,6 +23,23 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:40
 
 const { width } = Dimensions.get('window');
 
+const safeFetch = async (url: string, options: any = {}) => {
+  const res = await fetch(url, options);
+  const text = await res.text();
+  if (!res.ok) {
+    const errorSnippet = text.substring(0, 300);
+    Alert.alert('HTTP Error ' + res.status, `Failed to load ${url.replace(API_BASE_URL, '')}.\nResponse: ${errorSnippet}`);
+    throw new Error(`HTTP Error ${res.status}: ${errorSnippet}`);
+  }
+  try {
+    return JSON.parse(text);
+  } catch (err) {
+    const errorSnippet = text.substring(0, 300);
+    Alert.alert('JSON Parse Error', `Unexpected response from server.\nResponse: ${errorSnippet}`);
+    throw err;
+  }
+};
+
 const greyShadow = {
   shadowColor: '#000',
   shadowOffset: { width: 0, height: 4 },
@@ -97,28 +114,36 @@ const LabSchedulingScreen: React.FC = () => {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const profData = await profRes.json();
-      if (profRes.ok && profData.success) {
-        const user = profData.data;
+      if (profRes.ok && profData) {
+        const user = profData;
         setUserName(user.name);
         setDepartment(user.department || 'Blood Test');
 
-        const labsRes = await fetch(`${API_BASE_URL}/api/labs?limit=100`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const labsData = await labsRes.json();
-        if (labsRes.ok && labsData.success) {
-          const list = labsData.data || [];
-          let foundLab = list.find((l: any) => l.assignedNurse?._id === user._id);
-          if (!foundLab) {
-            foundLab = list.find((l: any) => l.name?.toLowerCase() === user.department?.toLowerCase());
+        // Immediately set the nurse ID as a default fallback so schedule operations work regardless!
+        setMyLabId(user._id);
+        fetchSchedule(user._id, selectedDate);
+
+        try {
+          const labsRes = await fetch(`${API_BASE_URL}/api/labs?limit=100`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const labsData = await labsRes.json();
+          if (labsRes.ok && labsData.success) {
+            const list = labsData.data || [];
+            let foundLab = list.find((l: any) => {
+              const nurseId = l.assignedNurse?._id || l.assignedNurse;
+              return nurseId === user._id;
+            });
+            if (!foundLab) {
+              foundLab = list.find((l: any) => l.name?.toLowerCase() === user.department?.toLowerCase());
+            }
+            if (foundLab) {
+              setMyLabId(foundLab._id);
+              fetchSchedule(foundLab._id, selectedDate);
+            }
           }
-          if (foundLab) {
-            setMyLabId(foundLab._id);
-            fetchSchedule(foundLab._id, selectedDate);
-          } else {
-            setMyLabId(user._id);
-            fetchSchedule(user._id, selectedDate);
-          }
+        } catch (labsErr) {
+          console.error('Failed to fetch labs list:', labsErr);
         }
       }
     } catch (err) {
@@ -239,7 +264,10 @@ const LabSchedulingScreen: React.FC = () => {
           Alert.alert('Error', data.message || 'Failed to update slot');
         }
       } else {
-        if (!myLabId) return;
+        if (!myLabId) {
+          Alert.alert('Error', 'Unable to retrieve Lab ID. Please reload the screen.');
+          return;
+        }
         const res = await fetch(`${API_BASE_URL}/api/labs/${myLabId}/schedule`, {
           method: 'POST',
           headers: {

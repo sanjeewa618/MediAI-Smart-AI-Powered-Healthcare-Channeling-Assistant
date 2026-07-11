@@ -48,6 +48,24 @@ const LabAppointmentsScreen: React.FC = () => {
   const [selectedAppt, setSelectedAppt] = useState<any | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   
+  const [currentDateTime, setCurrentDateTime] = useState('');
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+      const slTime = new Date(utc + (5.5 * 3600000));
+      
+      const dateStr = slTime.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      const timeStr = slTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      
+      setCurrentDateTime(`${dateStr} • ${timeStr}`);
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 10000);
+    return () => clearInterval(interval);
+  }, []);
+  
   const [department, setDepartment] = useState('');
   const [appointments, setAppointments] = useState<any[]>([]);
   const [stats, setStats] = useState({ todayTotal: 0, pending: 0, completed: 0, urgent: 0 });
@@ -229,7 +247,7 @@ const LabAppointmentsScreen: React.FC = () => {
             </TouchableOpacity>
             <View>
               <Text style={styles.labName}>Test Appointments</Text>
-              <Text style={styles.dateTime}>Oct 24, 2023 • 10:15 AM</Text>
+              <Text style={styles.dateTime}>{currentDateTime}</Text>
             </View>
           </View>
           <View style={styles.headerRight}>
@@ -339,7 +357,9 @@ const LabAppointmentsScreen: React.FC = () => {
                     </View>
                     <View style={styles.detailRow}>
                       <Clock size={14} color={COLORS.textSecondary} />
-                      <Text style={styles.detailText}>{moment(item.appointmentDate).format('MMM DD, YYYY')} • {item.scheduleSlot?.startTime || 'N/A'}</Text>
+                      <Text style={styles.detailText}>
+                        {moment(item.appointmentDate).format('MMM DD, YYYY')} • {item.scheduleSlot?.startTime && item.scheduleSlot?.endTime ? `${item.scheduleSlot.startTime} - ${item.scheduleSlot.endTime}` : item.scheduleSlot?.startTime || 'N/A'}
+                      </Text>
                     </View>
                     <View style={styles.detailRow}>
                       <User size={14} color={COLORS.textSecondary} />

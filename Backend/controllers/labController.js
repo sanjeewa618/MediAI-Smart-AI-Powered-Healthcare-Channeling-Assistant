@@ -8,6 +8,60 @@ import LabReport from '../model/LabReport.js';
 import User from '../model/User.js';
 import Notification from '../model/Notification.js';
 
+const getUTCDateRange = (dateInput) => {
+  let dateStr = '';
+  if (dateInput instanceof Date) {
+    dateStr = dateInput.toISOString().split('T')[0];
+  } else if (typeof dateInput === 'string') {
+    dateStr = dateInput.split('T')[0];
+  } else {
+    dateStr = new Date().toISOString().split('T')[0];
+  }
+  
+  const parts = dateStr.split('-');
+  const year = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10) - 1;
+  const day = parseInt(parts[2], 10);
+  
+  const start = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
+  const end = new Date(Date.UTC(year, month, day, 23, 59, 59, 999));
+  return { start, end };
+};
+
+const isSlotExpired = (slotDate, endTimeStr) => {
+  let hours = 0;
+  let minutes = 0;
+  
+  const match = endTimeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (match) {
+    hours = parseInt(match[1], 10);
+    minutes = parseInt(match[2], 10);
+    const ampm = match[3].toUpperCase();
+    if (ampm === 'PM' && hours < 12) hours += 12;
+    if (ampm === 'AM' && hours === 12) hours = 0;
+  } else {
+    const match24 = endTimeStr.match(/(\d{1,2}):(\d{2})/);
+    if (match24) {
+      hours = parseInt(match24[1], 10);
+      minutes = parseInt(match24[2], 10);
+    }
+  }
+  
+  const offset = 5.5; // Sri Lanka Time (GMT+5:30)
+  const now = new Date();
+  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const localNow = new Date(utc + (3600000 * offset));
+  
+  const slotDateLocal = new Date(slotDate);
+  const year = slotDateLocal.getUTCFullYear();
+  const month = slotDateLocal.getUTCMonth();
+  const day = slotDateLocal.getUTCDate();
+  
+  const slotEndLocal = new Date(year, month, day, hours, minutes);
+  
+  return localNow.getTime() > slotEndLocal.getTime();
+};
+
 const generateBookingRef = async () => {
   const year = new Date().getFullYear();
   const count = await LabBooking.countDocuments();
@@ -31,7 +85,19 @@ const generateQueueToken = async (labId, date) => {
 
 const getCategories = async (req, res, next) => {
   try {
-    const categories = await LabCategory.find({ isActive: true }).sort({ order: 1 });
+    let categories = await LabCategory.find({ isActive: true }).sort({ order: 1 });
+    if (categories.length === 0) {
+      const defaultCategories = [
+        { name: 'Blood Test', icon: '🩸', color: '#FEE2E2', order: 1 },
+        { name: 'Urine Test', icon: '🧪', color: '#FEF3C7', order: 2 },
+        { name: 'Diabetes', icon: '🍬', color: '#E0F2FE', order: 3 },
+        { name: 'Heart', icon: '❤️', color: '#FCE7F3', order: 4 },
+        { name: 'Liver', icon: '🧬', color: '#FDF2F8', order: 5 },
+        { name: 'Pregnancy', icon: '🤰', color: '#FFF1F2', order: 6 }
+      ];
+      await LabCategory.insertMany(defaultCategories);
+      categories = await LabCategory.find({ isActive: true }).sort({ order: 1 });
+    }
     res.status(200).json({ success: true, data: categories });
   } catch (err) {
     next(err);
@@ -70,12 +136,26 @@ const getLabs = async (req, res, next) => {
     const [labs, total] = await Promise.all([
       Lab.find(filter)
         .populate('category', 'name icon color')
-        .populate('assignedNurse', 'name photo shift')
+        .populate('assignedNurse', 'name photo shift department')
         .skip(skip)
         .limit(pageSize)
         .sort({ createdAt: -1 }),
       Lab.countDocuments(filter),
     ]);
+
+    // Self-correct category reference in MongoDB if missing
+    for (let lab of labs) {
+      if (!lab.category && lab.assignedNurse) {
+        const dept = lab.assignedNurse.department || (lab.name && lab.name.split(' ')[0]);
+        if (dept) {
+          const matchedCat = await LabCategory.findOne({ name: new RegExp(`^${dept}$`, 'i') });
+          if (matchedCat) {
+            await Lab.updateOne({ _id: lab._id }, { category: matchedCat._id });
+            lab.category = matchedCat;
+          }
+        }
+      }
+    }
 
     res.status(200).json({
       success: true,
@@ -131,7 +211,7 @@ const getLabById = async (req, res, next) => {
 
     const lab = await Lab.findById(id)
       .populate('category', 'name icon color')
-      .populate('assignedNurse', 'name photo shift phone');
+      .populate('assignedNurse', 'name photo shift phone department');
 
     if (!lab) {
       return res.status(404).json({ success: false, message: 'Lab not found' });
@@ -151,30 +231,34 @@ const getLabAvailability = async (req, res, next) => {
     if (!mongoose.isValidObjectId(id)) {
       return res.status(400).json({ success: false, message: 'Invalid lab id' });
     }
-    if (!date) {
-      return res.status(400).json({ success: false, message: 'date query param is required' });
-    }
-
-    const targetDate = new Date(date);
-    if (isNaN(targetDate.getTime())) {
-      return res.status(400).json({ success: false, message: 'Invalid date format. Use ISO 8601 (YYYY-MM-DD)' });
-    }
 
     const lab = await Lab.findById(id);
     if (!lab) {
       return res.status(404).json({ success: false, message: 'Lab not found' });
     }
 
-    const dayStart = new Date(targetDate);
-    dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(targetDate);
-    dayEnd.setHours(23, 59, 59, 999);
+    let dayStart, dayEnd;
+    if (date) {
+      const range = getUTCDateRange(date);
+      dayStart = range.start;
+      dayEnd = range.end;
+    } else {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const range = getUTCDateRange(todayStr);
+      dayStart = range.start;
+    }
 
-    const scheduleSlots = await LabSchedule.find({
+    const query = {
       lab: id,
-      date: { $gte: dayStart, $lte: dayEnd },
       isActive: true,
-    }).sort({ startTime: 1 });
+    };
+    if (dayStart && dayEnd) {
+      query.date = { $gte: dayStart, $lte: dayEnd };
+    } else if (dayStart) {
+      query.date = { $gte: dayStart };
+    }
+
+    const scheduleSlots = await LabSchedule.find(query).sort({ date: 1, startTime: 1 });
 
     const slotsWithOccupancy = await Promise.all(
       scheduleSlots.map(async (slot) => {
@@ -189,6 +273,11 @@ const getLabAvailability = async (req, res, next) => {
         if (remaining <= 0) slotStatus = 'Full';
         else if (remaining <= Math.ceil(slot.maxPatients * 0.2)) slotStatus = 'Busy';
 
+        const isExpired = isSlotExpired(slot.date, slot.endTime);
+        if (isExpired) {
+          slotStatus = 'Closed';
+        }
+
         return {
           slotId: slot._id,
           startTime: slot.startTime,
@@ -199,6 +288,7 @@ const getLabAvailability = async (req, res, next) => {
           status: slotStatus,
           room: slot.room,
           nurse: slot.nurse,
+          isExpired,
         };
       })
     );
@@ -295,10 +385,7 @@ const createBooking = async (req, res, next) => {
     if (!slot) {
       const startTime = req.body.timeSlot || '09:00 AM';
       const endTime = req.body.endTime || '10:00 AM';
-      const apptDate = new Date(appointmentDate);
-      apptDate.setHours(0, 0, 0, 0);
-      const apptDateEnd = new Date(apptDate);
-      apptDateEnd.setHours(23, 59, 59, 999);
+      const { start: apptDate, end: apptDateEnd } = getUTCDateRange(appointmentDate);
 
       slot = await LabSchedule.findOne({
         lab: lab._id,
@@ -321,10 +408,7 @@ const createBooking = async (req, res, next) => {
       }
     }
 
-    const slotDate = new Date(appointmentDate);
-    slotDate.setHours(0, 0, 0, 0);
-    const slotDateEnd = new Date(slotDate);
-    slotDateEnd.setHours(23, 59, 59, 999);
+    const { start: slotDate, end: slotDateEnd } = getUTCDateRange(appointmentDate);
 
     const currentBooked = await LabBooking.countDocuments({
       lab: lab._id,
@@ -346,7 +430,8 @@ const createBooking = async (req, res, next) => {
           bookingRef,
           lab: lab._id,
           scheduleSlot: slot._id,
-          appointmentDate: new Date(appointmentDate),
+          patientUser: req.user._id,
+          appointmentDate: slotDate,
           patient,
           collectionMethod,
           homeAddress: collectionMethod === 'Home' ? homeAddress : undefined,
@@ -460,11 +545,16 @@ const listBookings = async (req, res, next) => {
     }
 
     if (date) {
-      const dayStart = new Date(date);
-      dayStart.setHours(0, 0, 0, 0);
-      const dayEnd = new Date(date);
-      dayEnd.setHours(23, 59, 59, 999);
-      filter.appointmentDate = { $gte: dayStart, $lte: dayEnd };
+      const slOffset = 5.5 * 60 * 60 * 1000;
+      const startLocal = new Date(`${date}T00:00:00.000Z`);
+      const dayStart = new Date(startLocal.getTime() - slOffset);
+      const endLocal = new Date(`${date}T23:59:59.999Z`);
+      const dayEnd = new Date(endLocal.getTime() - slOffset);
+      
+      const dayEndUtc = new Date(endLocal.getTime());
+      const maxDayEnd = dayEndUtc > dayEnd ? dayEndUtc : dayEnd;
+      
+      filter.appointmentDate = { $gte: dayStart, $lte: maxDayEnd };
     }
 
     if (patientName) {
@@ -528,6 +618,11 @@ const updateBookingStatus = async (req, res, next) => {
 
     // Send notification to patient if user is found
     try {
+      await booking.populate([
+        { path: 'lab', select: 'name floor' },
+        { path: 'scheduleSlot', select: 'startTime endTime room' }
+      ]);
+
       const patientUser = await User.findOne({ 
         $or: [
           { nic: booking.patient.nic }, 
@@ -535,13 +630,33 @@ const updateBookingStatus = async (req, res, next) => {
         ] 
       });
       if (patientUser) {
-        await Notification.create({
-          recipient: patientUser._id,
-          title: `Lab Booking ${status}`,
-          message: `Your lab booking (${booking.bookingRef}) has been updated to ${status.toLowerCase()}.`,
-          type: 'Appointment',
-          isRead: false
+        const formattedDate = new Date(booking.appointmentDate).toLocaleDateString('en-US', {
+          weekday: 'short',
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
         });
+        const timeSlot = booking.scheduleSlot && booking.scheduleSlot.startTime && booking.scheduleSlot.endTime
+          ? `${booking.scheduleSlot.startTime} - ${booking.scheduleSlot.endTime}`
+          : '10:00 AM - 12:00 PM';
+
+        if (status === 'Confirmed') {
+          await Notification.create({
+            user: patientUser._id,
+            title: 'Appointment Confirmed',
+            message: `Your appointment is scheduled on ${formattedDate} at ${timeSlot}. Please be present. Thank you for choosing us!`,
+            type: 'appointment',
+            isRead: false
+          });
+        } else {
+          await Notification.create({
+            user: patientUser._id,
+            title: `Lab Booking ${status}`,
+            message: `Your lab booking (${booking.bookingRef}) has been updated to ${status.toLowerCase()}.`,
+            type: 'appointment',
+            isRead: false
+          });
+        }
       }
     } catch (notifErr) {
       console.error('Failed to create booking notification:', notifErr);
@@ -558,12 +673,16 @@ const getDashboardStats = async (req, res, next) => {
     const { labId, date } = req.query;
 
     const targetDate = date ? new Date(date) : new Date();
-    const dayStart = new Date(targetDate);
-    dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(targetDate);
-    dayEnd.setHours(23, 59, 59, 999);
+    
+    const slOffset = 5.5 * 60 * 60 * 1000;
+    const startLocal = new Date(targetDate.getTime());
+    startLocal.setHours(0, 0, 0, 0);
+    const dayStart = new Date(startLocal.getTime());
+    const endLocal = new Date(targetDate.getTime());
+    endLocal.setHours(23, 59, 59, 999);
+    const dayEnd = new Date(endLocal.getTime());
 
-    const baseFilter = { appointmentDate: { $gte: dayStart, $lte: dayEnd } };
+    const baseFilter = {};
 
     if (labId && mongoose.isValidObjectId(labId)) {
       baseFilter.lab = labId;
@@ -579,11 +698,14 @@ const getDashboardStats = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Valid labId is required' });
     }
 
+    const todayFilter = { ...baseFilter, appointmentDate: { $gte: dayStart, $lte: dayEnd } };
+    const activeFilter = { ...baseFilter, appointmentDate: { $gte: dayStart } }; // Today and future
+
     const [todayTotal, pending, processing, completed] = await Promise.all([
-      LabBooking.countDocuments({ ...baseFilter }),
-      LabBooking.countDocuments({ ...baseFilter, status: 'Pending' }),
-      LabBooking.countDocuments({ ...baseFilter, status: { $in: ['Confirmed', 'Checked-In', 'Sample-Collected', 'Testing'] } }),
-      LabBooking.countDocuments({ ...baseFilter, status: 'Completed' }),
+      LabBooking.countDocuments(todayFilter),
+      LabBooking.countDocuments({ ...activeFilter, status: 'Pending' }),
+      LabBooking.countDocuments({ ...activeFilter, status: { $in: ['Confirmed', 'Checked-In', 'Sample-Collected', 'Testing'] } }),
+      LabBooking.countDocuments({ ...todayFilter, status: 'Completed' }),
     ]);
 
     res.status(200).json({
@@ -618,16 +740,27 @@ const getSchedule = async (req, res, next) => {
       lab = await Lab.findOne({ assignedNurse: labId });
     }
     if (!lab) {
-      lab = await Lab.findOne({});
+      const nurseUser = await User.findById(labId);
+      // Try to find a matching LabCategory by the nurse's department so the lab is properly categorised
+      let categoryId = null;
+      if (nurseUser?.department) {
+        const cat = await LabCategory.findOne({ name: new RegExp(`^${nurseUser.department}$`, 'i') });
+        categoryId = cat?._id || null;
+      }
+      lab = new Lab({
+        name: `${nurseUser?.department || 'General'} Lab`,
+        floor: 'Main Floor',
+        status: 'Available',
+        assignedNurse: labId,
+        ...(categoryId ? { category: categoryId } : {}),
+      });
+      await lab.save();
     }
     if (lab) {
       resolvedLabId = lab._id;
     }
 
-    const dayStart = new Date(date);
-    dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(date);
-    dayEnd.setHours(23, 59, 59, 999);
+    const { start: dayStart, end: dayEnd } = getUTCDateRange(date);
 
     const slots = await LabSchedule.find({
       lab: resolvedLabId,
@@ -678,24 +811,30 @@ const createScheduleSlot = async (req, res, next) => {
       lab = await Lab.findOne({ assignedNurse: labId });
     }
     if (!lab) {
-      lab = await Lab.findOne({});
-      if (!lab) {
-        lab = new Lab({
-          name: type || 'Blood Test Lab',
-          floor: 'Main Floor',
-          status: 'Available',
-          assignedNurse: labId,
-        });
-        await lab.save();
-      }
+      const nurseUser = await User.findById(labId);
+      // Try to find a matching LabCategory so the lab appears under the right category for patients
+      const departmentName = type || nurseUser?.department || 'General';
+      let categoryId = null;
+      const cat = await LabCategory.findOne({ name: new RegExp(`^${departmentName}$`, 'i') });
+      categoryId = cat?._id || null;
+      lab = new Lab({
+        name: `${departmentName} Lab`,
+        floor: 'Main Floor',
+        status: 'Available',
+        assignedNurse: labId,
+        ...(categoryId ? { category: categoryId } : {}),
+      });
+      await lab.save();
     }
     if (lab) {
       resolvedLabId = lab._id;
     }
 
+    const { start: slotDate } = getUTCDateRange(date);
+
     const slot = await LabSchedule.create({
       lab: resolvedLabId,
-      date: new Date(date),
+      date: slotDate,
       startTime,
       endTime,
       maxPatients: parseInt(maxPatients, 10),
@@ -809,7 +948,7 @@ const listReports = async (req, res, next) => {
     const [reports, total] = await Promise.all([
       LabReport.find(filter)
         .populate('lab', 'name floor')
-        .populate('booking', 'bookingRef queueToken')
+        .populate('booking', 'bookingRef queueToken appointmentDate createdAt')
         .sort({ reportDate: -1 })
         .skip(skip)
         .limit(pageSize),
@@ -901,7 +1040,10 @@ const updateReport = async (req, res, next) => {
 const sendBookingReminder = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const booking = await LabBooking.findById(id);
+    const booking = await LabBooking.findById(id)
+      .populate('lab', 'name floor')
+      .populate('scheduleSlot', 'startTime endTime room');
+
     if (!booking) {
       return res.status(404).json({ success: false, message: 'Booking not found' });
     }
@@ -914,11 +1056,21 @@ const sendBookingReminder = async (req, res, next) => {
     });
 
     if (patientUser) {
+      const formattedDate = new Date(booking.appointmentDate).toLocaleDateString('en-US', {
+        weekday: 'short',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+      const timeSlot = booking.scheduleSlot && booking.scheduleSlot.startTime && booking.scheduleSlot.endTime
+        ? `${booking.scheduleSlot.startTime} - ${booking.scheduleSlot.endTime}`
+        : '10:00 AM - 12:00 PM';
+
       await Notification.create({
-        recipient: patientUser._id,
+        user: patientUser._id,
         title: `Appointment Reminder`,
-        message: `Reminder: You have an upcoming lab booking (${booking.bookingRef}) scheduled for ${new Date(booking.appointmentDate).toLocaleDateString()}.`,
-        type: 'Appointment',
+        message: `Reminder: You have an upcoming lab booking scheduled for ${formattedDate} at ${timeSlot}. Please be present.`,
+        type: 'appointment',
         isRead: false
       });
       return res.status(200).json({ success: true, message: 'Reminder sent to patient' });

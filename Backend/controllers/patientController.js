@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import User from '../model/User.js';
 import Appointment from '../model/Appointment.js';
 import LabTest from '../model/LabTest.js';
+import LabBooking from '../model/LabBooking.js';
 import MedicalRecord from '../model/MedicalRecord.js';
 
 // Helper: builds a live queue snapshot for a list of appointments.
@@ -59,32 +60,106 @@ const buildQueueSnapshots = async (appointments) => {
   return snapshots;
 };
 
+const isAppointmentExpired = (apptDate, timeSlotStr) => {
+  if (!apptDate) return true;
+  if (!timeSlotStr) return false;
+
+  try {
+    let timePart = timeSlotStr;
+    if (timeSlotStr.includes('-')) {
+      timePart = timeSlotStr.split('-')[1].trim();
+    }
+
+    let hours = 0;
+    let minutes = 0;
+    const match = timePart.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+    if (match) {
+      hours = parseInt(match[1], 10);
+      minutes = parseInt(match[2], 10);
+      const ampm = match[3].toUpperCase();
+      if (ampm === 'PM' && hours < 12) hours += 12;
+      if (ampm === 'AM' && hours === 12) hours = 0;
+    } else {
+      const match24 = timePart.match(/(\d{1,2}):(\d{2})/);
+      if (match24) {
+        hours = parseInt(match24[1], 10);
+        minutes = parseInt(match24[2], 10);
+      }
+    }
+
+    const slOffset = 5.5 * 60 * 60 * 1000;
+    const baseDate = new Date(apptDate);
+    baseDate.setUTCHours(0, 0, 0, 0);
+
+    const localTimeMs = baseDate.getTime() + (hours * 60 + minutes) * 60 * 1000;
+    const slotEndUtc = new Date(localTimeMs - slOffset);
+
+    return new Date() > slotEndUtc;
+  } catch (err) {
+    console.error('Error in isAppointmentExpired:', err);
+    return false;
+  }
+};
+
 // @desc    Get patient dashboard summary (Upcoming appointments & lab tests)
 // @route   GET /api/patient/dashboard
 // @access  Private (Patient only)
 export const getDashboardData = async (req, res) => {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const now = new Date();
+    const slOffset = 5.5 * 60 * 60 * 1000;
+    const localTime = new Date(now.getTime() + slOffset);
+    localTime.setUTCHours(0, 0, 0, 0);
+    const todayLocal = new Date(localTime.getTime() - slOffset);
+    const todayUtc = new Date();
+    todayUtc.setHours(0, 0, 0, 0);
+    const today = todayLocal < todayUtc ? todayLocal : todayUtc;
 
     // 1. Fetch upcoming doctor appointments (Populating doctor details for the UI)
-    const doctorAppointments = await Appointment.find({
+    const rawDoctorAppointments = await Appointment.find({
       patient: req.user._id,
       date: { $gte: today },
       status: { $in: ['pending', 'confirmed'] }
     })
       .populate('doctor', 'name specialization hospital')
       .sort({ date: 1, timeSlot: 1 })
-      .limit(5);
+      .limit(10);
 
-    // 2. Fetch upcoming lab tests
-    const labAppointments = await LabTest.find({
-      patient: req.user._id,
-      date: { $gte: today },
-      status: { $in: ['pending', 'scheduled'] }
+    const doctorAppointments = rawDoctorAppointments
+      .filter(appt => !isAppointmentExpired(appt.date, appt.timeSlot))
+      .slice(0, 5);
+
+    // 2. Fetch upcoming lab tests from LabBooking
+    const rawLabBookings = await LabBooking.find({
+      patientUser: req.user._id,
+      appointmentDate: { $gte: today },
+      status: { $in: ['Pending', 'Confirmed', 'Checked-In', 'Sample-Collected', 'Testing'] }
     })
-      .sort({ date: 1 })
-      .limit(5);
+      .populate('lab', 'name floor description')
+      .populate('scheduleSlot', 'startTime endTime room nurse')
+      .sort({ appointmentDate: 1 })
+      .limit(10);
+
+    const activeLabBookings = rawLabBookings.filter(booking => {
+      const timeRange = booking.scheduleSlot 
+        ? `${booking.scheduleSlot.startTime} - ${booking.scheduleSlot.endTime}`
+        : booking.timeSlot || '09:00 AM';
+      return !isAppointmentExpired(booking.appointmentDate, timeRange);
+    });
+
+    const labAppointments = activeLabBookings.slice(0, 5).map(booking => ({
+      _id: booking._id,
+      testName: booking.lab?.name || 'Lab Test',
+      date: booking.appointmentDate,
+      timeSlot: booking.scheduleSlot && booking.scheduleSlot.startTime && booking.scheduleSlot.endTime 
+        ? `${booking.scheduleSlot.startTime} - ${booking.scheduleSlot.endTime}` 
+        : (booking.scheduleSlot?.startTime || '09:00 AM'),
+      queueNumber: booking.queueToken,
+      status: booking.status,
+      collectionMethod: booking.collectionMethod,
+      paymentStatus: booking.paymentStatus,
+      room: booking.scheduleSlot?.room || 'Room 01'
+    }));
 
     // 3. Build live queue snapshots for the upcoming doctor appointments.
     const liveQueue = await buildQueueSnapshots(doctorAppointments);

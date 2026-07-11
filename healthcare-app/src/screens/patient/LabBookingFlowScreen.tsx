@@ -13,7 +13,7 @@ import {
   FileText, ArrowRight, Check, Timer, FlaskConical, Shield, Bell
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/types';
 import { useAuth } from '../../context/AuthContext';
@@ -62,6 +62,17 @@ const LabBookingFlowScreen = () => {
     name: ''
   });
 
+  useFocusEffect(
+    React.useCallback(() => {
+      if (initialDate) {
+        setSelectedDate(initialDate);
+      }
+      if (initialTime) {
+        setSelectedTime(initialTime);
+      }
+    }, [initialDate, initialTime])
+  );
+
   const handleAddToCalendar = () => {
     Alert.alert(
       "Added to Calendar",
@@ -109,6 +120,50 @@ const LabBookingFlowScreen = () => {
   const [queueTokenNum, setQueueTokenNum] = useState(22);
 
   const handleNext = async () => {
+    // Step 2 Validation (Patient Information)
+    if (currentStep === 2) {
+      if (!patientDetails.fullName.trim()) {
+        Alert.alert('Required Field', 'Please enter your full name.');
+        return;
+      }
+      if (!patientDetails.nic.trim()) {
+        Alert.alert('Required Field', 'Please enter your NIC or Passport.');
+        return;
+      }
+      if (!patientDetails.mobile.trim()) {
+        Alert.alert('Required Field', 'Please enter your mobile number.');
+        return;
+      }
+    }
+
+    // Step 3 Validation (Collection Method Address)
+    if (currentStep === 3 && collectionMethod === 'Home') {
+      if (!patientDetails.address.trim()) {
+        Alert.alert('Required Field', 'Please enter your home address for sample collection.');
+        return;
+      }
+    }
+
+    // Step 5 Validation (Payment Card Details)
+    if (currentStep === 5 && paymentMethod === 'Card') {
+      if (!cardDetails.name.trim()) {
+        Alert.alert('Required Field', 'Please enter the cardholder name.');
+        return;
+      }
+      if (!cardDetails.number.trim()) {
+        Alert.alert('Required Field', 'Please enter your card number.');
+        return;
+      }
+      if (!cardDetails.expiry.trim()) {
+        Alert.alert('Required Field', 'Please enter the card expiry date (MM/YY).');
+        return;
+      }
+      if (!cardDetails.cvv.trim()) {
+        Alert.alert('Required Field', 'Please enter the card CVV number.');
+        return;
+      }
+    }
+
     if (currentStep === 5) {
       setBookingLoading(true);
       try {
@@ -116,16 +171,16 @@ const LabBookingFlowScreen = () => {
         const payload = {
           labId: lab.id,
           scheduleSlotId,
-          appointmentDate: moment().date(parseInt(selectedDate, 10)).toDate(),
+          appointmentDate: selectedDate,
           timeSlot: selectedTime || '09:00 AM',
           patient: {
-            fullName: patientDetails.fullName || 'Patient Name',
-            nic: patientDetails.nic || '981234567V',
-            gender: patientDetails.gender || 'Male',
-            mobile: patientDetails.mobile || '077 123 4567'
+            fullName: patientDetails.fullName.trim(),
+            nic: patientDetails.nic.trim(),
+            gender: patientDetails.gender,
+            mobile: patientDetails.mobile.trim()
           },
           collectionMethod,
-          homeAddress: patientDetails.address || 'Colombo, Sri Lanka',
+          homeAddress: collectionMethod === 'Home' ? patientDetails.address.trim() : 'Hospital',
           paymentMethod,
         };
 
@@ -148,7 +203,7 @@ const LabBookingFlowScreen = () => {
         }
       } catch (err) {
         console.error(err);
-        Alert.alert('Network Error', 'Could not connect to the server.');
+        Alert.alert('Error', 'An error occurred while confirming booking.');
       } finally {
         setBookingLoading(false);
       }
@@ -248,68 +303,70 @@ const LabBookingFlowScreen = () => {
     </View>
   );
 
-  const renderStep3 = () => (
-    <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Patient Information</Text>
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Full Name</Text>
-        <TextInput 
-          style={styles.input} 
-          placeholder="Enter your full name"
-          value={patientDetails.fullName}
-          onChangeText={(v) => setPatientDetails({...patientDetails, fullName: v})}
-        />
-      </View>
-      <View style={styles.row}>
-        <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
-          <Text style={styles.inputLabel}>NIC / Passport</Text>
+  const renderStep3 = () => {
+    return (
+      <View style={styles.stepContent}>
+        <Text style={styles.stepTitle}>Patient Information</Text>
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Full Name</Text>
           <TextInput 
             style={styles.input} 
-            placeholder="Ex: 981234567V"
-            value={patientDetails.nic}
-            onChangeText={(v) => setPatientDetails({...patientDetails, nic: v})}
+            placeholder="Enter your full name"
+            value={patientDetails.fullName}
+            onChangeText={(v) => setPatientDetails({...patientDetails, fullName: v})}
           />
         </View>
-        <View style={[styles.inputGroup, { flex: 1 }]}>
-          <Text style={styles.inputLabel}>Gender</Text>
-          <View style={styles.genderRow}>
-            <TouchableOpacity 
-              style={[styles.genderBtn, patientDetails.gender === 'Male' && styles.genderBtnActive]}
-              onPress={() => setPatientDetails({...patientDetails, gender: 'Male'})}
-            >
-              <Text style={[styles.genderBtnText, patientDetails.gender === 'Male' && styles.genderBtnTextActive]}>Male</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.genderBtn, patientDetails.gender === 'Female' && styles.genderBtnActive]}
-              onPress={() => setPatientDetails({...patientDetails, gender: 'Female'})}
-            >
-              <Text style={[styles.genderBtnText, patientDetails.gender === 'Female' && styles.genderBtnTextActive]}>Female</Text>
-            </TouchableOpacity>
+        <View style={styles.row}>
+          <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
+            <Text style={styles.inputLabel}>NIC / Passport</Text>
+            <TextInput 
+              style={styles.input} 
+              placeholder="Ex: 981234567V"
+              value={patientDetails.nic}
+              onChangeText={(v) => setPatientDetails({...patientDetails, nic: v})}
+            />
+          </View>
+          <View style={[styles.inputGroup, { flex: 1 }]}>
+            <Text style={styles.inputLabel}>Gender</Text>
+            <View style={styles.genderRow}>
+              <TouchableOpacity 
+                style={[styles.genderBtn, patientDetails.gender === 'Male' && styles.genderBtnActive]}
+                onPress={() => setPatientDetails({...patientDetails, gender: 'Male'})}
+              >
+                <Text style={[styles.genderBtnText, patientDetails.gender === 'Male' && styles.genderBtnTextActive]}>Male</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.genderBtn, patientDetails.gender === 'Female' && styles.genderBtnActive]}
+                onPress={() => setPatientDetails({...patientDetails, gender: 'Female'})}
+              >
+                <Text style={[styles.genderBtnText, patientDetails.gender === 'Female' && styles.genderBtnTextActive]}>Female</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Mobile Number</Text>
+          <TextInput 
+            style={styles.input} 
+            placeholder="Ex: 077 123 4567"
+            keyboardType="phone-pad"
+            value={patientDetails.mobile}
+            onChangeText={(v) => setPatientDetails({...patientDetails, mobile: v})}
+          />
+        </View>
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Medical Notes (Optional)</Text>
+          <TextInput 
+            style={[styles.input, { height: 80, paddingTop: 12 }]} 
+            placeholder="Existing diseases, allergies..."
+            multiline
+            value={patientDetails.medicalNotes}
+            onChangeText={(v) => setPatientDetails({...patientDetails, medicalNotes: v})}
+          />
+        </View>
       </View>
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Mobile Number</Text>
-        <TextInput 
-          style={styles.input} 
-          placeholder="Ex: 077 123 4567"
-          keyboardType="phone-pad"
-          value={patientDetails.mobile}
-          onChangeText={(v) => setPatientDetails({...patientDetails, mobile: v})}
-        />
-      </View>
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Medical Notes (Optional)</Text>
-        <TextInput 
-          style={[styles.input, { height: 80, paddingTop: 12 }]} 
-          placeholder="Existing diseases, allergies..."
-          multiline
-          value={patientDetails.medicalNotes}
-          onChangeText={(v) => setPatientDetails({...patientDetails, medicalNotes: v})}
-        />
-      </View>
-    </View>
-  );
+    );
+  };
 
   const renderStep4 = () => (
     <View style={styles.stepContent}>
@@ -336,7 +393,13 @@ const LabBookingFlowScreen = () => {
       {collectionMethod === 'Home' && (
         <View style={[styles.homeDetails, SHADOWS.small]}>
           <Text style={styles.inputLabel}>Home Address</Text>
-          <TextInput style={styles.input} placeholder="Enter your full address" multiline />
+          <TextInput 
+            style={styles.input} 
+            placeholder="Enter your full address" 
+            multiline 
+            value={patientDetails.address}
+            onChangeText={(v) => setPatientDetails({...patientDetails, address: v})}
+          />
           <Text style={[styles.inputLabel, { marginTop: 15 }]}>Landmark</Text>
           <TextInput style={styles.input} placeholder="Near Supermarket, etc." />
         </View>
@@ -375,7 +438,7 @@ const LabBookingFlowScreen = () => {
         
         <View style={styles.reviewItem}>
           <Calendar size={18} color="#6B7280" />
-          <Text style={styles.reviewItemText}>{selectedDate} May 2026</Text>
+          <Text style={styles.reviewItemText}>{moment(selectedDate).format('DD MMMM YYYY')}</Text>
         </View>
         <View style={styles.reviewItem}>
           <Clock size={18} color="#6B7280" />
@@ -488,11 +551,13 @@ const LabBookingFlowScreen = () => {
   );
 
   const renderSuccess = () => (
-    <View style={styles.successContent}>
-      <LinearGradient
-        colors={['#ECFDF5', '#FFF']}
-        style={styles.successBg}
-      >
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#ECFDF5' }}>
+      <StatusBar barStyle="dark-content" />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}>
+        <LinearGradient
+          colors={['#ECFDF5', '#FFF']}
+          style={styles.successBg}
+        >
         <Text style={styles.successTitle}>Booking Confirmed!</Text>
         <Text style={styles.successSub}>Your lab test has been scheduled successfully.</Text>
         
@@ -518,7 +583,7 @@ const LabBookingFlowScreen = () => {
           <View style={styles.ticketDetails}>
             <View style={styles.ticketDetailRow}>
               <Text style={styles.ticketDetailLabel}>Date</Text>
-              <Text style={styles.ticketDetailValue}>{selectedDate} {moment().format('MMMM, YYYY')}</Text>
+              <Text style={styles.ticketDetailValue}>{moment(selectedDate).format('DD MMMM YYYY')}</Text>
             </View>
             <View style={styles.ticketDetailRow}>
               <Text style={styles.ticketDetailLabel}>Time</Text>
@@ -557,6 +622,7 @@ const LabBookingFlowScreen = () => {
           </TouchableOpacity>
         </View>
       </LinearGradient>
+    </ScrollView>
 
       {/* Reminder Modal */}
       <Modal
@@ -595,8 +661,12 @@ const LabBookingFlowScreen = () => {
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
+
+  if (currentStep === 6) {
+    return renderSuccess();
+  }
 
   return (
     <SafeAreaView style={styles.container}>
