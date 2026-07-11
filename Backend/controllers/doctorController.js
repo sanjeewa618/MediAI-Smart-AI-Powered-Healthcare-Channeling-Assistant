@@ -93,7 +93,7 @@ export const updateDoctorProfile = async (req, res) => {
 // @access  Private
 export const getAllDoctors = async (req, res) => {
   try {
-    const filter = { role: 'doctor' };
+    const filter = { role: 'doctor', status: 'approved' };
     
     // Optional filter by specialty from query string: ?specialty=Cardiology
     if (req.query.specialty && req.query.specialty !== 'All') {
