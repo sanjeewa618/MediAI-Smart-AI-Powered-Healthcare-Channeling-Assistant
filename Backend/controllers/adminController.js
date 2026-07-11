@@ -307,6 +307,183 @@ const buildReportPayload = async (reportType, rangeInput, from, to) => {
   throw new Error('Unsupported report type');
 };
 
+const resolveAnalyticsWindow = (timeframe = 'monthly') => {
+  const now = new Date();
+
+  if (timeframe === 'weekly') {
+    const start = new Date(now);
+    start.setDate(start.getDate() - 6);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(now);
+    end.setHours(23, 59, 59, 999);
+    return { start, end, label: 'Last 7 Days' };
+  }
+
+  if (timeframe === 'yearly') {
+    const start = new Date(now.getFullYear(), 0, 1);
+    const end = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+    return { start, end, label: String(now.getFullYear()) };
+  }
+
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  return { start, end, label: now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) };
+};
+
+const buildTimeSeries = (timeframe, records) => {
+  if (timeframe === 'yearly') {
+    const months = Array.from({ length: 12 }, (_, index) => ({
+      label: new Date(2000, index, 1).toLocaleDateString('en-US', { month: 'short' }),
+      value: 0,
+    }));
+
+    records.forEach(record => {
+      const monthIndex = new Date(record).getMonth();
+      months[monthIndex].value += 1;
+    });
+
+    return months;
+  }
+
+  const daysBack = timeframe === 'weekly' ? 6 : 29;
+  const days = Array.from({ length: daysBack + 1 }, (_, index) => {
+    const date = new Date();
+    date.setDate(date.getDate() - (daysBack - index));
+    return {
+      key: date.toISOString().slice(0, 10),
+      label: date.toLocaleDateString('en-US', { weekday: 'short' }),
+      value: 0,
+    };
+  });
+
+  records.forEach(record => {
+    const key = new Date(record).toISOString().slice(0, 10);
+    const match = days.find(day => day.key === key);
+    if (match) {
+      match.value += 1;
+    }
+  });
+
+  return days.map(({ label, value, key }) => ({
+    label: timeframe === 'monthly' ? key.slice(5).replace('-', '/') : label,
+    value,
+  }));
+};
+
+const buildSpecialtyBreakdown = (appointments) => {
+  const specialtyMap = new Map();
+
+  appointments.forEach(appointment => {
+    const specialty = appointment.doctor?.specialization || 'General';
+    specialtyMap.set(specialty, (specialtyMap.get(specialty) || 0) + 1);
+  });
+
+  const total = appointments.length || 1;
+  const palette = ['#7B2FF7', '#3B82F6', '#10B981', '#F59E0B', '#EF4444'];
+
+  return Array.from(specialtyMap.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([label, count], index) => ({
+      label,
+      count,
+      percentage: Math.round((count / total) * 100),
+      color: palette[index % palette.length],
+    }));
+};
+
+export const getAnalyticsMetrics = async (req, res) => {
+  try {
+    const { timeframe = 'monthly' } = req.query;
+    if (!['weekly', 'monthly', 'yearly'].includes(timeframe)) {
+      return res.status(400).json({ message: 'Invalid timeframe provided' });
+    }
+
+    const window = resolveAnalyticsWindow(timeframe);
+    const [users, appointments, aiLogs] = await Promise.all([
+      User.find({}, 'role status createdAt').lean(),
+      Appointment.find({ date: { $gte: window.start, $lte: window.end } })
+        .populate('doctor', 'specialization')
+        .lean(),
+      AIAnalysisLog.find({ createdAt: { $gte: window.start, $lte: window.end } })
+        .lean(),
+    ]);
+
+    const activeUserStatuses = new Set(['active', 'approved', 'verified']);
+    const totalUsers = users.length;
+    const activeUsers = users.filter(user => activeUserStatuses.has(String(user.status || '').toLowerCase())).length;
+    const newUsers = users.filter(user => new Date(user.createdAt) >= window.start && new Date(user.createdAt) <= window.end).length;
+
+    const appointmentStatuses = appointments.reduce((accumulator, appointment) => {
+      const key = String(appointment.status || 'unknown').toLowerCase();
+      accumulator[key] = (accumulator[key] || 0) + 1;
+      return accumulator;
+    }, {});
+
+    const aiSpecialistCounts = aiLogs.reduce((accumulator, log) => {
+      const key = log.recommendedSpecialist || 'General Practitioner';
+      accumulator[key] = (accumulator[key] || 0) + 1;
+      return accumulator;
+    }, {});
+
+    const aiRecent = aiLogs.slice(0, 12).map(log => ({
+      id: String(log._id),
+      query: log.symptomsProvided,
+      response: log.aiResponse,
+      specialist: log.recommendedSpecialist || 'General Practitioner',
+      createdAt: log.createdAt,
+    }));
+
+    const appointmentDates = appointments.map(appointment => appointment.date || appointment.createdAt);
+    const userSeries = buildTimeSeries(timeframe, users.filter(user => user.createdAt >= window.start && user.createdAt <= window.end).map(user => user.createdAt));
+    const appointmentSeries = buildTimeSeries(timeframe, appointmentDates);
+    const specialtyBreakdown = buildSpecialtyBreakdown(appointments);
+
+    const topSpecialist = Object.entries(aiSpecialistCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'General Practitioner';
+
+    res.json({
+      success: true,
+      data: {
+        timeframe,
+        range: {
+          start: window.start,
+          end: window.end,
+          label: window.label,
+        },
+        summary: {
+          totalUsers,
+          activeUsers,
+          newUsers,
+          totalAppointments: appointments.length,
+          completedAppointments: appointmentStatuses.completed || 0,
+          pendingAppointments: appointmentStatuses.pending || 0,
+          aiAnalyses: aiLogs.length,
+          aiUniqueSpecialists: Object.keys(aiSpecialistCounts).length,
+        },
+        userStats: {
+          total: totalUsers,
+          active: activeUsers,
+          new: newUsers,
+        },
+        appointmentTrend: appointmentSeries,
+        specialtyBreakdown,
+        aiStats: {
+          totalAnalyses: aiLogs.length,
+          topSpecialist,
+          specialistBreakdown: Object.entries(aiSpecialistCounts)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
+            .map(([label, count]) => ({ label, count })),
+        },
+        aiRecent,
+        userTrend: userSeries,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
 export const getAdminReport = async (req, res) => {
   try {
     const { reportType, range = '30d', from, to } = req.query;
