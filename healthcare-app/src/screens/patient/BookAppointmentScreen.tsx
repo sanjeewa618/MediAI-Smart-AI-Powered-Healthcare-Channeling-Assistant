@@ -9,6 +9,7 @@ import * as Sharing from 'expo-sharing';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
+import moment from 'moment';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
 
@@ -111,17 +112,102 @@ const BookAppointmentScreen = () => {
     try {
       const htmlContent = `
         <html>
-          <body style="font-family: Arial, sans-serif; padding: 20px;">
-            <h1 style="color: #10B981; text-align: center;">MediAI E-Receipt</h1>
-            <p style="text-align: center; color: #6B7280;">Booking Reference: BK-9824X</p>
-            <hr />
-            <table style="width: 100%; margin-top: 20px; border-collapse: collapse;">
-              <tr><td style="padding: 10px; border-bottom: 1px solid #E5E7EB;"><strong>Patient Name:</strong></td><td style="padding: 10px; border-bottom: 1px solid #E5E7EB;">${patientInfo.name || 'John Doe'}</td></tr>
-              <tr><td style="padding: 10px; border-bottom: 1px solid #E5E7EB;"><strong>Doctor:</strong></td><td style="padding: 10px; border-bottom: 1px solid #E5E7EB;">${doctorName}</td></tr>
-              <tr><td style="padding: 10px; border-bottom: 1px solid #E5E7EB;"><strong>Date & Time:</strong></td><td style="padding: 10px; border-bottom: 1px solid #E5E7EB;">${date} | ${time}</td></tr>
-              <tr><td style="padding: 10px; border-bottom: 1px solid #E5E7EB;"><strong>Total Amount:</strong></td><td style="padding: 10px; border-bottom: 1px solid #E5E7EB; font-weight: bold;">LKR ${TOTAL_AMOUNT.toFixed(2)}</td></tr>
-            </table>
-            <p style="text-align: center; margin-top: 40px; color: #9CA3AF; font-size: 12px;">Thank you for choosing MediAI Healthcare Assistant.</p>
+          <body style="font-family: Arial, sans-serif; padding: 0 40px 40px 40px; color: #1F2937;">
+            <!-- Top Teal Accent Line -->
+            <div style="width: 100%; height: 6px; background-color: #00a896; margin-bottom: 25px;"></div>
+            
+            <!-- Title -->
+            <div style="text-align: center; margin-bottom: 40px;">
+              <h1 style="color: #3b7a9e; font-size: 28px; font-weight: bold; margin: 0; letter-spacing: 0.5px;">General Hospital Bill Receipt</h1>
+            </div>
+            
+            <!-- Hospital Details -->
+            <div style="margin-bottom: 30px; line-height: 1.6; font-size: 14px;">
+              <strong style="font-size: 16px; color: #111827;">MediAI General Hospital</strong><br />
+              No 120, Colombo Road, Colombo 03<br />
+              +94 11 234 5678 / info@mediai.lk<br />
+              www.mediai.lk
+            </div>
+            
+            <!-- Issue & Receipt Meta -->
+            <div style="margin-bottom: 30px; line-height: 1.6; font-size: 14px;">
+              <strong>Date of Issue:</strong> ${moment().format('DD/MM/YYYY')}<br />
+              <strong>Receipt No:</strong> BK-9824X
+            </div>
+            
+            <!-- Patient Information -->
+            <div style="margin-bottom: 30px;">
+              <h3 style="border-bottom: 1px solid #E5E7EB; padding-bottom: 6px; margin-bottom: 12px; font-size: 16px; color: #111827;">Patient Information</h3>
+              <table style="width: 100%; border-collapse: collapse; font-size: 14px; line-height: 1.8;">
+                <tr>
+                  <td style="width: 30%; font-weight: bold; padding: 2px 0;">Patient Name:</td>
+                  <td>${patientInfo.name || 'John Doe'}</td>
+                </tr>
+                <tr>
+                  <td style="font-weight: bold; padding: 2px 0;">Patient ID:</td>
+                  <td>${patientInfo.nic || 'P-482098'}</td>
+                </tr>
+                <tr>
+                  <td style="font-weight: bold; padding: 2px 0;">Address:</td>
+                  <td>${patientInfo.address || 'Colombo, Sri Lanka'}</td>
+                </tr>
+                <tr>
+                  <td style="font-weight: bold; padding: 2px 0;">Phone Number:</td>
+                  <td>${patientInfo.mobile || '-'}</td>
+                </tr>
+                <tr>
+                  <td style="font-weight: bold; padding: 2px 0;">Date of Admission:</td>
+                  <td>${moment(date, 'YYYY-MM-DD').isValid() ? moment(date, 'YYYY-MM-DD').format('DD/MM/YYYY') : moment().format('DD/MM/YYYY')}</td>
+                </tr>
+                <tr>
+                  <td style="font-weight: bold; padding: 2px 0;">Date of Discharge:</td>
+                  <td>${moment(date, 'YYYY-MM-DD').isValid() ? moment(date, 'YYYY-MM-DD').format('DD/MM/YYYY') : moment().format('DD/MM/YYYY')} (Same day outpatient)</td>
+                </tr>
+                <tr>
+                  <td style="font-weight: bold; padding: 2px 0;">Doctor in Charge:</td>
+                  <td>${doctorName}</td>
+                </tr>
+              </table>
+            </div>
+            
+            <!-- Bill Details -->
+            <div style="margin-bottom: 30px;">
+              <h3 style="border-bottom: 1px solid #E5E7EB; padding-bottom: 6px; margin-bottom: 15px; font-size: 16px; color: #111827;">Bill Details</h3>
+              <table style="width: 100%; border-collapse: collapse; font-size: 14px; text-align: left;">
+                <thead>
+                  <tr style="border: 1px solid #9CA3AF;">
+                    <th style="padding: 12px; border: 1px solid #9CA3AF; text-align: center; width: 45%;">Description</th>
+                    <th style="padding: 12px; border: 1px solid #9CA3AF; text-align: center; width: 15%;">Quantity</th>
+                    <th style="padding: 12px; border: 1px solid #9CA3AF; text-align: center; width: 20%;">Unit Price</th>
+                    <th style="padding: 12px; border: 1px solid #9CA3AF; text-align: center; width: 20%;">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style="border: 1px solid #9CA3AF;">
+                    <td style="padding: 12px; border: 1px solid #9CA3AF;">Hospital Charges (Facility Fee)</td>
+                    <td style="padding: 12px; border: 1px solid #9CA3AF; text-align: center;">1 Day</td>
+                    <td style="padding: 12px; border: 1px solid #9CA3AF; text-align: right;">LKR ${HOSPITAL_FEE.toFixed(2)}</td>
+                    <td style="padding: 12px; border: 1px solid #9CA3AF; text-align: right; font-weight: bold;">LKR ${HOSPITAL_FEE.toFixed(2)}</td>
+                  </tr>
+                  <tr style="border: 1px solid #9CA3AF;">
+                    <td style="padding: 12px; border: 1px solid #9CA3AF;">Doctor Consultation Fee</td>
+                    <td style="padding: 12px; border: 1px solid #9CA3AF; text-align: center;">1 Visit</td>
+                    <td style="padding: 12px; border: 1px solid #9CA3AF; text-align: right;">LKR ${CHANNELING_FEE.toFixed(2)}</td>
+                    <td style="padding: 12px; border: 1px solid #9CA3AF; text-align: right; font-weight: bold;">LKR ${CHANNELING_FEE.toFixed(2)}</td>
+                  </tr>
+                  <tr style="border: 1px solid #9CA3AF; background-color: #F9FAFB;">
+                    <td colspan="3" style="padding: 12px; border: 1px solid #9CA3AF; text-align: right; font-weight: bold;">Total Amount Paid</td>
+                    <td style="padding: 12px; border: 1px solid #9CA3AF; text-align: right; font-weight: bold; color: #00a896; font-size: 16px;">LKR ${TOTAL_AMOUNT.toFixed(2)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Footer Notes -->
+            <div style="text-align: center; margin-top: 60px; color: #9CA3AF; font-size: 12px; border-top: 1px dashed #E5E7EB; padding-top: 15px;">
+              <p>Thank you for choosing MediAI. Please produce this receipt/e-token at the channeling center.</p>
+              <p style="margin-top: 5px;">MediAI Smart Healthcare Channeling Assistant &copy; 2026</p>
+            </div>
           </body>
         </html>
       `;
@@ -476,8 +562,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20, paddingVertical: 14, borderRadius: 16, marginTop: 24, width: '100%', justifyContent: 'center'
   },
   downloadText: { color: '#FFF', fontWeight: '700', fontSize: 15 },
-  homeBtn: { padding: 16 },
-  homeBtnText: { color: COLORS.primary, fontWeight: '700', fontSize: 15 }
+  homeBtn: {
+    backgroundColor: '#FFF',
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+    paddingVertical: 14,
+    borderRadius: 16,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+  },
+  homeBtnText: {
+    color: COLORS.primary,
+    fontWeight: '800',
+    fontSize: 15,
+  }
 });
 
 export default BookAppointmentScreen;
