@@ -8,7 +8,7 @@ import {
   ChevronLeft, Bell, Search, FileText, Download,
   Filter, TrendingUp, Droplets, Activity, Zap,
   Microscope, Shield, FlaskConical, CheckCircle,
-  Clock, Calendar, ChevronRight, BarChart2, AlertCircle, Plus, X
+  Clock, Calendar, ChevronRight, BarChart2, AlertCircle, Plus, X, Edit2
 } from 'lucide-react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { COLORS, SHADOWS } from '../../theme/theme';
@@ -16,6 +16,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import NurseBottomNavBar from '../../components/NurseBottomNavBar';
 import { useAuth } from '../../context/AuthContext';
 import moment from 'moment';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 
 const { width, height } = Dimensions.get('window');
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
@@ -48,6 +50,9 @@ const LabReportsScreen: React.FC = () => {
   
   // Modal & Form States
   const [addModalVisible, setAddModalVisible] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingReportId, setEditingReportId] = useState<string | null>(null);
+  
   const [activeBookings, setActiveBookings] = useState<any[]>([]);
   const [nurseProfile, setNurseProfile] = useState<any | null>(null);
   const [selectedBooking, setSelectedBooking] = useState<any | null>(null);
@@ -81,7 +86,7 @@ const LabReportsScreen: React.FC = () => {
         pan.flattenOffset();
         // Check if it's a simple tap gesture (very small delta movement)
         if (Math.abs(gestureState.dx) < 8 && Math.abs(gestureState.dy) < 8) {
-          handleOpenAddModal();
+          handleFABPress();
         }
       },
     })
@@ -104,6 +109,17 @@ const LabReportsScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleFABPress = () => {
+    setIsEditMode(false);
+    setEditingReportId(null);
+    setSelectedBooking(null);
+    setTestType('');
+    setResult('Normal');
+    setStatus('Completed');
+    setNotes('');
+    handleOpenAddModal();
   };
 
   const handleOpenAddModal = async () => {
@@ -139,6 +155,35 @@ const LabReportsScreen: React.FC = () => {
     } catch (err) {
       console.error('Error opening add report modal:', err);
     }
+  };
+
+  const handleOpenEditModal = async (report: any) => {
+    setIsEditMode(true);
+    setEditingReportId(report._id);
+    
+    // Fetch profile if not already fetched
+    if (!nurseProfile) {
+      try {
+        const profileRes = await fetch(`${API_BASE_URL}/api/auth/me`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const profileData = await profileRes.json();
+        if (profileRes.ok && profileData) {
+          setNurseProfile(profileData);
+        }
+      } catch (err) {
+        console.error('Error fetching nurse profile during edit:', err);
+      }
+    }
+
+    // Pre-populate fields
+    setSelectedBooking(report.booking);
+    setTestType(report.testType);
+    setResult(report.result);
+    setStatus(report.status);
+    setNotes(report.notes || '');
+    
+    setAddModalVisible(true);
   };
 
   const handleSelectBooking = (booking: any) => {
@@ -197,6 +242,135 @@ const LabReportsScreen: React.FC = () => {
       alert('Error creating report. Please try again.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleUpdateReport = async () => {
+    if (!editingReportId) return;
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        result,
+        status,
+        notes
+      };
+
+      const res = await fetch(`${API_BASE_URL}/api/labs/reports/${editingReportId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      const resData = await res.json();
+      if (res.ok && resData.success) {
+        alert('Report updated successfully!');
+        setAddModalVisible(false);
+        // Reset/Clear
+        setIsEditMode(false);
+        setEditingReportId(null);
+        setSelectedBooking(null);
+        setTestType('');
+        setResult('Normal');
+        setStatus('Completed');
+        setNotes('');
+        // Refresh
+        fetchReports();
+      } else {
+        alert(resData.message || 'Failed to update report.');
+      }
+    } catch (err) {
+      console.error('Error updating report:', err);
+      alert('Error updating report. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDownloadPDF = async (report: any) => {
+    try {
+      const htmlContent = `
+        <html>
+          <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+              body { font-family: 'Helvetica', Arial, sans-serif; padding: 30px; color: #1E293B; background-color: #F8FAFC; }
+              .container { background-color: #FFFFFF; border-radius: 16px; padding: 40px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-top: 8px solid #7C3AED; }
+              .header { text-align: center; margin-bottom: 30px; }
+              .logo { font-size: 28px; font-weight: 800; color: #7C3AED; letter-spacing: -0.5px; }
+              .subtitle { font-size: 14px; color: #64748B; margin-top: 4px; }
+              .ref-no { font-size: 12px; font-weight: 700; color: #7C3AED; margin-top: 10px; text-transform: uppercase; background-color: #F3E8FF; display: inline-block; padding: 4px 12px; border-radius: 9999px; }
+              .divider { height: 1px; background-color: #E2E8F0; margin: 30px 0; }
+              .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; font-size: 14px; margin-bottom: 30px; }
+              .meta-item { display: flex; flex-direction: column; }
+              .meta-label { font-weight: 600; color: #64748B; font-size: 12px; text-transform: uppercase; margin-bottom: 4px; }
+              .meta-value { font-weight: 700; color: #0F172A; }
+              .result-section { background-color: #F1F5F9; border-radius: 12px; padding: 20px; margin-bottom: 30px; }
+              .result-title { font-size: 14px; font-weight: 700; color: #475569; text-transform: uppercase; margin-bottom: 8px; }
+              .result-value { font-size: 20px; font-weight: 800; color: #10B981; }
+              .notes-section { background-color: #FAF5FF; border: 1px solid #E9D5FF; border-radius: 12px; padding: 20px; }
+              .notes-title { font-size: 14px; font-weight: 700; color: #7C3AED; text-transform: uppercase; margin-bottom: 8px; }
+              .notes-value { font-size: 14px; color: #475569; line-height: 1.6; }
+              .footer { text-align: center; font-size: 11px; color: #94A3B8; margin-top: 50px; border-top: 1px solid #E2E8F0; padding-top: 20px; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+               <div class="header">
+                 <div class="logo">MediAI Smart Laboratory</div>
+                 <div class="subtitle">Healthcare Channeling Assistant & Diagnostic Center</div>
+                 <div class="ref-no">Ref: ${report.refNo}</div>
+               </div>
+               
+               <div class="divider"></div>
+               
+               <div class="meta-grid">
+                 <div class="meta-item">
+                   <span class="meta-label">Patient Name</span>
+                   <span class="meta-value">${report.patient?.fullName || 'N/A'}</span>
+                 </div>
+                 <div class="meta-item">
+                   <span class="meta-label">Date & Time</span>
+                   <span class="meta-value">${moment(report.booking?.appointmentDate || report.reportDate).format('MMM DD, YYYY - hh:mm A')}</span>
+                 </div>
+                 <div class="meta-item">
+                   <span class="meta-label">Test Category</span>
+                   <span class="meta-value">${report.category || 'General'}</span>
+                 </div>
+                 <div class="meta-item">
+                   <span class="meta-label">Test Type</span>
+                   <span class="meta-value">${report.testType}</span>
+                 </div>
+               </div>
+               
+               <div class="result-section">
+                 <div class="result-title">Diagnostic Finding</div>
+                 <div class="result-value" style="color: ${report.result === 'Normal' || report.result === 'Negative' ? '#10B981' : (report.result === 'Borderline' ? '#F59E0B' : '#EF4444')};">
+                   ${report.result}
+                 </div>
+               </div>
+               
+               <div class="notes-section">
+                 <div class="notes-title">Clinical Notes / Comments</div>
+                 <div class="notes-value">${report.notes || 'No specific notes or comments reported.'}</div>
+               </div>
+               
+               <div class="footer">
+                 This report is electronically generated and validated by MediAI Healthcare.
+                 <br>Copyright &copy; ${new Date().getFullYear()} MediAI. All rights reserved.
+               </div>
+            </div>
+          </body>
+        </html>
+      `;
+
+      const { uri } = await Print.printToFileAsync({ html: htmlContent });
+      await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: `Download report_${report.refNo}.pdf` });
+    } catch (err) {
+      console.error('Error generating PDF:', err);
+      alert('Could not download PDF. Please try again.');
     }
   };
 
@@ -389,7 +563,13 @@ const LabReportsScreen: React.FC = () => {
                     <View style={[styles.resultBadge, { backgroundColor: resultColor + '18' }]}>
                       <Text style={[styles.resultText, { color: resultColor }]}>{report.result}</Text>
                     </View>
-                    <TouchableOpacity style={styles.downloadBtn}>
+                    
+                    {/* Pencil Edit Icon Button */}
+                    <TouchableOpacity style={styles.editBtn} onPress={() => handleOpenEditModal(report)}>
+                      <Edit2 size={15} color={COLORS.primary} />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.downloadBtn} onPress={() => handleDownloadPDF(report)}>
                       <Download size={15} color={COLORS.primary} />
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.viewBtn}>
@@ -419,59 +599,76 @@ const LabReportsScreen: React.FC = () => {
         <Plus size={28} color="#FFF" />
       </Animated.View>
 
-      {/* Add Report Modal */}
+      {/* Add / Edit Report Modal */}
       <Modal visible={addModalVisible} transparent animationType="fade" onRequestClose={() => setAddModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Generate Lab Report</Text>
+              <Text style={styles.modalTitle}>{isEditMode ? 'Edit Lab Report' : 'Generate Lab Report'}</Text>
               <TouchableOpacity onPress={() => setAddModalVisible(false)} style={styles.closeBtn}>
                 <X size={20} color={COLORS.textHeader} />
               </TouchableOpacity>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={styles.modalLabel}>Select Patient Appointment</Text>
-              {selectedBooking ? (
-                <TouchableOpacity style={styles.selectorBtn} onPress={() => setShowBookingSelector(!showBookingSelector)}>
-                  <Text style={styles.selectorBtnText}>
-                    {selectedBooking.patient?.fullName} - {selectedBooking.bookingRef}
+              <Text style={styles.modalLabel}>Patient Appointment</Text>
+              
+              {isEditMode ? (
+                <View style={styles.readOnlyField}>
+                  <Text style={styles.readOnlyText}>
+                    {(selectedBooking?.patient?.fullName || selectedBooking?.patient || 'Patient')} (Ref: {selectedBooking?.bookingRef || 'N/A'})
                   </Text>
-                </TouchableOpacity>
+                </View>
               ) : (
-                <View style={styles.noBookingsWarning}>
-                  <Text style={styles.noBookingsWarningText}>No active appointments available.</Text>
-                </View>
-              )}
+                <>
+                  {selectedBooking ? (
+                    <TouchableOpacity style={styles.selectorBtn} onPress={() => setShowBookingSelector(!showBookingSelector)}>
+                      <Text style={styles.selectorBtnText}>
+                        {selectedBooking.patient?.fullName} - {selectedBooking.bookingRef}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={styles.noBookingsWarning}>
+                      <Text style={styles.noBookingsWarningText}>No active appointments available.</Text>
+                    </View>
+                  )}
 
-              {showBookingSelector && (
-                <View style={styles.bookingsDropdown}>
-                  <ScrollView nestedScrollEnabled style={{ maxHeight: 150 }}>
-                    {activeBookings.map((b) => (
-                      <TouchableOpacity
-                        key={b._id}
-                        style={[styles.dropdownItem, selectedBooking?._id === b._id && styles.dropdownItemActive]}
-                        onPress={() => {
-                          handleSelectBooking(b);
-                          setShowBookingSelector(false);
-                        }}
-                      >
-                        <Text style={[styles.dropdownItemText, selectedBooking?._id === b._id && styles.dropdownItemTextActive]}>
-                          {b.patient?.fullName} ({b.bookingRef} - {b.lab?.name || 'Lab'})
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
+                  {showBookingSelector && (
+                    <View style={styles.bookingsDropdown}>
+                      <ScrollView nestedScrollEnabled style={{ maxHeight: 150 }}>
+                        {activeBookings.map((b) => (
+                          <TouchableOpacity
+                            key={b._id}
+                            style={[styles.dropdownItem, selectedBooking?._id === b._id && styles.dropdownItemActive]}
+                            onPress={() => {
+                              handleSelectBooking(b);
+                              setShowBookingSelector(false);
+                            }}
+                          >
+                            <Text style={[styles.dropdownItemText, selectedBooking?._id === b._id && styles.dropdownItemTextActive]}>
+                              {b.patient?.fullName} ({b.bookingRef} - {b.lab?.name || 'Lab'})
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
+                </>
               )}
 
               <Text style={styles.modalLabel}>Test Type / Description</Text>
-              <TextInput
-                style={styles.modalInput}
-                placeholder="e.g. Fasting Blood Sugar"
-                value={testType}
-                onChangeText={setTestType}
-              />
+              {isEditMode ? (
+                <View style={styles.readOnlyField}>
+                  <Text style={styles.readOnlyText}>{testType}</Text>
+                </View>
+              ) : (
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="e.g. Fasting Blood Sugar"
+                  value={testType}
+                  onChangeText={setTestType}
+                />
+              )}
 
               <Text style={styles.modalLabel}>Result Value</Text>
               <View style={styles.btnRow}>
@@ -508,11 +705,15 @@ const LabReportsScreen: React.FC = () => {
                 onChangeText={setNotes}
               />
 
-              <TouchableOpacity style={styles.submitBtn} onPress={handleSubmitReport} disabled={submitting}>
+              <TouchableOpacity 
+                style={styles.submitBtn} 
+                onPress={isEditMode ? handleUpdateReport : handleSubmitReport} 
+                disabled={submitting}
+              >
                 {submitting ? (
                   <ActivityIndicator size="small" color="#FFF" />
                 ) : (
-                  <Text style={styles.submitBtnText}>Generate Report</Text>
+                  <Text style={styles.submitBtnText}>{isEditMode ? 'Update Report' : 'Generate Report'}</Text>
                 )}
               </TouchableOpacity>
             </ScrollView>
@@ -611,6 +812,7 @@ const styles = StyleSheet.create({
   resultBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
   resultText: { fontSize: 11, fontWeight: '800' },
   downloadBtn: { width: 32, height: 32, borderRadius: 10, backgroundColor: COLORS.primaryLight, alignItems: 'center', justifyContent: 'center' },
+  editBtn: { width: 32, height: 32, borderRadius: 10, backgroundColor: COLORS.primaryLight, alignItems: 'center', justifyContent: 'center' },
   viewBtn: { width: 32, height: 32, borderRadius: 10, backgroundColor: COLORS.primaryLight, alignItems: 'center', justifyContent: 'center' },
 
   // Draggable FAB
@@ -680,6 +882,19 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: COLORS.textHeader,
+  },
+  readOnlyField: {
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#F1F5F9',
+  },
+  readOnlyText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748B',
   },
   noBookingsWarning: {
     padding: 12,
