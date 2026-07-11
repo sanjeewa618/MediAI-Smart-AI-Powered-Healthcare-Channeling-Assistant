@@ -152,6 +152,39 @@ export const rejectRequest = async (req, res) => {
   }
 };
 
+// @desc    Request additional documents from a pending doctor request
+// @route   PUT /api/admin/requests/:id/request-docs
+// @access  Private (Admin only)
+export const requestAdditionalDocuments = async (req, res) => {
+  try {
+    const { message } = req.body;
+
+    if (!message || !message.trim()) {
+      return res.status(400).json({ message: 'Please provide a document request message' });
+    }
+
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.status = 'pending';
+    user.verificationNotes = message.trim();
+    user.verificationRequestedAt = new Date();
+    user.verificationRequestedBy = req.user?._id;
+
+    const updatedUser = await user.save();
+
+    res.json({
+      success: true,
+      message: 'Document request saved successfully',
+      data: updatedUser
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
 // @desc    Add a new user manually (admin creates patient/doctor/nurse)
 // @route   POST /api/admin/users
 // @access  Private (Admin only)

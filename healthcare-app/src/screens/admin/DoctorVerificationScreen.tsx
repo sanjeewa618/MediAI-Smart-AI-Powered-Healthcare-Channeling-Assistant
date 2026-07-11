@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SHADOWS } from '../../theme/theme';
+import { useAuth } from '../../context/AuthContext';
 import { 
   ArrowLeft, 
   FileText, 
@@ -29,45 +30,27 @@ import {
 } from 'lucide-react-native';
 import AdminBottomNavBar from '../../components/AdminBottomNavBar';
 
-const INITIAL_REQUESTS = [
-  {
-    id: 'V001',
-    name: 'Dr. Priyantha Cooray',
-    specialty: 'Pediatrician',
-    slmcNumber: 'SLMC-REG-2015-8942',
-    licenseNumber: 'LIC-PED-554109',
-    certificates: ['Pediatrics Specialization - Faculty of Medicine Colombo', 'Board Certified MD in Child Health'],
-    status: 'Pending',
-    dateSubmitted: '2026-06-22',
-    img: 'https://img.icons8.com/bubbles/100/000000/doctor-male.png'
-  },
-  {
-    id: 'V002',
-    name: 'Dr. Sanduni Perera',
-    specialty: 'Dermatologist',
-    slmcNumber: 'SLMC-REG-2018-1249',
-    licenseNumber: 'LIC-DERM-998241',
-    certificates: ['MD in Dermatology - Post Graduate Institute of Medicine', 'Advanced Cosmetology Diploma'],
-    status: 'Pending',
-    dateSubmitted: '2026-06-23',
-    img: 'https://img.icons8.com/bubbles/100/000000/female-doctor.png'
-  },
-  {
-    id: 'V003',
-    name: 'Dr. Saman Perera',
-    specialty: 'Cardiologist',
-    slmcNumber: 'SLMC-REG-2010-3351',
-    licenseNumber: 'LIC-CARD-112093',
-    certificates: ['Cardiology Fellowship - Royal College of Physicians'],
-    status: 'Approved',
-    dateSubmitted: '2026-06-15',
-    img: 'https://img.icons8.com/bubbles/100/000000/doctor-male.png'
-  },
-];
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
+
+type VerificationRequest = {
+  _id: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: 'doctor' | 'nurse';
+  status: 'pending' | 'approved' | 'rejected' | 'active' | 'suspended' | 'disabled' | 'verified';
+  specialization?: string;
+  department?: string;
+  staffId?: string;
+  verificationNotes?: string;
+  createdAt?: string;
+};
 
 const DoctorVerificationScreen = () => {
   const navigation = useNavigation<any>();
-  const [requests, setRequests] = useState(INITIAL_REQUESTS);
+  const { token } = useAuth();
+  const [requests, setRequests] = useState<VerificationRequest[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'Pending' | 'Approved' | 'Rejected'>('Pending');
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -76,19 +59,84 @@ const DoctorVerificationScreen = () => {
   const [requestText, setRequestText] = useState('');
   const [activeReqId, setActiveReqId] = useState<string | null>(null);
 
+  const fetchRequests = async () => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/users?role=doctor`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.message || 'Failed to load verification requests');
+      }
+
+      setRequests((data.data || []) as VerificationRequest[]);
+    } catch (error) {
+      console.error('Fetch verification requests error:', error);
+      Alert.alert('Error', 'Failed to fetch doctor verification requests.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRequests();
+  }, [token]);
+
   const toggleExpand = (id: string) => {
     setExpandedId(prev => (prev === id ? null : id));
   };
 
-  const handleApprove = (id: string) => {
-    setRequests(prev => prev.map(req => {
-      if (req.id === id) {
-        Alert.alert('Approved', 'Doctor credentials approved and status updated.');
-        return { ...req, status: 'Approved' };
+  const mapUiFilterToStatus = (selectedFilter: 'Pending' | 'Approved' | 'Rejected') => {
+    switch (selectedFilter) {
+      case 'Approved':
+        return ['approved', 'verified'];
+      case 'Rejected':
+        return ['rejected'];
+      default:
+        return ['pending'];
+    }
+  };
+
+  const updateRequestStatus = async (id: string, status: 'approved' | 'rejected', successMessage: string) => {
+    if (!token) {
+      Alert.alert('Error', 'You must be signed in as an admin.');
+      return;
+    }
+
+    try {
+      const endpoint = status === 'approved' ? 'approve' : 'reject';
+      const response = await fetch(`${API_BASE_URL}/api/admin/requests/${id}/${endpoint}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.message || `Failed to ${status} request`);
       }
-      return req;
-    }));
-    setExpandedId(null);
+
+      Alert.alert('Success', successMessage);
+      fetchRequests();
+      setExpandedId(null);
+    } catch (error) {
+      console.error('Update request status error:', error);
+      Alert.alert('Error', `Unable to ${status} this request.`);
+    }
+  };
+
+  const handleApprove = (id: string) => {
+    updateRequestStatus(id, 'approved', 'Doctor credentials approved and status updated.');
   };
 
   const handleReject = (id: string) => {
@@ -97,16 +145,7 @@ const DoctorVerificationScreen = () => {
       'Are you sure you want to reject this doctor registration request?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Reject', style: 'destructive', onPress: () => {
-          setRequests(prev => prev.map(req => {
-            if (req.id === id) {
-              return { ...req, status: 'Rejected' };
-            }
-            return req;
-          }));
-          setExpandedId(null);
-          Alert.alert('Rejected', 'Doctor registration rejected.');
-        }}
+        { text: 'Reject', style: 'destructive', onPress: () => updateRequestStatus(id, 'rejected', 'Doctor registration rejected.') }
       ]
     );
   };
@@ -122,14 +161,65 @@ const DoctorVerificationScreen = () => {
       Alert.alert('Error', 'Please enter a description of the documents needed.');
       return;
     }
-    Alert.alert(
-      'Request Sent',
-      `An email notification requesting "${requestText}" has been sent to the doctor.`,
-      [{ text: 'OK', onPress: () => setDocModalVisible(false) }]
-    );
+    const sendRequest = async () => {
+      if (!token || !activeReqId) {
+        Alert.alert('Error', 'Unable to request documents right now.');
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/admin/requests/${activeReqId}/request-docs`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ message: requestText.trim() }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data?.message || 'Failed to request additional documents');
+        }
+
+        Alert.alert('Request Sent', 'Document request saved and sent to the doctor.');
+        setDocModalVisible(false);
+        setExpandedId(null);
+        fetchRequests();
+      } catch (error) {
+        console.error('Request docs error:', error);
+        Alert.alert('Error', 'Unable to send the document request.');
+      }
+    };
+
+    void sendRequest();
   };
 
-  const filteredRequests = requests.filter(req => req.status === filter);
+  const filteredRequests = useMemo(() => {
+    const allowedStatuses = mapUiFilterToStatus(filter);
+    return requests.filter(req => allowedStatuses.includes(req.status));
+  }, [filter, requests]);
+
+  const formatStatus = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return 'Pending';
+      case 'approved':
+      case 'verified':
+        return 'Approved';
+      case 'rejected':
+        return 'Rejected';
+      default:
+        return status;
+    }
+  };
+
+  const formatDate = (value?: string) => {
+    if (!value) return 'Recently submitted';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toISOString().split('T')[0];
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -163,23 +253,28 @@ const DoctorVerificationScreen = () => {
           {/* Main List */}
           <FlatList 
             data={filteredRequests}
-            keyExtractor={item => item.id}
+            keyExtractor={item => item._id}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
+            ListHeaderComponent={loading ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>Loading verification requests...</Text>
+              </View>
+            ) : null}
             renderItem={({ item }) => {
-              const isExpanded = expandedId === item.id;
+              const isExpanded = expandedId === item._id;
               return (
                 <View style={[styles.requestCard, SHADOWS.light]}>
                   <TouchableOpacity 
                     activeOpacity={0.8} 
                     style={styles.cardHeader}
-                    onPress={() => toggleExpand(item.id)}
+                    onPress={() => toggleExpand(item._id)}
                   >
-                    <Image source={{ uri: item.img }} style={styles.avatar} />
+                    <Image source={{ uri: `https://i.pravatar.cc/150?u=${item._id}` }} style={styles.avatar} />
                     <View style={styles.headerText}>
                       <Text style={styles.doctorName}>{item.name}</Text>
-                      <Text style={styles.specialtyText}>{item.specialty}</Text>
-                      <Text style={styles.dateText}>Submitted on: {item.dateSubmitted}</Text>
+                      <Text style={styles.specialtyText}>{item.specialization || 'Doctor'}</Text>
+                      <Text style={styles.dateText}>Submitted on: {formatDate(item.createdAt)}</Text>
                     </View>
                     {isExpanded ? <ChevronUp size={22} color={COLORS.textSecondary} /> : <ChevronDown size={22} color={COLORS.textSecondary} />}
                   </TouchableOpacity>
@@ -191,39 +286,37 @@ const DoctorVerificationScreen = () => {
                       {/* SLMC detail */}
                       <View style={styles.detailRow}>
                         <Text style={styles.detailLabel}>SLMC Reg Number:</Text>
-                        <Text style={styles.detailValue}>{item.slmcNumber}</Text>
+                        <Text style={styles.detailValue}>{item.staffId || 'Not provided'}</Text>
                       </View>
 
                       {/* License detail */}
                       <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Medical License:</Text>
-                        <Text style={styles.detailValue}>{item.licenseNumber}</Text>
+                        <Text style={styles.detailLabel}>Doctor ID:</Text>
+                        <Text style={styles.detailValue}>{item._id}</Text>
                       </View>
 
                       {/* Certificates List */}
                       <Text style={styles.subHeading}>Submitted Documents & Certificates</Text>
-                      {item.certificates.map((cert, index) => (
-                        <View key={index} style={styles.certItem}>
-                          <FileText size={16} color={COLORS.primary} />
-                          <Text style={styles.certText}>{cert}</Text>
-                        </View>
-                      ))}
+                      <View style={styles.certItem}>
+                        <FileText size={16} color={COLORS.primary} />
+                        <Text style={styles.certText}>{item.verificationNotes || 'No extra request notes added.'}</Text>
+                      </View>
 
                       {/* Certificate preview card mockup */}
                       <View style={styles.certificatePreview}>
                         <LinearGradient colors={['#FDFBFB', '#EBEDEE']} style={styles.certFrame}>
                           <FileCheck size={36} color={COLORS.primary} />
-                          <Text style={styles.certPreviewTitle}>Official SLMC Certificate Certificate</Text>
-                          <Text style={styles.certPreviewSub}>{item.slmcNumber}</Text>
+                          <Text style={styles.certPreviewTitle}>Verification Document Review</Text>
+                          <Text style={styles.certPreviewSub}>{formatStatus(item.status)}</Text>
                         </LinearGradient>
                       </View>
 
                       {/* Action buttons (only for Pending requests) */}
-                      {item.status === 'Pending' && (
+                      {item.status === 'pending' && (
                         <View style={styles.actionRow}>
                           <TouchableOpacity 
                             style={[styles.actionButton, styles.reqDocsBtn]} 
-                            onPress={() => openDocRequestModal(item.id)}
+                            onPress={() => openDocRequestModal(item._id)}
                           >
                             <AlertTriangle size={14} color="#F59E0B" />
                             <Text style={[styles.actionText, { color: '#D97706' }]}>Request Docs</Text>
@@ -231,7 +324,7 @@ const DoctorVerificationScreen = () => {
 
                           <TouchableOpacity 
                             style={[styles.actionButton, styles.rejectBtn]} 
-                            onPress={() => handleReject(item.id)}
+                            onPress={() => handleReject(item._id)}
                           >
                             <X size={14} color="#EF4444" />
                             <Text style={[styles.actionText, { color: '#EF4444' }]}>Reject</Text>
@@ -239,13 +332,19 @@ const DoctorVerificationScreen = () => {
 
                           <TouchableOpacity 
                             style={[styles.actionButton, styles.approveBtn]} 
-                            onPress={() => handleApprove(item.id)}
+                            onPress={() => handleApprove(item._id)}
                           >
                             <Check size={14} color="#FFF" />
                             <Text style={[styles.actionText, { color: '#FFF' }]}>Approve</Text>
                           </TouchableOpacity>
                         </View>
                       )}
+                      {item.status !== 'pending' && item.verificationNotes ? (
+                        <View style={[styles.certItem, { marginTop: 12 }]}>
+                          <AlertTriangle size={16} color="#D97706" />
+                          <Text style={styles.certText}>Follow-up note: {item.verificationNotes}</Text>
+                        </View>
+                      ) : null}
                     </View>
                   )}
                 </View>

@@ -43,6 +43,11 @@ const userSchema = new mongoose.Schema(
     experienceYears: { type: String },
     consultationFee: { type: Number },
     totalConsultations: { type: String },
+
+    // Verification workflow support for admin review
+    verificationNotes: { type: String },
+    verificationRequestedAt: { type: Date },
+    verificationRequestedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true }
 );
