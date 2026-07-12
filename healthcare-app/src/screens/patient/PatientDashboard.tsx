@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, Dimensions, Animated, PanResponder, Pressable, StatusBar, Modal, BackHandler, Easing } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
-import { Search, Calendar, User, FileText, Activity, MoreHorizontal, Home, Heart, Shield, MessageCircle, FileEdit, FlaskConical, ChevronRight, Baby, Droplets, Sparkles, Plus, Bell, LogOut, Pill, Truck, Settings, X, LifeBuoy, Stethoscope, Dna, Brain, Bone, Eye, Smile, Wallet, Clock, AlertCircle, Hourglass, Users } from 'lucide-react-native';
+import { Search, Calendar, User, FileText, Activity, MoreHorizontal, Home, Heart, Shield, MessageCircle, FileEdit, FlaskConical, ChevronRight, Baby, Droplets, Sparkles, Plus, Bell, LogOut, Pill, Truck, Settings, X, LifeBuoy, Stethoscope, Dna, Brain, Bone, Eye, Smile, Wallet, Clock, AlertCircle, Hourglass, Users, RefreshCw } from 'lucide-react-native';
 import BottomNavBar from '../../components/BottomNavBar';
 import { useAuth } from '../../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -427,49 +427,50 @@ const PatientDashboard = () => {
   const [labSlotCounts, setLabSlotCounts] = useState<{ [catId: string]: number }>({});
   const [labSlotsLoading, setLabSlotsLoading] = useState(false);
 
+  const fetchQueue = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/patient/dashboard`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        const startOfToday = moment().startOf('day');
+        const endOfTwoDays = moment().add(2, 'days').endOf('day');
+        const filterNextTwoDays = (appts: any[]) => {
+          if (!appts) return [];
+          return appts.filter(appt => {
+            const dateInRange = moment(appt.date).isBetween(startOfToday, endOfTwoDays, null, '[]');
+            if (!dateInRange) return false;
+            return !isApptExpiredFrontend(appt.date, appt.timeSlot);
+          });
+        };
+        const filterUnique = (appts: any[]) => {
+          const seen = new Set();
+          return appts.filter(a => {
+            if (!a || !a._id) return true;
+            const dup = seen.has(a._id);
+            seen.add(a._id);
+            return !dup;
+          });
+        };
+        setUpcomingDoctorAppointments(filterUnique(filterNextTwoDays(json.data.doctorAppointments)));
+        setUpcomingLabAppointments(filterUnique(filterNextTwoDays(json.data.labAppointments)));
+        setLiveQueue(json.data.liveQueue || []);
+        setLastQueueRefresh(new Date());
+      }
+    } catch (e) {
+      console.error('Queue fetch error:', e);
+    }
+  }, [token]);
+
   useFocusEffect(
     useCallback(() => {
-      const fetchQueue = async () => {
-        try {
-          const res = await fetch(`${API_BASE_URL}/api/patient/dashboard`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          const json = await res.json();
-          if (res.ok && json.success) {
-            const startOfToday = moment().startOf('day');
-            const endOfTwoDays = moment().add(2, 'days').endOf('day');
-            const filterNextTwoDays = (appts: any[]) => {
-              if (!appts) return [];
-              return appts.filter(appt => {
-                const dateInRange = moment(appt.date).isBetween(startOfToday, endOfTwoDays, null, '[]');
-                if (!dateInRange) return false;
-                return !isApptExpiredFrontend(appt.date, appt.timeSlot);
-              });
-            };
-            const filterUnique = (appts: any[]) => {
-              const seen = new Set();
-              return appts.filter(a => {
-                if (!a || !a._id) return true;
-                const dup = seen.has(a._id);
-                seen.add(a._id);
-                return !dup;
-              });
-            };
-            setUpcomingDoctorAppointments(filterUnique(filterNextTwoDays(json.data.doctorAppointments)));
-            setUpcomingLabAppointments(filterUnique(filterNextTwoDays(json.data.labAppointments)));
-            setLiveQueue(json.data.liveQueue || []);
-            setLastQueueRefresh(new Date());
-          }
-        } catch (e) {
-          console.error('Queue fetch error:', e);
-        }
-      };
       if (token) {
         fetchQueue();
         const interval = setInterval(fetchQueue, 30000);
         return () => clearInterval(interval);
       }
-    }, [token])
+    }, [token, fetchQueue])
   );
 
   useFocusEffect(
@@ -827,9 +828,9 @@ const PatientDashboard = () => {
               <View style={styles.headerActions}>
                 <TouchableOpacity
                   style={styles.headerActionButton}
-                  onPress={() => setAppointmentModalVisible(true)}
+                  onPress={fetchQueue}
                 >
-                  <Calendar size={20} color="#FFFFFF" />
+                  <RefreshCw size={20} color="#FFFFFF" />
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.headerActionButton, { marginLeft: 10 }]}>
                   <Bell size={20} color="#FFFFFF" />
