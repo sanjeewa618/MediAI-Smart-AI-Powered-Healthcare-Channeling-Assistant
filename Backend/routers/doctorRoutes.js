@@ -10,7 +10,8 @@ import {
   getSpecialties,
   getDoctorAvailabilityForPatient,
   getPatientDetailsForDoctor,
-  updateSessionState
+  updateSessionState,
+  getDoctorAnalytics
 } from '../controllers/doctorController.js';
 import { protect } from '../middlewares/authMiddleware.js';
 import { doctorOnly } from '../middlewares/roleMiddleware.js';
@@ -27,6 +28,7 @@ router.use(protect);
 
 // Doctor Dashboard Data & Profile update (Only accessible by doctors)
 router.get('/dashboard', doctorOnly, getDoctorDashboard);
+router.get('/analytics', doctorOnly, getDoctorAnalytics);
 router.put('/profile', doctorOnly, updateDoctorProfile);
 router.get('/patient/:id', doctorOnly, getPatientDetailsForDoctor);
 router.put('/session/:action', doctorOnly, updateSessionState);

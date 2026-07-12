@@ -543,3 +543,103 @@ export const updateSessionState = async (req, res) => {
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
+
+// @desc    Get doctor analytics/reports data
+// @route   GET /api/doctor/analytics
+// @access  Private (Doctor only)
+export const getDoctorAnalytics = async (req, res) => {
+  try {
+    const doctorId = req.user._id;
+
+    // 1. Total Unique Patients
+    const uniquePatients = await Appointment.distinct('patient', { doctor: doctorId, status: 'completed' });
+    const totalPatients = uniquePatients.length;
+
+    // 2. This Month's Completed Appointments
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+    const thisMonthAppts = await Appointment.countDocuments({
+      doctor: doctorId,
+      date: { $gte: startOfMonth, $lte: endOfMonth },
+      status: 'completed'
+    });
+
+    // 3. Avg Rating (Mock for now, or derived)
+    const avgRating = "4.8";
+
+    // 4. Hours Worked (Derived from completed sessions)
+    const completedSessions = await DailySession.countDocuments({ doctor: doctorId, status: 'ended' });
+    const hoursWorked = completedSessions * 2; // Rough estimate of 2 hrs per session
+
+    // 5. Weekly Patients (Last 7 days)
+    const weeklyData = [];
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(now.getDate() - i);
+      const startOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      const endOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59);
+      
+      const count = await Appointment.countDocuments({
+        doctor: doctorId,
+        date: { $gte: startOfDay, $lte: endOfDay },
+        status: 'completed'
+      });
+      
+      weeklyData.push({
+        day: dayNames[d.getDay()],
+        count,
+        max: 10
+      });
+    }
+    
+    // Normalize weekly max
+    const overallMax = Math.max(...weeklyData.map(w => w.count), 10);
+    weeklyData.forEach(w => w.max = overallMax);
+
+    // 6. Top Conditions Treated
+    const allCompletedAppts = await Appointment.find({ doctor: doctorId, status: 'completed' }).select('symptoms');
+    const symptomCounts = {};
+    let totalSymptoms = 0;
+    
+    allCompletedAppts.forEach(app => {
+      if (app.symptoms) {
+        const sym = app.symptoms.trim();
+        symptomCounts[sym] = (symptomCounts[sym] || 0) + 1;
+        totalSymptoms++;
+      }
+    });
+
+    let topConditions = Object.keys(symptomCounts).map(sym => ({
+      name: sym.substring(0, 25), // prevent too long names
+      count: symptomCounts[sym],
+      pct: Math.round((symptomCounts[sym] / totalSymptoms) * 100)
+    })).sort((a, b) => b.count - a.count).slice(0, 4);
+
+    if (topConditions.length === 0) {
+      topConditions = [
+        { name: 'General Consultations', count: 0, pct: 0 },
+      ];
+    }
+
+    res.json({
+      success: true,
+      data: {
+        stats: {
+          totalPatients: totalPatients.toString(),
+          thisMonth: thisMonthAppts.toString(),
+          avgRating,
+          hoursWorked: `${hoursWorked}h`
+        },
+        weekly: weeklyData,
+        topConditions
+      }
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+ 
