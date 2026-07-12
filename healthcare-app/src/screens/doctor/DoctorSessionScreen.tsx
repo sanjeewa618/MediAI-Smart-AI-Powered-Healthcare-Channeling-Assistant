@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Platform, Alert, ActivityIndicator, Modal, Dimensions, Linking } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ChevronRight, Play, Clock, Check, ArrowRight, XCircle, User, Activity, FileText } from 'lucide-react-native';
+import { ChevronRight, Play, Clock, Check, ArrowRight, XCircle, User, Activity, FileText, RefreshCw } from 'lucide-react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/types';
 import { COLORS } from '../../theme/theme';
@@ -21,6 +21,26 @@ const DoctorSessionScreen = () => {
   const [patients, setPatients] = useState<any[]>(appointments);
   const [sessionStarted, setSessionStarted] = useState(false);
   const [loadingAppId, setLoadingAppId] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    try {
+      setIsRefreshing(true);
+      const res = await fetch(`${API_BASE_URL}/api/doctor/dashboard`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        const timeSlotStr = `${slot.startTime} - ${slot.endTime}`;
+        const updatedPatients = (data.data.todayAppointments || []).filter((app: any) => app.timeSlot === timeSlotStr);
+        setPatients(updatedPatients);
+      }
+    } catch (error) {
+      console.error('Error refreshing appointments:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Profile Modal State
   const [selectedAppIndex, setSelectedAppIndex] = useState<number | null>(null);
@@ -112,6 +132,13 @@ const DoctorSessionScreen = () => {
 
   const handleArrowRight = async (appIndex: number) => {
     const updatedPatients = [...patients];
+    
+    // Ensure only one patient can be IN at a time
+    if (updatedPatients.some(p => p.status === 'in')) {
+      Alert.alert('Action Blocked', 'Another patient is currently in session. Please complete, skip, or cancel them first.');
+      return;
+    }
+
     const currentPatient = updatedPatients[appIndex];
 
     try {
@@ -131,31 +158,52 @@ const DoctorSessionScreen = () => {
     } catch (error) {}
   };
 
+  const autoPromoteToIn = async (updatedPatients: any[]) => {
+    if (updatedPatients.some(p => p.status === 'in')) return;
+
+    const nextInIndex = updatedPatients.findIndex(p => p.status === 'nextIn');
+    if (nextInIndex !== -1) {
+      await updatePatientStatus(updatedPatients[nextInIndex]._id, 'in');
+      updatedPatients[nextInIndex].status = 'in';
+      return;
+    }
+
+    const readyIndex = updatedPatients.findIndex(p => p.status === 'ready');
+    if (readyIndex !== -1) {
+      await updatePatientStatus(updatedPatients[readyIndex]._id, 'in');
+      updatedPatients[readyIndex].status = 'in';
+      
+      for (let j = readyIndex + 1; j < updatedPatients.length; j++) {
+        if (updatedPatients[j].status === 'started') {
+          await updatePatientStatus(updatedPatients[j]._id, 'ready');
+          updatedPatients[j].status = 'ready';
+          break;
+        }
+      }
+      return;
+    }
+
+    const startedIndex = updatedPatients.findIndex(p => p.status === 'started');
+    if (startedIndex !== -1) {
+      await updatePatientStatus(updatedPatients[startedIndex]._id, 'in');
+      updatedPatients[startedIndex].status = 'in';
+      return;
+    }
+  };
+
   const handleSkip = async (appIndex: number) => {
     const updatedPatients = [...patients];
     const currentPatient = updatedPatients[appIndex];
+    const wasIn = currentPatient.status === 'in';
 
     try {
       await updatePatientStatus(currentPatient._id, 'skipped');
       currentPatient.status = 'skipped';
 
-      // Immediately change the next 'ready' or 'started' patient to 'in'
-      for (let i = appIndex + 1; i < updatedPatients.length; i++) {
-        if (['started', 'ready'].includes(updatedPatients[i].status)) {
-          await updatePatientStatus(updatedPatients[i]._id, 'in');
-          updatedPatients[i].status = 'in';
-
-          // And set the one after that to 'ready'
-          for (let j = i + 1; j < updatedPatients.length; j++) {
-            if (updatedPatients[j].status === 'started') {
-              await updatePatientStatus(updatedPatients[j]._id, 'ready');
-              updatedPatients[j].status = 'ready';
-              break;
-            }
-          }
-          break;
-        }
+      if (wasIn) {
+        await autoPromoteToIn(updatedPatients);
       }
+
       setPatients(updatedPatients);
       setProfileModalVisible(false);
     } catch (error) {}
@@ -164,10 +212,16 @@ const DoctorSessionScreen = () => {
   const handleComplete = async (appIndex: number) => {
     const updatedPatients = [...patients];
     const currentPatient = updatedPatients[appIndex];
+    const wasIn = currentPatient.status === 'in';
 
     try {
       await updatePatientStatus(currentPatient._id, 'completed');
       currentPatient.status = 'completed';
+      
+      if (wasIn) {
+        await autoPromoteToIn(updatedPatients);
+      }
+
       setPatients(updatedPatients);
       setProfileModalVisible(false);
     } catch (error) {}
@@ -182,9 +236,15 @@ const DoctorSessionScreen = () => {
         onPress: async () => {
           const updatedPatients = [...patients];
           const currentPatient = updatedPatients[appIndex];
+          const wasIn = currentPatient.status === 'in';
           try {
             await updatePatientStatus(currentPatient._id, 'cancelled');
             currentPatient.status = 'cancelled';
+            
+            if (wasIn) {
+              await autoPromoteToIn(updatedPatients);
+            }
+
             setPatients(updatedPatients);
             setProfileModalVisible(false);
           } catch (error) {}
@@ -223,6 +283,7 @@ const DoctorSessionScreen = () => {
 
     if (status === 'ready') { bgColor = '#DBEAFE'; textColor = '#1D4ED8'; }
     if (status === 'in') { bgColor = '#FEF3C7'; textColor = '#D97706'; }
+    if (status === 'nextIn') { bgColor = '#FFEDD5'; textColor = '#C2410C'; text = 'NEXT IN'; }
     if (status === 'started') { bgColor = '#E0E7FF'; textColor = '#4338CA'; }
     if (status === 'skipped') { bgColor = '#FEE2E2'; textColor = '#B91C1C'; }
     if (status === 'completed') { bgColor = '#D1FAE5'; textColor = '#059669'; }
@@ -245,6 +306,9 @@ const DoctorSessionScreen = () => {
             <Text style={styles.headerTitle}>Session Details</Text>
             <Text style={styles.headerSub}>{slot?.startTime} – {slot?.endTime}</Text>
           </View>
+          <TouchableOpacity onPress={handleRefresh} style={styles.refreshBtn} disabled={isRefreshing}>
+            <RefreshCw size={22} color="#FFF" style={isRefreshing ? { opacity: 0.5 } : {}} />
+          </TouchableOpacity>
         </View>
       </LinearGradient>
 
@@ -285,6 +349,7 @@ const DoctorSessionScreen = () => {
             const isLoading = loadingAppId === app._id;
             const isActive = app.status === 'in';
             const isReady = app.status === 'ready';
+            const isNextIn = app.status === 'nextIn';
             const isSkipped = app.status === 'skipped';
             const isCompleted = app.status === 'completed';
 
@@ -295,42 +360,48 @@ const DoctorSessionScreen = () => {
                   styles.patientCard, 
                   isActive && styles.patientCardIn,
                   isReady && styles.patientCardReady,
-                  (isSkipped || isCompleted) && { opacity: 0.5 }
+                  isNextIn && styles.patientCardNextIn,
+                  (isSkipped || isCompleted) && { opacity: 0.5 },
+                  isActive && { flexDirection: 'column', alignItems: 'stretch' }
                 ]}
                 onPress={() => openPatientProfile(index)}
                 activeOpacity={0.7}
               >
-                <View style={styles.queueCircle}>
-                  <Text style={styles.queueText}>{app.queueNumber}</Text>
-                </View>
-                
-                <View style={styles.patientInfo}>
-                  <Text style={styles.patientName}>{app.patient?.name || 'Unknown Patient'}</Text>
-                  {renderStatusBadge(app.status)}
+                <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%' }}>
+                  <View style={styles.queueCircle}>
+                    <Text style={styles.queueText}>{app.queueNumber}</Text>
+                  </View>
+                  
+                  <View style={styles.patientInfo}>
+                    <Text style={styles.patientName}>{app.patient?.name || 'Unknown Patient'}</Text>
+                    {renderStatusBadge(app.status)}
+                  </View>
+
+                  {isLoading && (
+                    <ActivityIndicator size="small" color={COLORS.primary} style={{ marginRight: 10 }} />
+                  )}
+
+                  {!isActive && !isLoading && (
+                    <View style={styles.actionButtonsRow}>
+                      {isReady && (
+                        <TouchableOpacity style={styles.iconBtn} onPress={(e) => { e.stopPropagation(); handleArrowRight(index); }}>
+                          <ArrowRight size={24} color={COLORS.primary} />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
                 </View>
 
-                {isLoading ? (
-                  <ActivityIndicator size="small" color={COLORS.primary} style={{ marginRight: 10 }} />
-                ) : (
-                  <View style={styles.actionButtonsRow}>
-                    {isReady && (
-                      <TouchableOpacity style={styles.iconBtn} onPress={(e) => { e.stopPropagation(); handleArrowRight(index); }}>
-                        <ArrowRight size={24} color={COLORS.primary} />
-                      </TouchableOpacity>
-                    )}
-
-                    {isActive && (
-                      <>
-                        <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#FEE2E2' }]} onPress={(e) => { e.stopPropagation(); handleSkip(index); }}>
-                          <XCircle size={16} color="#DC2626" />
-                          <Text style={[styles.actionBtnText, { color: '#DC2626' }]}>Skip</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#D1FAE5' }]} onPress={(e) => { e.stopPropagation(); handleComplete(index); }}>
-                          <Check size={16} color="#059669" />
-                          <Text style={[styles.actionBtnText, { color: '#059669' }]}>Complete</Text>
-                        </TouchableOpacity>
-                      </>
-                    )}
+                {isActive && !isLoading && (
+                  <View style={{ flexDirection: 'row', gap: 12, marginTop: 12, width: '100%' }}>
+                    <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#FEE2E2', flex: 1, justifyContent: 'center' }]} onPress={(e) => { e.stopPropagation(); handleSkip(index); }}>
+                      <XCircle size={16} color="#DC2626" />
+                      <Text style={[styles.actionBtnText, { color: '#DC2626' }]}>Skip</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#D1FAE5', flex: 1, justifyContent: 'center' }]} onPress={(e) => { e.stopPropagation(); handleComplete(index); }}>
+                      <Check size={16} color="#059669" />
+                      <Text style={[styles.actionBtnText, { color: '#059669' }]}>Complete</Text>
+                    </TouchableOpacity>
                   </View>
                 )}
               </TouchableOpacity>
@@ -491,7 +562,22 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F4F6FB' },
   header: { paddingTop: Platform.OS === 'ios' ? 60 : 50, paddingHorizontal: 20, paddingBottom: 24, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
   headerRow: { flexDirection: 'row', alignItems: 'center' },
-  backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  refreshBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
   headerTitle: { fontSize: 20, fontWeight: '800', color: '#FFF' },
   headerSub: { fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 4 },
   content: { padding: 20, paddingBottom: 100 },
@@ -535,6 +621,10 @@ const styles = StyleSheet.create({
     borderColor: '#FDE68A',
     backgroundColor: '#FFFBEB',
     borderWidth: 2
+  },
+  patientCardNextIn: {
+    borderColor: '#FDBA74',
+    backgroundColor: '#FFF7ED'
   },
   queueCircle: {
     width: 44,
