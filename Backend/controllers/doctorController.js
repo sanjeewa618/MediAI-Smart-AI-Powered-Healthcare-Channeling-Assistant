@@ -30,14 +30,12 @@ export const getDoctorDashboard = async (req, res) => {
     const todayAppointments = await Appointment.find({
       doctor: req.user._id,
       date: { $gte: todayStart, $lte: todayEnd },
-      status: { $in: ['pending', 'confirmed'] }
+      status: { $ne: 'cancelled' }
     }).populate('patient', 'name email phone').sort({ queueNumber: 1 });
 
     const todayAppointmentsCount = todayAppointments.length;
-
-    // 3. Calculate Unique Patients Count
-    const uniquePatients = await Appointment.distinct('patient', { doctor: req.user._id });
-    const totalPatients = uniquePatients.length;
+    const completedTodayCount = todayAppointments.filter(app => app.status === 'completed').length;
+    const pendingTodayCount = todayAppointments.filter(app => ['pending', 'started', 'ready', 'skipped'].includes(app.status)).length;
 
     // 4. Fetch today's slots
     const today = new Date();
@@ -56,8 +54,9 @@ export const getDoctorDashboard = async (req, res) => {
       success: true,
       data: {
         stats: {
-          totalPatients,
-          todayAppointments: todayAppointmentsCount
+          totalPatients: completedTodayCount,
+          todayAppointments: todayAppointmentsCount,
+          pendingApprovals: pendingTodayCount
         },
         upcomingAppointments,
         todayAppointments,

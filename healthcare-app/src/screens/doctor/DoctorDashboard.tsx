@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, Platform, Modal, Animated, PanResponder, Dimensions, BackHandler } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
-import { Bell, Calendar, LogOut, X, Clock, FileEdit, Plus, Play } from 'lucide-react-native';
+import { Bell, Calendar, LogOut, X, Clock, FileEdit, Plus, Play, Users, CheckSquare, Activity } from 'lucide-react-native';
 
 const { height } = Dimensions.get('window');
 import DoctorBottomNavBar from '../../components/DoctorBottomNavBar';
@@ -29,7 +29,7 @@ const DoctorDashboard = () => {
   const [timeSlotModalVisible, setTimeSlotModalVisible] = useState(false);
   const [todaySlots, setTodaySlots] = useState<any[]>([]);
   const [todayAppointments, setTodayAppointments] = useState<any[]>([]);
-  const [stats, setStats] = useState({ totalPatients: 0, todayAppointments: 0 });
+  const [stats, setStats] = useState({ totalPatients: 0, todayAppointments: 0, pendingApprovals: 0 });
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
@@ -75,7 +75,7 @@ const DoctorDashboard = () => {
         if (dashboardRes.ok && dashboardData.success) {
           setTodaySlots(dashboardData.data.todaySlots || []);
           setTodayAppointments(dashboardData.data.todayAppointments || []);
-          setStats(dashboardData.data.stats || { totalPatients: 0, todayAppointments: 0 });
+          setStats(dashboardData.data.stats || { totalPatients: 0, todayAppointments: 0, pendingApprovals: 0 });
         }
       } catch (err) {
         console.error('Failed to fetch dashboard data:', err);
@@ -174,7 +174,34 @@ const DoctorDashboard = () => {
         </LinearGradient>
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <Text style={styles.sectionTitle}>Today's Schedule</Text>
+          {/* Quick Analytics Cards */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsContainer}>
+            <LinearGradient colors={['#3B82F6', '#2563EB']} style={styles.statCard}>
+              <View style={styles.statIconBox}>
+                <Clock size={20} color="#FFF" />
+              </View>
+              <Text style={styles.statValue}>{stats.todayAppointments}</Text>
+              <Text style={styles.statLabel}>Today's Apps</Text>
+            </LinearGradient>
+
+            <LinearGradient colors={['#10B981', '#059669']} style={styles.statCard}>
+              <View style={styles.statIconBox}>
+                <Users size={20} color="#FFF" />
+              </View>
+              <Text style={styles.statValue}>{stats.totalPatients}</Text>
+              <Text style={styles.statLabel}>Completed</Text>
+            </LinearGradient>
+
+            <LinearGradient colors={['#F59E0B', '#D97706']} style={styles.statCard}>
+              <View style={styles.statIconBox}>
+                <CheckSquare size={20} color="#FFF" />
+              </View>
+              <Text style={styles.statValue}>{stats.pendingApprovals || 0}</Text>
+              <Text style={styles.statLabel}>Pending</Text>
+            </LinearGradient>
+          </ScrollView>
+
+          <Text style={[styles.sectionTitle, { marginTop: 8 }]}>Today's Schedule</Text>
           {todaySlots.length === 0 ? (
             <View style={styles.emptyBox}>
               <Clock size={40} color="#D1D5DB" />
@@ -293,7 +320,44 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
   },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#1F2937', marginBottom: 16, marginTop: 10 },
+  statsContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    gap: 12,
+  },
+  statCard: {
+    width: 140,
+    padding: 16,
+    borderRadius: 20,
+    justifyContent: 'center',
+    marginRight: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  statIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#FFF',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.85)',
+  },
+  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#1F2937', marginBottom: 16, marginTop: 10, paddingHorizontal: 20 },
   slotCard: {
     backgroundColor: '#FFF',
     borderRadius: 16,
@@ -302,6 +366,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 12,
+    marginHorizontal: 20,
     shadowColor: '#9CA3AF',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
@@ -314,7 +379,7 @@ const styles = StyleSheet.create({
   slotMeta: { fontSize: 13, color: '#6B7280', marginTop: 2 },
   startBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#10B981', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 },
   startBtnText: { color: '#FFF', fontWeight: '700', fontSize: 13 },
-  emptyBox: { alignItems: 'center', paddingVertical: 40 },
+  emptyBox: { alignItems: 'center', paddingVertical: 40, paddingHorizontal: 20 },
   emptyTitle: { fontSize: 16, fontWeight: '600', color: '#6B7280', marginTop: 12 },
   headerTop: {
     flexDirection: 'row',
