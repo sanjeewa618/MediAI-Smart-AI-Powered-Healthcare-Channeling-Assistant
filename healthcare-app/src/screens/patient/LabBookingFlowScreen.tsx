@@ -5,6 +5,8 @@ import {
   KeyboardAvoidingView, Alert, Modal
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import { 
   ArrowLeft, ChevronRight, Calendar, Clock, User, 
@@ -102,6 +104,101 @@ const LabBookingFlowScreen = () => {
     if (!result.canceled && result.assets) {
       const uri = result.assets[0]?.uri;
       if (uri) setSelectedImage(uri);
+    }
+  };
+
+  const handleDownloadReceipt = async () => {
+    try {
+      const htmlContent = `
+        <html>
+          <body style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 30px; color: #1F2937;">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <h1 style="color: #3b82f6; margin-bottom: 5px;">MediAI Smart Channeling</h1>
+              <p style="color: #6B7280; margin-top: 0; font-size: 14px;">Lab Appointment E-Receipt</p>
+              <div style="display: inline-block; padding: 6px 12px; background-color: #ECFDF5; color: #047857; font-weight: bold; border-radius: 20px; font-size: 14px; margin-top: 10px;">
+                Booking ID: #${bookingRefId}
+              </div>
+            </div>
+            
+            <hr style="border: 0; border-top: 1px solid #E5E7EB; margin-bottom: 30px;" />
+            
+            <h3 style="color: #3b82f6; border-bottom: 2px solid #EFF6FF; padding-bottom: 8px;">Patient Information</h3>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #6B7280; width: 35%;"><strong>Patient Name</strong></td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #1F2937;">${patientDetails.fullName}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #6B7280;"><strong>NIC / Passport</strong></td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #1F2937;">${patientDetails.nic}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #6B7280;"><strong>Mobile Number</strong></td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #1F2937;">${patientDetails.mobile}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #6B7280;"><strong>Gender</strong></td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #1F2937;">${patientDetails.gender}</td>
+              </tr>
+              ${collectionMethod === 'Home' ? `
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #6B7280;"><strong>Collection Address</strong></td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #1F2937;">${patientDetails.address}</td>
+              </tr>
+              ` : ''}
+            </table>
+            
+            <h3 style="color: #3b82f6; border-bottom: 2px solid #EFF6FF; padding-bottom: 8px;">Lab & Appointment Details</h3>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #6B7280; width: 35%;"><strong>Lab Test</strong></td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #1F2937; font-weight: bold;">${lab.description}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #6B7280;"><strong>Lab Center</strong></td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #1F2937;">${lab.name}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #6B7280;"><strong>Date & Time</strong></td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #1F2937;">${moment(selectedDate).format('DD MMMM YYYY')} at ${selectedTime}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #6B7280;"><strong>Collection Method</strong></td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #1F2937;">${collectionMethod === 'Home' ? 'Home Collection' : 'Hospital Visit'}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #6B7280;"><strong>Assigned Nurse</strong></td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #1F2937;">Nurse ${lab.nurse}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #6B7280;"><strong>Queue Token</strong></td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #3b82f6; font-weight: bold; font-size: 16px;">${queueTokenNum}</td>
+              </tr>
+            </table>
+
+            <div style="background-color: #F9FAFB; padding: 20px; border-radius: 12px; border: 1px solid #E5E7EB; text-align: right; margin-top: 20px;">
+              <span style="color: #6B7280; font-size: 14px; margin-right: 15px;">Amount Paid:</span>
+              <strong style="color: #3b82f6; font-size: 20px;">${lab.price}</strong>
+            </div>
+            
+            <div style="text-align: center; margin-top: 50px; color: #9CA3AF; font-size: 12px;">
+              <p>Thank you for using MediAI. Please produce this receipt/e-token at the lab center.</p>
+              <p style="margin-top: 5px;">MediAI Smart Healthcare Channeling Assistant &copy; 2026</p>
+            </div>
+          </body>
+        </html>
+      `;
+
+      const { uri } = await Print.printToFileAsync({ html: htmlContent });
+      
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri);
+      } else {
+        Alert.alert('Saved', 'Receipt saved to your documents.');
+      }
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Error', 'Failed to generate receipt PDF.');
     }
   };
 
@@ -423,7 +520,9 @@ const LabBookingFlowScreen = () => {
   const renderStep5 = () => (
     <View style={styles.stepContent}>
       <Text style={styles.stepTitle}>Review Booking</Text>
-      <View style={[styles.reviewCard, SHADOWS.medium]}>
+      
+      {/* Test & Lab Details */}
+      <View style={[styles.reviewCard, SHADOWS.medium, { marginBottom: 16 }]}>
         <View style={styles.reviewHeader}>
           <View style={styles.reviewIconWrap}>
             <FlaskConical size={24} color={COLORS.primary} />
@@ -445,10 +544,6 @@ const LabBookingFlowScreen = () => {
           <Text style={styles.reviewItemText}>{selectedTime || 'Not selected'}</Text>
         </View>
         <View style={styles.reviewItem}>
-          <User size={18} color="#6B7280" />
-          <Text style={styles.reviewItemText}>Nurse {lab.nurse}</Text>
-        </View>
-        <View style={styles.reviewItem}>
           <MapPin size={18} color="#6B7280" />
           <Text style={styles.reviewItemText}>{collectionMethod === 'Home' ? 'Home Collection' : 'Hospital Visit'}</Text>
         </View>
@@ -456,6 +551,59 @@ const LabBookingFlowScreen = () => {
         <View style={styles.totalSection}>
           <Text style={styles.totalLabel}>Total Amount</Text>
           <Text style={styles.totalValue}>{lab.price}</Text>
+        </View>
+      </View>
+
+      {/* Patient Information Section */}
+      <View style={[styles.reviewCard, SHADOWS.medium, { marginBottom: 16 }]}>
+        <Text style={styles.sectionHeaderTitle}>Patient Information</Text>
+        <View style={styles.reviewDividerSmall} />
+        
+        <View style={styles.reviewDetailRow}>
+          <Text style={styles.detailRowLabel}>Full Name</Text>
+          <Text style={styles.detailRowValue} numberOfLines={1}>{patientDetails.fullName}</Text>
+        </View>
+        <View style={styles.reviewDetailRow}>
+          <Text style={styles.detailRowLabel}>NIC / Passport</Text>
+          <Text style={styles.detailRowValue}>{patientDetails.nic}</Text>
+        </View>
+        <View style={styles.reviewDetailRow}>
+          <Text style={styles.detailRowLabel}>Mobile Number</Text>
+          <Text style={styles.detailRowValue}>{patientDetails.mobile}</Text>
+        </View>
+        <View style={styles.reviewDetailRow}>
+          <Text style={styles.detailRowLabel}>Gender</Text>
+          <Text style={styles.detailRowValue}>{patientDetails.gender}</Text>
+        </View>
+        {collectionMethod === 'Home' && patientDetails.address ? (
+          <View style={styles.reviewDetailRow}>
+            <Text style={styles.detailRowLabel}>Collection Address</Text>
+            <Text style={styles.detailRowValue} numberOfLines={2}>{patientDetails.address}</Text>
+          </View>
+        ) : null}
+        {patientDetails.medicalNotes ? (
+          <View style={styles.reviewDetailRow}>
+            <Text style={styles.detailRowLabel}>Medical Notes</Text>
+            <Text style={styles.detailRowValue} numberOfLines={2}>{patientDetails.medicalNotes}</Text>
+          </View>
+        ) : null}
+      </View>
+
+      {/* Assigned Nurse Section */}
+      <View style={[styles.reviewCard, SHADOWS.medium, { marginBottom: 16 }]}>
+        <Text style={styles.sectionHeaderTitle}>Assigned Nurse</Text>
+        <View style={styles.reviewDividerSmall} />
+        
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+          <Image 
+            source={{ uri: 'https://img.freepik.com/free-photo/female-nurse-white-coat-standing-with-clipboard-isolated_1303-31411.jpg' }} 
+            style={styles.reviewNurseAvatar} 
+          />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.reviewNurseName}>Nurse {lab.nurse}</Text>
+            <Text style={styles.reviewNurseSub}>Lab Specialist • {lab.category || 'General Laboratory'}</Text>
+            <Text style={styles.reviewNurseShift}>Shift: {lab.openTime || '08:00 AM'} - {lab.closeTime || '06:00 PM'}</Text>
+          </View>
         </View>
       </View>
     </View>
@@ -581,18 +729,49 @@ const LabBookingFlowScreen = () => {
           <View style={styles.ticketDivider} />
 
           <View style={styles.ticketDetails}>
+            {/* Lab details */}
             <View style={styles.ticketDetailRow}>
-              <Text style={styles.ticketDetailLabel}>Date</Text>
-              <Text style={styles.ticketDetailValue}>{moment(selectedDate).format('DD MMMM YYYY')}</Text>
+              <Text style={styles.ticketDetailLabel}>Lab Center</Text>
+              <Text style={styles.ticketDetailValue}>{lab.name}</Text>
             </View>
             <View style={styles.ticketDetailRow}>
-              <Text style={styles.ticketDetailLabel}>Time</Text>
-              <Text style={styles.ticketDetailValue}>{selectedTime}</Text>
+              <Text style={styles.ticketDetailLabel}>Lab Test</Text>
+              <Text style={styles.ticketDetailValue}>{lab.description}</Text>
+            </View>
+            <View style={styles.ticketDetailRow}>
+              <Text style={styles.ticketDetailLabel}>Date & Time</Text>
+              <Text style={styles.ticketDetailValue}>{moment(selectedDate).format('DD MMMM YYYY')} at {selectedTime}</Text>
             </View>
             <View style={styles.ticketDetailRow}>
               <Text style={styles.ticketDetailLabel}>Nurse</Text>
               <Text style={styles.ticketDetailValue}>{lab.nurse}</Text>
             </View>
+
+            <View style={styles.ticketDivider} />
+
+            {/* Patient details */}
+            <View style={styles.ticketDetailRow}>
+              <Text style={styles.ticketDetailLabel}>Patient Name</Text>
+              <Text style={styles.ticketDetailValue}>{patientDetails.fullName}</Text>
+            </View>
+            <View style={styles.ticketDetailRow}>
+              <Text style={styles.ticketDetailLabel}>NIC / Passport</Text>
+              <Text style={styles.ticketDetailValue}>{patientDetails.nic}</Text>
+            </View>
+            <View style={styles.ticketDetailRow}>
+              <Text style={styles.ticketDetailLabel}>Mobile</Text>
+              <Text style={styles.ticketDetailValue}>{patientDetails.mobile}</Text>
+            </View>
+            <View style={styles.ticketDetailRow}>
+              <Text style={styles.ticketDetailLabel}>Method</Text>
+              <Text style={styles.ticketDetailValue}>{collectionMethod === 'Home' ? 'Home Collection' : 'Hospital Visit'}</Text>
+            </View>
+            {collectionMethod === 'Home' && patientDetails.address ? (
+              <View style={styles.ticketDetailRow}>
+                <Text style={styles.ticketDetailLabel}>Address</Text>
+                <Text style={styles.ticketDetailValue} numberOfLines={2}>{patientDetails.address}</Text>
+              </View>
+            ) : null}
           </View>
         </View>
 
@@ -604,14 +783,7 @@ const LabBookingFlowScreen = () => {
           </View>
         </View>
 
-        <TouchableOpacity 
-          style={styles.actionBtnPrimary}
-          onPress={() => navigation.navigate('PatientDashboard')}
-        >
-          <Text style={styles.actionBtnText}>Go to Dashboard</Text>
-        </TouchableOpacity>
-
-        <View style={styles.extraActions}>
+        <View style={[styles.extraActions, { marginBottom: 20 }]}>
           <TouchableOpacity style={styles.extraBtn} onPress={handleAddToCalendar}>
             <Calendar size={18} color={COLORS.primary} />
             <Text style={styles.extraBtnText}>Add to Calendar</Text>
@@ -621,6 +793,20 @@ const LabBookingFlowScreen = () => {
             <Text style={styles.extraBtnText}>Set Reminder</Text>
           </TouchableOpacity>
         </View>
+
+        <TouchableOpacity 
+          style={styles.successActionBtn}
+          onPress={() => navigation.navigate('PatientDashboard')}
+        >
+          <Text style={styles.successActionBtnText}>Go to Dashboard</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.successActionBtn, { backgroundColor: '#FFF', borderWidth: 2, borderColor: COLORS.primary, marginBottom: 30 }]}
+          onPress={handleDownloadReceipt}
+        >
+          <Text style={[styles.successActionBtnText, { color: COLORS.primary }]}>Download Receipt (PDF)</Text>
+        </TouchableOpacity>
       </LinearGradient>
     </ScrollView>
 
@@ -1170,6 +1356,58 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: COLORS.primary,
   },
+  sectionHeaderTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.textHeader,
+  },
+  reviewDividerSmall: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginVertical: 12,
+  },
+  reviewDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+    alignItems: 'center',
+  },
+  detailRowLabel: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    fontWeight: '600',
+  },
+  detailRowValue: {
+    fontSize: 14,
+    color: COLORS.textHeader,
+    fontWeight: '700',
+    textAlign: 'right',
+    flex: 1,
+    paddingLeft: 20,
+  },
+  reviewNurseAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    borderWidth: 2,
+    borderColor: '#F3F0FF',
+  },
+  reviewNurseName: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.textHeader,
+  },
+  reviewNurseSub: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  reviewNurseShift: {
+    fontSize: 12,
+    color: COLORS.primary,
+    fontWeight: '600',
+    marginTop: 2,
+  },
   // Step 6 Payment Styles
   payOption: {
     flexDirection: 'row',
@@ -1370,6 +1608,19 @@ const styles = StyleSheet.create({
   actionBtnText: {
     color: '#FFF',
     fontSize: 16,
+    fontWeight: '800',
+  },
+  successActionBtn: {
+    backgroundColor: COLORS.primary,
+    width: '100%',
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  successActionBtnText: {
+    color: '#FFF',
+    fontSize: 14,
     fontWeight: '800',
   },
   extraActions: {
