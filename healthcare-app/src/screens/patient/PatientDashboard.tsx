@@ -251,21 +251,57 @@ const QueueAppointmentCard = ({
         </View>
 
         {/* Estimated Wait Banner */}
-        <View style={[styles.waitBanner, { backgroundColor: statusBg }]}>
-          <Hourglass size={14} color={statusColor} />
-          <Text style={[styles.waitBannerText, { color: statusColor }]}>{statusText}</Text>
+        {/* Prominent Status Banner */}
+        <View style={[
+          styles.waitBanner, 
+          { backgroundColor: statusBg },
+          ['ready', 'in', 'skipped'].includes(rawStatus) && {
+            paddingVertical: 16,
+            borderRadius: 16,
+            shadowColor: statusColor,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
+            elevation: 6,
+            marginTop: 20
+          }
+        ]}>
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={{ backgroundColor: 'rgba(255,255,255,0.4)', padding: 8, borderRadius: 12 }}>
+              {rawStatus === 'in' ? <CheckCircle size={24} color={statusColor} /> :
+               rawStatus === 'ready' ? <Sparkles size={24} color={statusColor} /> :
+               rawStatus === 'skipped' ? <AlertCircle size={24} color={statusColor} /> :
+               <Hourglass size={16} color={statusColor} />}
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[
+                styles.waitBannerText, 
+                { color: statusColor },
+                ['ready', 'in', 'skipped'].includes(rawStatus) && { fontSize: 18, fontWeight: '900', letterSpacing: 0.5 }
+              ]}>{statusText}</Text>
+              
+              {['ready', 'in', 'skipped'].includes(rawStatus) && (
+                <Text style={{ fontSize: 12, color: statusColor, opacity: 0.8, marginTop: 2, fontWeight: '700' }}>
+                  {rawStatus === 'in' ? 'Doctor is waiting for you inside.' :
+                   rawStatus === 'ready' ? 'Be prepared near the room.' :
+                   'You missed your turn. Request another chance.'}
+                </Text>
+              )}
+            </View>
+          </View>
+          
           {showRequestBtn && onRequestAdmin ? (
             <TouchableOpacity 
-              style={{ backgroundColor: '#DC2626', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}
+              style={{ backgroundColor: '#DC2626', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, shadowColor: '#DC2626', shadowOpacity: 0.4, shadowRadius: 6, elevation: 4 }}
               onPress={() => onRequestAdmin(appointment._id)}
             >
-              <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>Request Next In</Text>
+              <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '800' }}>Request</Text>
             </TouchableOpacity>
-          ) : lastRefresh && (
+          ) : lastRefresh && !['ready', 'in', 'skipped'].includes(rawStatus) ? (
             <Text style={styles.refreshLabel}>
-              · Updated {moment(lastRefresh).format('HH:mm:ss')}
+              · {moment(lastRefresh).format('HH:mm')}
             </Text>
-          )}
+          ) : null}
         </View>
       </LinearGradient>
     </TouchableOpacity>

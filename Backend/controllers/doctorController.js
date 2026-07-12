@@ -6,6 +6,7 @@ import DoctorAvailability from '../model/DoctorAvailability.js';
 import DailySession from '../model/DailySession.js';
 import Specialty from '../model/Specialty.js';
 import MedicalRecord from '../model/MedicalRecord.js';
+import jwt from 'jsonwebtoken';
 
 // @desc    Get doctor dashboard data (Stats & Upcoming appointments)
 // @route   GET /api/doctor/dashboard
@@ -244,8 +245,36 @@ export const deleteDoctorSchedule = async (req, res) => {
       return res.status(404).json({ message: 'Schedule slot not found' });
     }
 
+    const slotTimeSlot = `${slot.startTime} - ${slot.endTime}`;
     await slot.deleteOne();
-    res.json({ success: true, message: 'Schedule slot removed' });
+
+    // Intelligently cancel all future appointments that were booked for this deleted time slot
+    // making sure to only cancel appointments on the same day of the week as the deleted slot!
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const futureAppointments = await Appointment.find({
+      doctor: req.user._id,
+      timeSlot: slotTimeSlot,
+      date: { $gte: todayStart },
+      status: { $in: ['pending', 'confirmed'] }
+    });
+
+    const dayMap = { 'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6 };
+    const targetDay = dayMap[slot.day];
+
+    const toCancelIds = futureAppointments
+      .filter(appt => new Date(appt.date).getDay() === targetDay)
+      .map(appt => appt._id);
+
+    if (toCancelIds.length > 0) {
+      await Appointment.updateMany(
+        { _id: { $in: toCancelIds } },
+        { $set: { status: 'cancelled' } }
+      );
+    }
+
+    res.json({ success: true, message: 'Schedule slot removed and future appointments cancelled' });
   } catch (error) {
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
@@ -288,6 +317,17 @@ export const getDoctorAvailabilityForPatient = async (req, res) => {
     const doctorId = req.params.id;
     const { month, year } = req.query;
 
+    let patientId = null;
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      try {
+        const token = req.headers.authorization.split(' ')[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        patientId = decoded.id;
+      } catch (err) {
+        // gracefully ignore invalid token for public calendar access
+      }
+    }
+
     const targetDate = new Date();
     const targetMonth = month !== undefined ? parseInt(month) : targetDate.getMonth();
     const targetYear = year !== undefined ? parseInt(year) : targetDate.getFullYear();
@@ -299,10 +339,26 @@ export const getDoctorAvailabilityForPatient = async (req, res) => {
     const startDate = new Date(targetYear, targetMonth, 1);
     const endDate = new Date(targetYear, targetMonth + 1, 0);
 
-    // 3. Fetch all active appointments for this doctor in this month
+    // 3. Fetch all active appointments and sessions for this doctor in this month
     const appointments = await Appointment.find({
       doctor: doctorId,
       date: { $gte: startDate, $lte: endDate }
+    });
+
+    const sessions = await DailySession.find({
+      doctor: doctorId,
+      date: { $gte: startDate, $lte: endDate }
+    });
+
+    // Group sessions by date string (YYYY-MM-DD) and timeSlot
+    const sessionStatusMap = {};
+    sessions.forEach(sess => {
+      const sessDate = new Date(sess.date);
+      const m = String(sessDate.getMonth() + 1).padStart(2, '0');
+      const d = String(sessDate.getDate()).padStart(2, '0');
+      const dateStr = `${sessDate.getFullYear()}-${m}-${d}`;
+      const key = `${dateStr}_${sess.timeSlot}`;
+      sessionStatusMap[key] = sess.status;
     });
 
     // Group appointments by date string (YYYY-MM-DD) and timeSlot so we
@@ -317,12 +373,15 @@ export const getDoctorAvailabilityForPatient = async (req, res) => {
       
       const key = `${dateStr}_${app.timeSlot}`;
       if (!appointmentCounts[key]) {
-        appointmentCounts[key] = { active: 0, highestQueue: 0 };
+        appointmentCounts[key] = { active: 0, highestQueue: 0, hasBooked: false };
       }
       
       // Active slots consumed (cancellations free up a slot)
       if (app.status !== 'cancelled') {
         appointmentCounts[key].active++;
+        if (patientId && app.patient.toString() === patientId) {
+          appointmentCounts[key].hasBooked = true;
+        }
       }
       
       // Highest queue number assigned (to ensure monotonic strictly increasing queue numbers)
@@ -364,6 +423,9 @@ export const getDoctorAvailabilityForPatient = async (req, res) => {
         // The queue number strictly increments based on the highest queue number generated so far.
         // It never re-uses numbers even if there are cancellations.
         const nextQueueNumber = slotData.highestQueue + 1;
+        
+        const isEnded = sessionStatusMap[key] === 'ended';
+        const hasBooked = slotData.hasBooked || false;
 
         return {
           id: s._id,
@@ -372,7 +434,9 @@ export const getDoctorAvailabilityForPatient = async (req, res) => {
           timeSlot: timeSlotStr,
           maxPatients,
           bookedCount,
-          isFull: bookedCount >= maxPatients,
+          isFull: bookedCount >= maxPatients || isEnded,
+          isEnded,
+          hasBooked,
           type: s.type,
           consultType: s.consultType,
           notes: s.notes,

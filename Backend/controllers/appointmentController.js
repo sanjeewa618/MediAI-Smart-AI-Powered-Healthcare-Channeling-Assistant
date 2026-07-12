@@ -60,6 +60,18 @@ export const createAppointment = async (req, res) => {
       status: { $ne: 'cancelled' }
     });
 
+    const existingPatientAppt = await Appointment.findOne({
+      patient: req.user._id,
+      doctor,
+      timeSlot,
+      date: { $gte: startOfDay, $lte: endOfDay },
+      status: { $ne: 'cancelled' }
+    });
+
+    if (existingPatientAppt) {
+      return res.status(400).json({ message: 'You have already booked an appointment for this exact time slot on this date.' });
+    }
+
     if (existingInSlot >= slot.maxPatients) {
       return res.status(400).json({ message: 'This time slot is fully booked. Please choose another slot.' });
     }
