@@ -240,10 +240,6 @@ const DoctorAppointmentsScreen = () => {
             return (
               <View key={appt._id} style={[styles.card, SHADOWS.medium]}>
                 <View style={styles.cardTop}>
-                  <Image 
-                    source={{ uri: `https://i.pravatar.cc/150?u=${appt.patient?._id || idx}` }} 
-                    style={styles.avatar} 
-                  />
                   <View style={styles.info}>
                     <Text style={styles.name}>{patientName}</Text>
                     <Text style={styles.sub}>{issueText}</Text>
@@ -332,7 +328,7 @@ const styles = StyleSheet.create({
   card: { backgroundColor: '#FFF', borderRadius: 20, padding: 16 },
   cardTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   avatar: { width: 48, height: 48, borderRadius: 14, backgroundColor: '#F3F4F6' },
-  info: { flex: 1, marginLeft: 12 },
+  info: { flex: 1 },
   name: { fontSize: 15, fontWeight: '700', color: '#1F2937' },
   sub: { fontSize: 12, color: '#6B7280', marginTop: 2 },
   badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
