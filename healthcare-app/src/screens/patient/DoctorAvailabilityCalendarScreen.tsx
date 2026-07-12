@@ -20,6 +20,7 @@ interface Slot {
   maxPatients: number;
   bookedCount: number;
   isFull: boolean;
+  isEnded?: boolean;
   type: string;
   consultType: string;
   notes?: string;
@@ -216,32 +217,34 @@ const DoctorAvailabilityCalendarScreen = () => {
                   </View>
                   <View style={styles.capacityBadge}>
                     <Users size={14} color={slot.isFull ? '#EF4444' : '#10B981'} />
-                    <Text style={[styles.capacityText, slot.isFull && { color: '#EF4444' }]}>
-                      {slot.bookedCount} / {slot.maxPatients} Booked
-                    </Text>
-                  </View>
+                  <Text style={[styles.capacityText, slot.isFull && { color: '#EF4444' }]}>
+                    {slot.bookedCount} / {slot.maxPatients} Booked
+                  </Text>
                 </View>
-
-                <TouchableOpacity
-                  style={[styles.bookBtn, slot.isFull && styles.bookBtnDisabled]}
-                  disabled={slot.isFull}
-                  onPress={() => navigation.navigate('BookAppointment', {
-                    doctorId,
-                    doctorName,
-                    specialty,
-                    date: selectedDate,
-                    time: slot.timeSlot,
-                    // Pass the queue number hint to the next screen.
-                    // The server is the source of truth and will assign
-                    // the final queue number when the appointment is
-                    // actually created (to avoid two patients seeing the
-                    // same number in a race condition).
-                    queueNumber: assignedQueue
-                  })}
-                >
-                  <Text style={styles.bookBtnText}>{slot.isFull ? 'Full' : 'Book'}</Text>
-                </TouchableOpacity>
               </View>
+
+              <TouchableOpacity
+                style={[styles.bookBtn, (slot.isFull || slot.isEnded) && styles.bookBtnDisabled]}
+                disabled={slot.isFull || slot.isEnded}
+                onPress={() => navigation.navigate('BookAppointment', {
+                  doctorId,
+                  doctorName,
+                  specialty,
+                  date: selectedDate,
+                  time: slot.timeSlot,
+                  // Pass the queue number hint to the next screen.
+                  // The server is the source of truth and will assign
+                  // the final queue number when the appointment is
+                  // actually created (to avoid two patients seeing the
+                  // same number in a race condition).
+                  queueNumber: assignedQueue
+                })}
+              >
+                <Text style={styles.bookBtnText}>
+                  {slot.isEnded ? 'Ended' : slot.isFull ? 'Full' : 'Book'}
+                </Text>
+              </TouchableOpacity>
+            </View>
             );
           })
         )}

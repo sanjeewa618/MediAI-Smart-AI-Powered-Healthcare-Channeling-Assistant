@@ -436,39 +436,44 @@ const BookAppointmentScreen = () => {
     </View>
   );
 
-  const renderReceipt = () => (
-    <View style={styles.receiptContainer}>
-      <View style={[styles.receiptCard, SHADOWS.medium]}>
-        <View style={styles.receiptHeader}>
-          <CheckCircle2 size={50} color="#10B981" />
-          <Text style={styles.receiptTitle}>Payment Successful!</Text>
-          <Text style={styles.receiptSub}>Your appointment is confirmed</Text>
-        </View>
-        
-        <View style={styles.receiptDetails}>
-          <Text style={styles.receiptRef}>Ref No: BK-9824X</Text>
-          <View style={styles.divider} />
-          
-          <View style={styles.receiptRow}><Text style={styles.rLabel}>Patient Name</Text><Text style={styles.rValue}>{patientInfo.name || 'John Doe'}</Text></View>
-          <View style={styles.receiptRow}><Text style={styles.rLabel}>Doctor</Text><Text style={styles.rValue}>{doctorName}</Text></View>
-          <View style={styles.receiptRow}><Text style={styles.rLabel}>Date & Time</Text><Text style={styles.rValue}>{date} | {time}</Text></View>
-          <View style={styles.receiptRow}><Text style={styles.rLabel}>Queue No</Text><Text style={[styles.rValue, { fontSize: 18, color: COLORS.primary, fontWeight: '800' }]}>{assignedQueueNumber ?? '-'}</Text></View>
-          
-          <View style={styles.divider} />
-          <View style={styles.receiptRow}><Text style={styles.rLabel}>Amount Paid</Text><Text style={[styles.rValue, { fontWeight: '700' }]}>LKR {TOTAL_AMOUNT.toFixed(2)}</Text></View>
-        </View>
+  if (currentStep === 3) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { padding: 20, justifyContent: 'center' }]}>
+        <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={false} />
+        <View style={styles.receiptContainer}>
+          <View style={[styles.receiptCard, SHADOWS.medium]}>
+            <View style={styles.receiptHeader}>
+              <CheckCircle2 size={50} color="#10B981" />
+              <Text style={styles.receiptTitle}>Payment Successful!</Text>
+              <Text style={styles.receiptSub}>Your appointment is confirmed</Text>
+            </View>
+            
+            <View style={styles.receiptDetails}>
+              <Text style={styles.receiptRef}>Ref No: BK-9824X</Text>
+              <View style={styles.divider} />
+              
+              <View style={styles.receiptRow}><Text style={styles.rLabel}>Patient Name</Text><Text style={styles.rValue}>{patientInfo.name || 'John Doe'}</Text></View>
+              <View style={styles.receiptRow}><Text style={styles.rLabel}>Doctor</Text><Text style={styles.rValue}>{doctorName}</Text></View>
+              <View style={styles.receiptRow}><Text style={styles.rLabel}>Date & Time</Text><Text style={styles.rValue}>{date} | {time}</Text></View>
+              <View style={styles.receiptRow}><Text style={styles.rLabel}>Queue No</Text><Text style={[styles.rValue, { fontSize: 18, color: COLORS.primary, fontWeight: '800' }]}>{assignedQueueNumber ?? '-'}</Text></View>
+              
+              <View style={styles.divider} />
+              <View style={styles.receiptRow}><Text style={styles.rLabel}>Amount Paid</Text><Text style={[styles.rValue, { fontWeight: '700' }]}>LKR {TOTAL_AMOUNT.toFixed(2)}</Text></View>
+            </View>
 
-        <TouchableOpacity style={styles.downloadBtn} onPress={handleDownloadReceipt}>
-          <Download size={20} color="#FFF" />
-          <Text style={styles.downloadText}>Download E-Receipt</Text>
-        </TouchableOpacity>
-      </View>
+            <TouchableOpacity style={styles.downloadBtn} onPress={handleDownloadReceipt}>
+              <Download size={20} color="#FFF" />
+              <Text style={styles.downloadText}>Download E-Receipt</Text>
+            </TouchableOpacity>
+          </View>
 
-      <TouchableOpacity style={styles.homeBtn} onPress={() => navigation.navigate('PatientDashboard')}>
-        <Text style={styles.homeBtnText}>Back to Dashboard</Text>
-      </TouchableOpacity>
-    </View>
-  );
+          <TouchableOpacity style={styles.homeBtn} onPress={() => navigation.navigate('PatientDashboard')}>
+            <Text style={styles.homeBtnText}>Back to Dashboard</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -494,7 +499,6 @@ const BookAppointmentScreen = () => {
           {currentStep === 0 && renderPatientInfo()}
           {currentStep === 1 && renderMedicalDetails()}
           {currentStep === 2 && renderReviewAndPay()}
-          {currentStep === 3 && renderReceipt()}
         </ScrollView>
       </KeyboardAvoidingView>
 

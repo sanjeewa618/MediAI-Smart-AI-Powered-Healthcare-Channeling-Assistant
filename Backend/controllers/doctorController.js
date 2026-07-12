@@ -299,10 +299,26 @@ export const getDoctorAvailabilityForPatient = async (req, res) => {
     const startDate = new Date(targetYear, targetMonth, 1);
     const endDate = new Date(targetYear, targetMonth + 1, 0);
 
-    // 3. Fetch all active appointments for this doctor in this month
+    // 3. Fetch all active appointments and sessions for this doctor in this month
     const appointments = await Appointment.find({
       doctor: doctorId,
       date: { $gte: startDate, $lte: endDate }
+    });
+
+    const sessions = await DailySession.find({
+      doctor: doctorId,
+      date: { $gte: startDate, $lte: endDate }
+    });
+
+    // Group sessions by date string (YYYY-MM-DD) and timeSlot
+    const sessionStatusMap = {};
+    sessions.forEach(sess => {
+      const sessDate = new Date(sess.date);
+      const m = String(sessDate.getMonth() + 1).padStart(2, '0');
+      const d = String(sessDate.getDate()).padStart(2, '0');
+      const dateStr = `${sessDate.getFullYear()}-${m}-${d}`;
+      const key = `${dateStr}_${sess.timeSlot}`;
+      sessionStatusMap[key] = sess.status;
     });
 
     // Group appointments by date string (YYYY-MM-DD) and timeSlot so we
@@ -364,6 +380,8 @@ export const getDoctorAvailabilityForPatient = async (req, res) => {
         // The queue number strictly increments based on the highest queue number generated so far.
         // It never re-uses numbers even if there are cancellations.
         const nextQueueNumber = slotData.highestQueue + 1;
+        
+        const isEnded = sessionStatusMap[key] === 'ended';
 
         return {
           id: s._id,
@@ -372,7 +390,8 @@ export const getDoctorAvailabilityForPatient = async (req, res) => {
           timeSlot: timeSlotStr,
           maxPatients,
           bookedCount,
-          isFull: bookedCount >= maxPatients,
+          isFull: bookedCount >= maxPatients || isEnded,
+          isEnded,
           type: s.type,
           consultType: s.consultType,
           notes: s.notes,
