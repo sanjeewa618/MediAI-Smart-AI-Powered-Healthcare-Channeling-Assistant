@@ -35,7 +35,7 @@ const buildQueueSnapshots = async (appointments) => {
       doctor: appt.doctor._id ?? appt.doctor,
       timeSlot: appt.timeSlot,
       date: { $gte: startOfDay, $lte: endOfDay },
-      status: { $in: ['pending', 'confirmed'] }
+      status: { $nin: ['completed', 'cancelled', 'skipped'] }
     })
       .sort({ queueNumber: 1 })
       .select('queueNumber');
@@ -162,12 +162,27 @@ export const getDashboardData = async (req, res) => {
     // 3. Build live queue snapshots for the upcoming doctor appointments.
     const liveQueue = await buildQueueSnapshots(doctorAppointments);
 
+    // 4. Fetch counts for today's completed and cancelled doctor appointments
+    const todayCompletedCount = await Appointment.countDocuments({
+      patient: req.user._id,
+      date: { $gte: today },
+      status: 'completed'
+    });
+    
+    const todayCancelledCount = await Appointment.countDocuments({
+      patient: req.user._id,
+      date: { $gte: today },
+      status: 'cancelled'
+    });
+
     res.json({
       success: true,
       data: {
         doctorAppointments,
         labAppointments,
-        liveQueue
+        liveQueue,
+        todayCompletedCount,
+        todayCancelledCount
       }
     });
   } catch (error) {
@@ -388,5 +403,37 @@ export const uploadPatientAvatar = async (req, res) => {
     }
   } catch (error) {
     res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+// @desc    Request admin to set skipped appointment to nextIn
+// @route   PUT /api/patient/request-next-in/:appointmentId
+// @access  Private (Patient only)
+export const requestAdminNextIn = async (req, res) => {
+  try {
+    const appointment = await Appointment.findOne({
+      _id: req.params.appointmentId,
+      patient: req.user._id
+    });
+
+    if (!appointment) {
+      return res.status(404).json({ success: false, message: 'Appointment not found' });
+    }
+
+    if (appointment.status !== 'skipped') {
+      return res.status(400).json({ success: false, message: 'Only skipped appointments can be requested' });
+    }
+
+    appointment.status = 'nextIn';
+    await appointment.save();
+
+    res.json({
+      success: true,
+      message: 'Request sent to admin successfully',
+      data: appointment
+    });
+  } catch (error) {
+    console.error('Error requesting nextIn:', error);
+    res.status(500).json({ success: false, message: 'Server error while requesting next in' });
   }
 };

@@ -423,14 +423,42 @@ export const updateSessionState = async (req, res) => {
       });
 
       if (activeSession && activeSession.timeSlot !== timeSlot) {
-        // Self-healing: The frontend blocks starting if a visible session is active.
-        // If we reach here, it's either a ghost session (deleted slot) or concurrent bypass.
-        // We auto-end any dangling started sessions to maintain the single-session constraint.
+        // Self-healing: auto-end any dangling started sessions
         await DailySession.updateMany(
           { doctor: req.user._id, date: targetDate, status: 'started' },
           { $set: { status: 'ended' } }
         );
       }
+
+      // --- KEY FIX: update all pending/confirmed appointments for this slot to 'started' ---
+      const todayEnd = new Date();
+      todayEnd.setHours(23, 59, 59, 999);
+
+      await Appointment.updateMany(
+        {
+          doctor: req.user._id,
+          timeSlot: timeSlot,
+          date: { $gte: targetDate, $lte: todayEnd },
+          status: { $in: ['pending', 'confirmed'] }
+        },
+        { $set: { status: 'started' } }
+      );
+
+    } else if (action === 'end') {
+      // When session ends, cancel any appointments still sitting on 'started'
+      // (i.e., they were never called in — doctor ended early)
+      const todayEnd = new Date();
+      todayEnd.setHours(23, 59, 59, 999);
+
+      await Appointment.updateMany(
+        {
+          doctor: req.user._id,
+          timeSlot: timeSlot,
+          date: { $gte: targetDate, $lte: todayEnd },
+          status: 'started'
+        },
+        { $set: { status: 'cancelled' } }
+      );
     }
 
     const session = await DailySession.findOneAndUpdate(
