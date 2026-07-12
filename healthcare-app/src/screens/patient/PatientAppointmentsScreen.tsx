@@ -356,7 +356,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   scrollContent: {
-    paddingBottom: 160,
+    paddingBottom: 200,
   },
   categoryCardsRow: {
     flexDirection: 'row',
@@ -492,9 +492,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 8,
   },
   footerDetail: {
     flexDirection: 'row',
@@ -524,10 +524,9 @@ const styles = StyleSheet.create({
   },
   floatingButtonContainer: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 100 : 100,
+    bottom: Platform.OS === 'ios' ? 120 : 120,
     left: 24,
     right: 24,
-    
   },
   mainBookBtn: {
     borderRadius: 20,
