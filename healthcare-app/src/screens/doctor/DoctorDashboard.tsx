@@ -75,36 +75,64 @@ const DoctorDashboard = () => {
     }, [])
   );
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [profileRes, dashboardRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/api/auth/me`, { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch(`${API_BASE_URL}/api/doctor/dashboard`, { headers: { 'Authorization': `Bearer ${token}` } })
-        ]);
+  const fetchDashboardData = async () => {
+    try {
+      const [profileRes, dashboardRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/auth/me`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${API_BASE_URL}/api/doctor/dashboard`, { headers: { 'Authorization': `Bearer ${token}` } })
+      ]);
 
-        const profileData = await profileRes.json();
-        if (profileRes.ok && profileData) {
-          const name = profileData.name || 'Doctor';
-          setDoctorName(name.startsWith('Dr.') ? name : `Dr. ${name}`);
-          setDoctorSpecialty(profileData.specialization || 'General Practitioner');
-        }
-
-        const dashboardData = await dashboardRes.json();
-        if (dashboardRes.ok && dashboardData.success) {
-          setTodaySlots(dashboardData.data.todaySlots || []);
-          setTodayAppointments(dashboardData.data.todayAppointments || []);
-          setStats(dashboardData.data.stats || { totalPatients: 0, todayAppointments: 0, pendingApprovals: 0 });
-        }
-      } catch (err) {
-        console.error('Failed to fetch dashboard data:', err);
+      const profileData = await profileRes.json();
+      if (profileRes.ok && profileData) {
+        const name = profileData.name || 'Doctor';
+        setDoctorName(name.startsWith('Dr.') ? name : `Dr. ${name}`);
+        setDoctorSpecialty(profileData.specialization || 'General Practitioner');
       }
-    };
 
+      const dashboardData = await dashboardRes.json();
+      if (dashboardRes.ok && dashboardData.success) {
+        setTodaySlots(dashboardData.data.todaySlots || []);
+        setTodayAppointments(dashboardData.data.todayAppointments || []);
+        setStats(dashboardData.data.stats || { totalPatients: 0, todayAppointments: 0, pendingApprovals: 0 });
+      }
+    } catch (err) {
+      console.error('Failed to fetch dashboard data:', err);
+    }
+  };
+
+  useEffect(() => {
     if (token) {
-      fetchData();
+      fetchDashboardData();
     }
   }, [token]);
+
+  const handleStartSessionFromDashboard = async (slot: any) => {
+    try {
+      await fetch(`${API_BASE_URL}/api/doctor/session/start`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          date: new Date().toISOString(),
+          timeSlot: `${slot.startTime} - ${slot.endTime}`
+        })
+      });
+      fetchDashboardData();
+    } catch (error) {
+      console.error('Failed to start session from dashboard', error);
+    }
+  };
+
+  // Pulse Animation for Up Next Card
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.03, duration: 1000, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true })
+      ])
+    ).start();
+  }, []);
 
   // Animation and PanResponder for Bottom Sheet
   const transitionAnim = useRef(new Animated.Value(height)).current;
@@ -274,10 +302,16 @@ const DoctorDashboard = () => {
                 }
               }
 
-              return (
+              const cardStyle = [
+                styles.slotCard,
+                isNext && styles.nextSlotCard,
+                slot.sessionStatus === 'started' && { backgroundColor: '#ECFDF5', borderColor: '#10B981', borderWidth: 1 },
+                slot.sessionStatus === 'ended' && { backgroundColor: '#FEF2F2', borderColor: '#DC2626', borderWidth: 1 }
+              ];
+
+              const cardContent = (
                 <TouchableOpacity 
-                  key={slot._id || idx} 
-                  style={[styles.slotCard, isNext && styles.nextSlotCard]}
+                  style={cardStyle}
                   onPress={() => navigation.navigate('DoctorSession', { slot, appointments: patientsForSlot })}
                   activeOpacity={0.8}
                 >
@@ -293,12 +327,40 @@ const DoctorDashboard = () => {
                       </Text>
                     </View>
                   </View>
-                  <View style={[styles.startBtn, isNext && { backgroundColor: '#FFF' }]}>
-                    <Play size={14} color={isNext ? "#10B981" : "#FFF"} fill={isNext ? "#10B981" : "#FFF"} />
-                    <Text style={[styles.startBtnText, isNext && { color: "#10B981" }]}>Start</Text>
+                  <View style={{ flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+                    {slot.sessionStatus === 'started' ? (
+                      <View style={{ paddingVertical: 10 }}>
+                        <Text style={{ color: '#059669', fontWeight: '700', fontSize: 13 }}>Session Started</Text>
+                      </View>
+                    ) : slot.sessionStatus === 'ended' ? (
+                      <View style={{ paddingVertical: 10 }}>
+                        <Text style={{ color: '#DC2626', fontWeight: '700', fontSize: 13 }}>Session Ended</Text>
+                      </View>
+                    ) : (
+                      <TouchableOpacity 
+                        style={[styles.startBtn, isNext && { backgroundColor: '#FFF' }]}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          handleStartSessionFromDashboard(slot);
+                        }}
+                      >
+                        <Play size={14} color={isNext ? "#10B981" : "#FFF"} fill={isNext ? "#10B981" : "#FFF"} />
+                        <Text style={[styles.startBtnText, isNext && { color: "#10B981" }]}>Start</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </TouchableOpacity>
               );
+
+              if (isNext) {
+                return (
+                  <Animated.View key={slot._id || idx} style={{ transform: [{ scale: pulseAnim }] }}>
+                    {cardContent}
+                  </Animated.View>
+                );
+              }
+
+              return <View key={slot._id || idx}>{cardContent}</View>;
             });
           })()}
           <View style={{ height: 60 }} />
@@ -466,11 +528,12 @@ const styles = StyleSheet.create({
   nextSlotCard: {
     backgroundColor: '#10B981', // A bright emerald color
     borderWidth: 0,
-    transform: [{ scale: 1.02 }],
+    paddingVertical: 20,
     shadowColor: '#10B981',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 8,
   },
   upNextBadge: {
     color: '#D1FAE5',
@@ -656,16 +719,33 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   statusAvailable: {
-    backgroundColor: '#ECFDF5',
+    backgroundColor: '#D1FAE5',
   },
   statusBooked: {
-    backgroundColor: '#FEF2F2',
+    backgroundColor: '#FEE2E2',
   },
   statusPillText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#1F2937',
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#059669',
   },
+  statusPillBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusPillBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  statusStarted: { backgroundColor: '#D1FAE5' },
+  statusEnded: { backgroundColor: '#FEE2E2' },
+  statusPending: { backgroundColor: '#F3F4F6' },
+  statusStartedText: { color: '#059669', fontSize: 12, fontWeight: '700' },
+  statusEndedText: { color: '#DC2626', fontSize: 12, fontWeight: '700' },
+  statusPendingText: { color: '#6B7280', fontSize: 12, fontWeight: '700' },
 });
 
 export default DoctorDashboard;

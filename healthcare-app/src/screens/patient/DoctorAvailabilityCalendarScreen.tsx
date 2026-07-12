@@ -65,7 +65,9 @@ const DoctorAvailabilityCalendarScreen = () => {
         setCalendarData(data.data);
         
         // Auto select first available day with slots, or today if in current month
-        const todayStr = new Date().toISOString().split('T')[0];
+        const d = new Date();
+        const todayStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        
         let defaultSelect = data.data.find((d: DayData) => d.date === todayStr);
         if (!defaultSelect || defaultSelect.slots.length === 0) {
           defaultSelect = data.data.find((d: DayData) => d.slots.length > 0 && d.date >= todayStr);
@@ -101,9 +103,13 @@ const DoctorAvailabilityCalendarScreen = () => {
     setCurrentDate(next);
   };
 
+  const getLocalDateString = (d: Date = new Date()) => {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  };
+
   const selectedDayData = calendarData.find(d => d.date === selectedDate);
   const displaySlots = selectedDayData?.slots || [];
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getLocalDateString();
 
   return (
     <SafeAreaView style={styles.safe}>

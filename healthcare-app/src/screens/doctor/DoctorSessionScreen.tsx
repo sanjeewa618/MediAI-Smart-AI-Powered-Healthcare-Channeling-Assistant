@@ -19,7 +19,7 @@ const DoctorSessionScreen = () => {
   const { token } = useAuth();
 
   const [patients, setPatients] = useState<any[]>(appointments);
-  const [sessionStarted, setSessionStarted] = useState(false);
+  const [sessionState, setSessionState] = useState<'pending' | 'started' | 'ended'>(slot?.sessionStatus || 'pending');
   const [loadingAppId, setLoadingAppId] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -50,9 +50,11 @@ const DoctorSessionScreen = () => {
 
   // Initialize session state if already started previously
   useEffect(() => {
-    const isAlreadyStarted = patients.some(p => ['started', 'ready', 'in', 'completed', 'skipped'].includes(p.status));
-    if (isAlreadyStarted) {
-      setSessionStarted(true);
+    if (sessionState === 'pending') {
+      const isAlreadyStarted = patients.some(p => ['started', 'ready', 'in', 'completed', 'skipped'].includes(p.status));
+      if (isAlreadyStarted) {
+        setSessionState('started');
+      }
     }
   }, []);
 
@@ -80,7 +82,7 @@ const DoctorSessionScreen = () => {
   };
 
   const handleStartSession = async () => {
-    if (sessionStarted) {
+    if (sessionState === 'started') {
       Alert.alert('End Session', 'Are you sure you want to end this session?', [
         { text: 'Cancel', style: 'cancel' },
         { 
@@ -88,18 +90,20 @@ const DoctorSessionScreen = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              const updatedPatients = [...patients];
-              const promises = updatedPatients.map(p => {
-                if (p.status !== 'completed' && p.status !== 'pending' && p.status !== 'cancelled') {
-                  p.status = 'cancelled';
-                  return updatePatientStatus(p._id, 'cancelled');
-                }
-                return Promise.resolve();
+              await fetch(`${API_BASE_URL}/api/doctor/session/end`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({
+                  date: new Date().toISOString(),
+                  timeSlot: `${slot.startTime} - ${slot.endTime}`
+                })
               });
-              await Promise.all(promises);
-              setPatients(updatedPatients);
-              setSessionStarted(false);
-            } catch (error) {}
+              
+              setSessionState('ended');
+              Alert.alert('Session Ended', 'New patients can no longer book this session.');
+            } catch (error) {
+              Alert.alert('Error', 'Failed to end session.');
+            }
           }
         }
       ]);
@@ -122,9 +126,21 @@ const DoctorSessionScreen = () => {
         return Promise.resolve();
       });
 
+      // Start DailySession in backend
+      promises.push(
+        fetch(`${API_BASE_URL}/api/doctor/session/start`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({
+            date: new Date().toISOString(),
+            timeSlot: `${slot.startTime} - ${slot.endTime}`
+          })
+        }).then(res => res.json())
+      );
+
       await Promise.all(promises);
       setPatients(updatedPatients);
-      setSessionStarted(true);
+      setSessionState('started');
     } catch (error) {
        // Handled in updatePatientStatus
     }
@@ -317,23 +333,27 @@ const DoctorSessionScreen = () => {
         <View style={styles.sessionControlCard}>
           <View style={styles.sessionControlInfo}>
             <Text style={styles.sessionControlTitle}>
-              {sessionStarted ? 'Session is Active' : 'Ready to Start?'}
+              {sessionState === 'started' ? 'Session is Active' : sessionState === 'ended' ? 'Session Ended' : 'Ready to Start?'}
             </Text>
             <Text style={styles.sessionControlSub}>
               {patients.filter(p => !['skipped', 'completed'].includes(p.status)).length} Patient(s) left
             </Text>
           </View>
           
-          <TouchableOpacity style={[styles.startBtn, sessionStarted && styles.endBtn]} onPress={handleStartSession}>
-            {sessionStarted ? (
-              <Text style={[styles.startBtnText, { color: '#DC2626' }]}>End Session</Text>
-            ) : (
-              <LinearGradient colors={['#10B981', '#059669']} style={styles.startBtnGrad}>
-                <Play size={18} color="#FFF" fill="#FFF" />
-                <Text style={styles.startBtnText}>START</Text>
-              </LinearGradient>
-            )}
-          </TouchableOpacity>
+          {sessionState === 'ended' ? (
+            <Text style={{ color: '#DC2626', fontWeight: '700', fontSize: 14 }}>Session had been ended.</Text>
+          ) : (
+            <TouchableOpacity style={[styles.startBtn, sessionState === 'started' && styles.endBtn]} onPress={handleStartSession}>
+              {sessionState === 'started' ? (
+                <Text style={[styles.startBtnText, { color: '#DC2626' }]}>End Session</Text>
+              ) : (
+                <LinearGradient colors={['#10B981', '#059669']} style={styles.startBtnGrad}>
+                  <Play size={18} color="#FFF" fill="#FFF" />
+                  <Text style={styles.startBtnText}>START</Text>
+                </LinearGradient>
+              )}
+            </TouchableOpacity>
+          )}
         </View>
 
         <Text style={styles.sectionTitle}>Patient Queue</Text>

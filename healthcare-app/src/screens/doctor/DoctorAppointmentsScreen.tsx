@@ -284,10 +284,6 @@ const DoctorAppointmentsScreen = () => {
                     <Calendar size={14} color="#6B7280" />
                     <Text style={styles.timeText}>{new Date(appt.date).toLocaleDateString()}</Text>
                   </View>
-                  <View style={[styles.typeTag, { backgroundColor: '#EDE9FE' }]}>
-                    <User size={12} color="#7C3AED" />
-                    <Text style={[styles.typeText, { color: '#7C3AED' }]}>Physical</Text>
-                  </View>
                 </View>
 
                 <View style={styles.actions}>
