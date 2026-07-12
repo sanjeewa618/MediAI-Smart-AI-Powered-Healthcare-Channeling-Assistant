@@ -119,15 +119,13 @@ export const getDashboardData = async (req, res) => {
     const rawDoctorAppointments = await Appointment.find({
       patient: req.user._id,
       date: { $gte: today },
-      status: { $in: ['pending', 'confirmed'] }
+      status: { $nin: ['cancelled', 'completed'] }
     })
       .populate('doctor', 'name specialization hospital')
       .sort({ date: 1, timeSlot: 1 })
       .limit(10);
 
-    const doctorAppointments = rawDoctorAppointments
-      .filter(appt => !isAppointmentExpired(appt.date, appt.timeSlot))
-      .slice(0, 5);
+    const doctorAppointments = rawDoctorAppointments.slice(0, 5);
 
     // 2. Fetch upcoming lab tests from LabBooking
     const rawLabBookings = await LabBooking.find({

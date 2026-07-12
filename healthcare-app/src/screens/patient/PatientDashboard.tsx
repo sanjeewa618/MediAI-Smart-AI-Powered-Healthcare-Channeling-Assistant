@@ -439,9 +439,10 @@ const PatientDashboard = () => {
         const filterNextTwoDays = (appts: any[]) => {
           if (!appts) return [];
           return appts.filter(appt => {
+            if (appt.status === 'cancelled' || appt.status === 'completed') return false;
             const dateInRange = moment(appt.date).isBetween(startOfToday, endOfTwoDays, null, '[]');
             if (!dateInRange) return false;
-            return !isApptExpiredFrontend(appt.date, appt.timeSlot);
+            return true;
           });
         };
         const filterUnique = (appts: any[]) => {
