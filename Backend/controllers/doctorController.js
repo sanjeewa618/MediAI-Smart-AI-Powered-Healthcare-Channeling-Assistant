@@ -15,7 +15,7 @@ export const getDoctorDashboard = async (req, res) => {
     const todayEnd = new Date();
     todayEnd.setHours(23, 59, 59, 999);
 
-    // 1. Fetch upcoming appointments for the doctor
+    // 1. Fetch upcoming appointments for the doctor (Future)
     const upcomingAppointments = await Appointment.find({
       doctor: req.user._id,
       date: { $gte: new Date() },
@@ -26,15 +26,30 @@ export const getDoctorDashboard = async (req, res) => {
       .limit(10);
 
     // 2. Calculate Today's Appointments Count
-    const todayAppointmentsCount = await Appointment.countDocuments({
+    const todayAppointments = await Appointment.find({
       doctor: req.user._id,
       date: { $gte: todayStart, $lte: todayEnd },
       status: { $in: ['pending', 'confirmed'] }
-    });
+    }).populate('patient', 'name email phone').sort({ queueNumber: 1 });
+
+    const todayAppointmentsCount = todayAppointments.length;
 
     // 3. Calculate Unique Patients Count
     const uniquePatients = await Appointment.distinct('patient', { doctor: req.user._id });
     const totalPatients = uniquePatients.length;
+
+    // 4. Fetch today's slots
+    const today = new Date();
+    const todayDayName = today.toLocaleDateString('en-US', { weekday: 'short' });
+    const todayDateStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+
+    const availabilities = await DoctorAvailability.find({ doctor: req.user._id });
+    const todaySlots = availabilities.filter(s => 
+      s.repeat === 'daily' || 
+      (s.repeat === 'weekly' && s.day === todayDayName) || 
+      s.day === todayDayName || 
+      s.day === todayDateStr
+    ).sort((a, b) => a.startTime.localeCompare(b.startTime));
 
     res.json({
       success: true,
@@ -43,7 +58,9 @@ export const getDoctorDashboard = async (req, res) => {
           totalPatients,
           todayAppointments: todayAppointmentsCount
         },
-        upcomingAppointments
+        upcomingAppointments,
+        todayAppointments,
+        todaySlots
       }
     });
   } catch (error) {

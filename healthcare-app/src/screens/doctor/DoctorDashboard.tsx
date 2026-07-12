@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, Platform, Modal, Animated, PanResponder, Dimensions, BackHandler } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
-import { Bell, Calendar, LogOut, X, Clock, FileEdit, Plus } from 'lucide-react-native';
+import { Bell, Calendar, LogOut, X, Clock, FileEdit, Plus, Play } from 'lucide-react-native';
 
 const { height } = Dimensions.get('window');
 import DoctorBottomNavBar from '../../components/DoctorBottomNavBar';
@@ -27,6 +27,9 @@ const DoctorDashboard = () => {
   const [doctorName, setDoctorName] = useState('Loading...');
   const [doctorSpecialty, setDoctorSpecialty] = useState('Doctor');
   const [timeSlotModalVisible, setTimeSlotModalVisible] = useState(false);
+  const [todaySlots, setTodaySlots] = useState<any[]>([]);
+  const [todayAppointments, setTodayAppointments] = useState<any[]>([]);
+  const [stats, setStats] = useState({ totalPatients: 0, todayAppointments: 0 });
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
@@ -54,26 +57,33 @@ const DoctorDashboard = () => {
   );
 
   useEffect(() => {
-    const fetchProfile = async () => {
+    const fetchData = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        const data = await response.json();
-        if (response.ok && data) {
-          const name = data.name || 'Doctor';
+        const [profileRes, dashboardRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/auth/me`, { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch(`${API_BASE_URL}/api/doctor/dashboard`, { headers: { 'Authorization': `Bearer ${token}` } })
+        ]);
+
+        const profileData = await profileRes.json();
+        if (profileRes.ok && profileData) {
+          const name = profileData.name || 'Doctor';
           setDoctorName(name.startsWith('Dr.') ? name : `Dr. ${name}`);
-          setDoctorSpecialty(data.specialization || 'General Practitioner');
+          setDoctorSpecialty(profileData.specialization || 'General Practitioner');
+        }
+
+        const dashboardData = await dashboardRes.json();
+        if (dashboardRes.ok && dashboardData.success) {
+          setTodaySlots(dashboardData.data.todaySlots || []);
+          setTodayAppointments(dashboardData.data.todayAppointments || []);
+          setStats(dashboardData.data.stats || { totalPatients: 0, todayAppointments: 0 });
         }
       } catch (err) {
-        console.error('Failed to fetch doctor profile:', err);
+        console.error('Failed to fetch dashboard data:', err);
       }
     };
 
     if (token) {
-      fetchProfile();
+      fetchData();
     }
   }, [token]);
 
@@ -164,6 +174,40 @@ const DoctorDashboard = () => {
         </LinearGradient>
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <Text style={styles.sectionTitle}>Today's Schedule</Text>
+          {todaySlots.length === 0 ? (
+            <View style={styles.emptyBox}>
+              <Clock size={40} color="#D1D5DB" />
+              <Text style={styles.emptyTitle}>No slots today</Text>
+            </View>
+          ) : (
+            todaySlots.map((slot, idx) => {
+              const timeSlotStr = `${slot.startTime} - ${slot.endTime}`;
+              const patientsForSlot = todayAppointments.filter(app => app.timeSlot === timeSlotStr);
+              return (
+                <TouchableOpacity 
+                  key={slot._id || idx} 
+                  style={styles.slotCard}
+                  onPress={() => navigation.navigate('DoctorSession', { slot, appointments: patientsForSlot })}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.slotLeft}>
+                    <View style={styles.slotIconBox}>
+                      <Clock size={20} color={COLORS.primary} />
+                    </View>
+                    <View>
+                      <Text style={styles.slotTime}>{timeSlotStr}</Text>
+                      <Text style={styles.slotMeta}>{patientsForSlot.length} Patient{patientsForSlot.length !== 1 ? 's' : ''}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.startBtn}>
+                    <Play size={14} color="#FFF" fill="#FFF" />
+                    <Text style={styles.startBtnText}>Start</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })
+          )}
           <View style={{ height: 60 }} />
         </ScrollView>
         <DoctorBottomNavBar />
@@ -249,6 +293,30 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
   },
+  content: { padding: 20 },
+  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#1F2937', marginBottom: 16, marginTop: 10 },
+  slotCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    shadowColor: '#9CA3AF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  slotLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  slotIconBox: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#F5F3FF', alignItems: 'center', justifyContent: 'center' },
+  slotTime: { fontSize: 15, fontWeight: '700', color: '#1F2937' },
+  slotMeta: { fontSize: 13, color: '#6B7280', marginTop: 2 },
+  startBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#10B981', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 },
+  startBtnText: { color: '#FFF', fontWeight: '700', fontSize: 13 },
+  emptyBox: { alignItems: 'center', paddingVertical: 40 },
+  emptyTitle: { fontSize: 16, fontWeight: '600', color: '#6B7280', marginTop: 12 },
   headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
