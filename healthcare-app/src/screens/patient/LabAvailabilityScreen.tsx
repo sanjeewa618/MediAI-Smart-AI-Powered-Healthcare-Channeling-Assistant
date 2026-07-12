@@ -7,7 +7,7 @@ import {
 import { COLORS, SHADOWS } from '../../theme/theme';
 import { 
   Search, Bell, ArrowLeft, Filter, FlaskConical, Clock, ChevronLeft, ChevronRight, 
-  CheckCircle2, AlertCircle, Calendar, User, MapPin, 
+  CheckCircle2, AlertCircle, Calendar, User, MapPin, Users,
   Activity, Heart, Droplets, Baby, Sun, Shield, 
   Stethoscope, Microscope, Thermometer, Brain, Bone, Eye, Smile, X, ArrowRight
 } from 'lucide-react-native';
@@ -385,14 +385,22 @@ const LabAvailabilityScreen = () => {
   const displaySlots = dbSlots.length > 0
     ? dbSlots.map(s => {
         const timeRange = s.endTime ? `${s.startTime} - ${s.endTime}` : s.startTime;
+        const bookedCount = s.booked || 0;
+        const maxPatients = s.maxPatients || 10;
+        const isFull = s.status === 'Full' || bookedCount >= maxPatients || s.isExpired;
+        const nextQueueNumber = bookedCount + 1;
         return {
           time: timeRange,
           status: s.status || 'Available',
           rawSlot: s,
-          isExpired: s.isExpired
+          isExpired: s.isExpired,
+          bookedCount,
+          maxPatients,
+          isFull,
+          nextQueueNumber
         };
       })
-    : (timeSlotsData[selectedDate] || timeSlotsData['default']);
+    : [];
 
   const openAvailability = (lab: any) => {
     setSelectedLabForAvailability(lab);
@@ -517,19 +525,10 @@ const LabAvailabilityScreen = () => {
                     <MapPin size={16} color={COLORS.primary} />
                     <Text style={styles.detailText}>{lab.floor}</Text>
                   </View>
-                  <View style={styles.detailItem}>
-                    <Calendar size={16} color={COLORS.primary} />
-                    <Text style={styles.detailText}>Slots: {availableSlotsCount[lab.id] !== undefined ? availableSlotsCount[lab.id] : 0}</Text>
-                  </View>
                 </View>
 
                 {/* Token/Queue System Preview */}
                 <View style={styles.queueBox}>
-                  <View style={styles.queueItem}>
-                    <Text style={styles.queueLabel}>Current Token</Text>
-                    <Text style={styles.queueValue}>{currentTokens[lab.id] !== undefined ? currentTokens[lab.id] : 1}</Text>
-                  </View>
-                  <View style={styles.queueDivider} />
                   <View style={styles.queueItem}>
                     <Text style={styles.queueLabel}>Wait Time</Text>
                     <Text style={styles.queueValue}>{lab.wait}</Text>
@@ -652,56 +651,61 @@ const LabAvailabilityScreen = () => {
                     <Text style={{ color: COLORS.textSecondary, fontSize: 13, marginTop: 8 }}>Loading available slots...</Text>
                   </View>
                 ) : displaySlots.length === 0 ? (
-                  <View style={{ paddingVertical: 30, alignItems: 'center', justifyContent: 'center', width: '100%' }}>
-                    <AlertCircle size={36} color={COLORS.textSecondary} style={{ marginBottom: 10 }} />
-                    <Text style={{ color: COLORS.textHeader, fontSize: 15, fontWeight: '700' }}>No slots available</Text>
-                    <Text style={{ color: COLORS.textSecondary, fontSize: 13, marginTop: 4, textAlign: 'center', paddingHorizontal: 20 }}>
-                      The medical staff has not scheduled any slots for this date.
-                    </Text>
+                  <View style={styles.emptyBox}>
+                    <Clock size={48} color="#D1D5DB" />
+                    <Text style={styles.emptyTitle}>No slots available</Text>
+                    <Text style={styles.emptySub}>This laboratory has no schedules for this date.</Text>
                   </View>
                 ) : (
-                  <View style={styles.timeGrid}>
-                    {displaySlots.map((slot: any, i: number) => (
-                      <TouchableOpacity 
-                        key={i} 
-                        style={[
-                          styles.timeSlot, 
-                          slot.status === 'Available' ? styles.timeSlotAvailable : 
-                          slot.status === 'Busy' ? styles.timeSlotBusy : 
-                          (slot.status === 'Closed' || slot.isExpired) ? styles.timeSlotExpired : styles.timeSlotClosed,
-                          selectedTimeSlot === slot.time && styles.timeSlotSelected
-                        ]}
-                        onPress={() => setSelectedTimeSlot(slot.time)}
-                        disabled={slot.status === 'Closed' || slot.isExpired}
-                      >
-                        <Text style={[
-                          styles.timeText,
-                          slot.status === 'Available' ? styles.timeTextAvailable : 
-                          slot.status === 'Busy' ? styles.statusFew : 
-                          (slot.status === 'Closed' || slot.isExpired) ? styles.timeTextExpired : styles.statusFull,
-                          selectedTimeSlot === slot.time && styles.timeTextSelected
-                        ]}>
-                          {slot.time}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
+                  <View style={styles.slotsVerticalList}>
+                    {displaySlots.map((slot: any, i: number) => {
+                      const isFull = slot.isFull;
+                      const nextQueue = isFull ? null : slot.nextQueueNumber;
+                      return (
+                        <View key={i} style={styles.slotCard}>
+                          <View style={styles.slotInfo}>
+                            <View style={styles.slotTopRow}>
+                              <Text style={styles.slotTime}>{slot.time}</Text>
+                              {nextQueue !== null ? (
+                                <View style={styles.queueBadge}>
+                                  <Text style={styles.queueBadgeText}>Queue #{nextQueue}</Text>
+                                </View>
+                              ) : (
+                                <View style={[styles.queueBadge, styles.queueBadgeFull]}>
+                                  <Text style={[styles.queueBadgeText, styles.queueBadgeTextFull]}>Full</Text>
+                                </View>
+                              )}
+                            </View>
+                            <View style={styles.capacityBadge}>
+                              <Users size={14} color={isFull ? '#EF4444' : '#10B981'} />
+                              <Text style={[styles.capacityText, isFull && { color: '#EF4444' }]}>
+                                {slot.bookedCount} / {slot.maxPatients} Booked
+                              </Text>
+                            </View>
+                          </View>
+
+                          <TouchableOpacity
+                            style={[styles.bookBtn, isFull && styles.bookBtnDisabled]}
+                            disabled={isFull}
+                            onPress={() => {
+                              setSelectedTimeSlot(slot.time);
+                              const rawSlotObj = slot.rawSlot;
+                              setIsModalVisible(false);
+                              navigation.navigate('LabBookingFlow', { 
+                                lab: selectedLabForAvailability,
+                                initialDate: selectedDate,
+                                initialTime: slot.time,
+                                scheduleSlotId: rawSlotObj ? rawSlotObj.slotId || rawSlotObj._id : undefined
+                              });
+                            }}
+                          >
+                            <Text style={styles.bookBtnText}>{isFull ? 'Full' : 'Book'}</Text>
+                          </TouchableOpacity>
+                        </View>
+                      );
+                    })}
                   </View>
                 )}
-                {/* Time Legend */}
-                <View style={styles.legendContainer}>
-                  <View style={styles.legendItem}>
-                    <View style={[styles.legendDot, { backgroundColor: '#10B981' }]} />
-                    <Text style={styles.legendText}>Available</Text>
-                  </View>
-                  <View style={styles.legendItem}>
-                    <View style={[styles.legendDot, { backgroundColor: '#F59E0B' }]} />
-                    <Text style={styles.legendText}>Few Slots Left</Text>
-                  </View>
-                  <View style={styles.legendItem}>
-                    <View style={[styles.legendDot, { backgroundColor: '#9CA3AF' }]} />
-                    <Text style={styles.legendText}>Full / Closed</Text>
-                  </View>
-                </View>
               </View>
 
               {/* Nurse in Modal */}
@@ -721,27 +725,6 @@ const LabAvailabilityScreen = () => {
                   <View style={styles.activeIndicator} />
                 </View>
               </View>
-
-              <TouchableOpacity 
-                style={[
-                  styles.confirmBookingBtn,
-                  !isBookingEnabled && { opacity: 0.4, shadowOpacity: 0, elevation: 0 }
-                ]}
-                disabled={!isBookingEnabled}
-                onPress={() => {
-                  const rawSlotObj = selectedSlotObj?.rawSlot;
-                  setIsModalVisible(false);
-                  navigation.navigate('LabBookingFlow', { 
-                    lab: selectedLabForAvailability,
-                    initialDate: selectedDate,
-                    initialTime: selectedTimeSlot,
-                    scheduleSlotId: rawSlotObj ? rawSlotObj._id || rawSlotObj.slotId : undefined
-                  });
-                }}
-              >
-                <Text style={styles.confirmBookingBtnText}>Book Now</Text>
-                <ArrowRight size={20} color="#FFF" />
-              </TouchableOpacity>
             </ScrollView>
           </Animated.View>
         </View>
@@ -1456,7 +1439,60 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 15,
     fontWeight: '800',
-  }
+  },
+  slotsVerticalList: {
+    paddingHorizontal: 2,
+    marginTop: 10,
+    marginBottom: 20
+  },
+  slotCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    shadowColor: '#8B3DFF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  slotInfo: { gap: 6, flex: 1 },
+  slotTopRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
+  slotTime: { fontSize: 16, fontWeight: '700', color: '#1F2937' },
+  queueBadge: {
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999
+  },
+  queueBadgeFull: { backgroundColor: '#FEE2E2' },
+  queueBadgeText: { color: COLORS.primary, fontSize: 12, fontWeight: '700' },
+  queueBadgeTextFull: { color: '#EF4444' },
+  capacityBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  capacityText: { fontSize: 13, fontWeight: '600', color: '#10B981' },
+  bookBtn: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 12
+  },
+  bookBtnDisabled: { backgroundColor: '#D1D5DB' },
+  bookBtnText: { color: '#FFF', fontWeight: '700', fontSize: 14 },
+  emptyBox: { 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    paddingVertical: 40, 
+    backgroundColor: '#FFF', 
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginTop: 10,
+  },
+  emptyTitle: { fontSize: 16, fontWeight: '700', color: '#4B5563', marginTop: 16 },
+  emptySub: { fontSize: 13, color: '#6B7280', marginTop: 8, textAlign: 'center', paddingHorizontal: 40 }
 });
 
 export default LabAvailabilityScreen;
