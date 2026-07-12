@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Platform, Alert, ActivityIndicator, Modal, Dimensions, Linking } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ChevronRight, Play, Clock, Check, ArrowRight, XCircle, User, Activity, FileText } from 'lucide-react-native';
+import { ChevronRight, Play, Clock, Check, ArrowRight, XCircle, User, Activity, FileText, RefreshCw } from 'lucide-react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/types';
 import { COLORS } from '../../theme/theme';
@@ -19,8 +19,28 @@ const DoctorSessionScreen = () => {
   const { token } = useAuth();
 
   const [patients, setPatients] = useState<any[]>(appointments);
-  const [sessionStarted, setSessionStarted] = useState(false);
+  const [sessionState, setSessionState] = useState<'pending' | 'started' | 'ended'>(slot?.sessionStatus || 'pending');
   const [loadingAppId, setLoadingAppId] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    try {
+      setIsRefreshing(true);
+      const res = await fetch(`${API_BASE_URL}/api/doctor/dashboard`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        const timeSlotStr = `${slot.startTime} - ${slot.endTime}`;
+        const updatedPatients = (data.data.todayAppointments || []).filter((app: any) => app.timeSlot === timeSlotStr);
+        setPatients(updatedPatients);
+      }
+    } catch (error) {
+      console.error('Error refreshing appointments:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Profile Modal State
   const [selectedAppIndex, setSelectedAppIndex] = useState<number | null>(null);
@@ -30,9 +50,11 @@ const DoctorSessionScreen = () => {
 
   // Initialize session state if already started previously
   useEffect(() => {
-    const isAlreadyStarted = patients.some(p => ['started', 'ready', 'in', 'completed', 'skipped'].includes(p.status));
-    if (isAlreadyStarted) {
-      setSessionStarted(true);
+    if (sessionState === 'pending') {
+      const isAlreadyStarted = patients.some(p => ['started', 'ready', 'in', 'completed', 'skipped'].includes(p.status));
+      if (isAlreadyStarted) {
+        setSessionState('started');
+      }
     }
   }, []);
 
@@ -60,10 +82,30 @@ const DoctorSessionScreen = () => {
   };
 
   const handleStartSession = async () => {
-    if (sessionStarted) {
+    if (sessionState === 'started') {
       Alert.alert('End Session', 'Are you sure you want to end this session?', [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'End', onPress: () => setSessionStarted(false), style: 'destructive' }
+        { 
+          text: 'End', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await fetch(`${API_BASE_URL}/api/doctor/session/end`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({
+                  date: new Date().toISOString(),
+                  timeSlot: `${slot.startTime} - ${slot.endTime}`
+                })
+              });
+              
+              setSessionState('ended');
+              Alert.alert('Session Ended', 'New patients can no longer book this session.');
+            } catch (error) {
+              Alert.alert('Error', 'Failed to end session.');
+            }
+          }
+        }
       ]);
       return;
     }
@@ -84,9 +126,21 @@ const DoctorSessionScreen = () => {
         return Promise.resolve();
       });
 
+      // Start DailySession in backend
+      promises.push(
+        fetch(`${API_BASE_URL}/api/doctor/session/start`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({
+            date: new Date().toISOString(),
+            timeSlot: `${slot.startTime} - ${slot.endTime}`
+          })
+        }).then(res => res.json())
+      );
+
       await Promise.all(promises);
       setPatients(updatedPatients);
-      setSessionStarted(true);
+      setSessionState('started');
     } catch (error) {
        // Handled in updatePatientStatus
     }
@@ -94,6 +148,13 @@ const DoctorSessionScreen = () => {
 
   const handleArrowRight = async (appIndex: number) => {
     const updatedPatients = [...patients];
+    
+    // Ensure only one patient can be IN at a time
+    if (updatedPatients.some(p => p.status === 'in')) {
+      Alert.alert('Action Blocked', 'Another patient is currently in session. Please complete, skip, or cancel them first.');
+      return;
+    }
+
     const currentPatient = updatedPatients[appIndex];
 
     try {
@@ -113,31 +174,52 @@ const DoctorSessionScreen = () => {
     } catch (error) {}
   };
 
+  const autoPromoteToIn = async (updatedPatients: any[]) => {
+    if (updatedPatients.some(p => p.status === 'in')) return;
+
+    const nextInIndex = updatedPatients.findIndex(p => p.status === 'nextIn');
+    if (nextInIndex !== -1) {
+      await updatePatientStatus(updatedPatients[nextInIndex]._id, 'in');
+      updatedPatients[nextInIndex].status = 'in';
+      return;
+    }
+
+    const readyIndex = updatedPatients.findIndex(p => p.status === 'ready');
+    if (readyIndex !== -1) {
+      await updatePatientStatus(updatedPatients[readyIndex]._id, 'in');
+      updatedPatients[readyIndex].status = 'in';
+      
+      for (let j = readyIndex + 1; j < updatedPatients.length; j++) {
+        if (updatedPatients[j].status === 'started') {
+          await updatePatientStatus(updatedPatients[j]._id, 'ready');
+          updatedPatients[j].status = 'ready';
+          break;
+        }
+      }
+      return;
+    }
+
+    const startedIndex = updatedPatients.findIndex(p => p.status === 'started');
+    if (startedIndex !== -1) {
+      await updatePatientStatus(updatedPatients[startedIndex]._id, 'in');
+      updatedPatients[startedIndex].status = 'in';
+      return;
+    }
+  };
+
   const handleSkip = async (appIndex: number) => {
     const updatedPatients = [...patients];
     const currentPatient = updatedPatients[appIndex];
+    const wasIn = currentPatient.status === 'in';
 
     try {
       await updatePatientStatus(currentPatient._id, 'skipped');
       currentPatient.status = 'skipped';
 
-      // Immediately change the next 'ready' or 'started' patient to 'in'
-      for (let i = appIndex + 1; i < updatedPatients.length; i++) {
-        if (['started', 'ready'].includes(updatedPatients[i].status)) {
-          await updatePatientStatus(updatedPatients[i]._id, 'in');
-          updatedPatients[i].status = 'in';
-
-          // And set the one after that to 'ready'
-          for (let j = i + 1; j < updatedPatients.length; j++) {
-            if (updatedPatients[j].status === 'started') {
-              await updatePatientStatus(updatedPatients[j]._id, 'ready');
-              updatedPatients[j].status = 'ready';
-              break;
-            }
-          }
-          break;
-        }
+      if (wasIn) {
+        await autoPromoteToIn(updatedPatients);
       }
+
       setPatients(updatedPatients);
       setProfileModalVisible(false);
     } catch (error) {}
@@ -146,13 +228,45 @@ const DoctorSessionScreen = () => {
   const handleComplete = async (appIndex: number) => {
     const updatedPatients = [...patients];
     const currentPatient = updatedPatients[appIndex];
+    const wasIn = currentPatient.status === 'in';
 
     try {
       await updatePatientStatus(currentPatient._id, 'completed');
       currentPatient.status = 'completed';
+      
+      if (wasIn) {
+        await autoPromoteToIn(updatedPatients);
+      }
+
       setPatients(updatedPatients);
       setProfileModalVisible(false);
     } catch (error) {}
+  };
+
+  const handleCancel = async (appIndex: number) => {
+    Alert.alert('Cancel Appointment', 'Are you sure you want to cancel this appointment?', [
+      { text: 'No', style: 'cancel' },
+      { 
+        text: 'Yes, Cancel', 
+        style: 'destructive',
+        onPress: async () => {
+          const updatedPatients = [...patients];
+          const currentPatient = updatedPatients[appIndex];
+          const wasIn = currentPatient.status === 'in';
+          try {
+            await updatePatientStatus(currentPatient._id, 'cancelled');
+            currentPatient.status = 'cancelled';
+            
+            if (wasIn) {
+              await autoPromoteToIn(updatedPatients);
+            }
+
+            setPatients(updatedPatients);
+            setProfileModalVisible(false);
+          } catch (error) {}
+        }
+      }
+    ]);
   };
 
   const openPatientProfile = async (appIndex: number) => {
@@ -185,6 +299,7 @@ const DoctorSessionScreen = () => {
 
     if (status === 'ready') { bgColor = '#DBEAFE'; textColor = '#1D4ED8'; }
     if (status === 'in') { bgColor = '#FEF3C7'; textColor = '#D97706'; }
+    if (status === 'nextIn') { bgColor = '#FFEDD5'; textColor = '#C2410C'; text = 'NEXT IN'; }
     if (status === 'started') { bgColor = '#E0E7FF'; textColor = '#4338CA'; }
     if (status === 'skipped') { bgColor = '#FEE2E2'; textColor = '#B91C1C'; }
     if (status === 'completed') { bgColor = '#D1FAE5'; textColor = '#059669'; }
@@ -207,6 +322,9 @@ const DoctorSessionScreen = () => {
             <Text style={styles.headerTitle}>Session Details</Text>
             <Text style={styles.headerSub}>{slot?.startTime} – {slot?.endTime}</Text>
           </View>
+          <TouchableOpacity onPress={handleRefresh} style={styles.refreshBtn} disabled={isRefreshing}>
+            <RefreshCw size={22} color="#FFF" style={isRefreshing ? { opacity: 0.5 } : {}} />
+          </TouchableOpacity>
         </View>
       </LinearGradient>
 
@@ -215,23 +333,27 @@ const DoctorSessionScreen = () => {
         <View style={styles.sessionControlCard}>
           <View style={styles.sessionControlInfo}>
             <Text style={styles.sessionControlTitle}>
-              {sessionStarted ? 'Session is Active' : 'Ready to Start?'}
+              {sessionState === 'started' ? 'Session is Active' : sessionState === 'ended' ? 'Session Ended' : 'Ready to Start?'}
             </Text>
             <Text style={styles.sessionControlSub}>
               {patients.filter(p => !['skipped', 'completed'].includes(p.status)).length} Patient(s) left
             </Text>
           </View>
           
-          <TouchableOpacity style={[styles.startBtn, sessionStarted && styles.endBtn]} onPress={handleStartSession}>
-            {sessionStarted ? (
-              <Text style={[styles.startBtnText, { color: '#DC2626' }]}>End Session</Text>
-            ) : (
-              <LinearGradient colors={['#10B981', '#059669']} style={styles.startBtnGrad}>
-                <Play size={18} color="#FFF" fill="#FFF" />
-                <Text style={styles.startBtnText}>START</Text>
-              </LinearGradient>
-            )}
-          </TouchableOpacity>
+          {sessionState === 'ended' ? (
+            <Text style={{ color: '#DC2626', fontWeight: '700', fontSize: 14 }}>Session had been ended.</Text>
+          ) : (
+            <TouchableOpacity style={[styles.startBtn, sessionState === 'started' && styles.endBtn]} onPress={handleStartSession}>
+              {sessionState === 'started' ? (
+                <Text style={[styles.startBtnText, { color: '#DC2626' }]}>End Session</Text>
+              ) : (
+                <LinearGradient colors={['#10B981', '#059669']} style={styles.startBtnGrad}>
+                  <Play size={18} color="#FFF" fill="#FFF" />
+                  <Text style={styles.startBtnText}>START</Text>
+                </LinearGradient>
+              )}
+            </TouchableOpacity>
+          )}
         </View>
 
         <Text style={styles.sectionTitle}>Patient Queue</Text>
@@ -247,6 +369,7 @@ const DoctorSessionScreen = () => {
             const isLoading = loadingAppId === app._id;
             const isActive = app.status === 'in';
             const isReady = app.status === 'ready';
+            const isNextIn = app.status === 'nextIn';
             const isSkipped = app.status === 'skipped';
             const isCompleted = app.status === 'completed';
 
@@ -257,42 +380,48 @@ const DoctorSessionScreen = () => {
                   styles.patientCard, 
                   isActive && styles.patientCardIn,
                   isReady && styles.patientCardReady,
-                  (isSkipped || isCompleted) && { opacity: 0.5 }
+                  isNextIn && styles.patientCardNextIn,
+                  (isSkipped || isCompleted) && { opacity: 0.5 },
+                  isActive && { flexDirection: 'column', alignItems: 'stretch' }
                 ]}
                 onPress={() => openPatientProfile(index)}
                 activeOpacity={0.7}
               >
-                <View style={styles.queueCircle}>
-                  <Text style={styles.queueText}>{app.queueNumber}</Text>
-                </View>
-                
-                <View style={styles.patientInfo}>
-                  <Text style={styles.patientName}>{app.patient?.name || 'Unknown Patient'}</Text>
-                  {renderStatusBadge(app.status)}
+                <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%' }}>
+                  <View style={styles.queueCircle}>
+                    <Text style={styles.queueText}>{app.queueNumber}</Text>
+                  </View>
+                  
+                  <View style={styles.patientInfo}>
+                    <Text style={styles.patientName}>{app.patient?.name || 'Unknown Patient'}</Text>
+                    {renderStatusBadge(app.status)}
+                  </View>
+
+                  {isLoading && (
+                    <ActivityIndicator size="small" color={COLORS.primary} style={{ marginRight: 10 }} />
+                  )}
+
+                  {!isActive && !isLoading && (
+                    <View style={styles.actionButtonsRow}>
+                      {isReady && (
+                        <TouchableOpacity style={styles.iconBtn} onPress={(e) => { e.stopPropagation(); handleArrowRight(index); }}>
+                          <ArrowRight size={24} color={COLORS.primary} />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
                 </View>
 
-                {isLoading ? (
-                  <ActivityIndicator size="small" color={COLORS.primary} style={{ marginRight: 10 }} />
-                ) : (
-                  <View style={styles.actionButtonsRow}>
-                    {isReady && (
-                      <TouchableOpacity style={styles.iconBtn} onPress={(e) => { e.stopPropagation(); handleArrowRight(index); }}>
-                        <ArrowRight size={24} color={COLORS.primary} />
-                      </TouchableOpacity>
-                    )}
-
-                    {isActive && (
-                      <>
-                        <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#FEE2E2' }]} onPress={(e) => { e.stopPropagation(); handleSkip(index); }}>
-                          <XCircle size={16} color="#DC2626" />
-                          <Text style={[styles.actionBtnText, { color: '#DC2626' }]}>Skip</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#D1FAE5' }]} onPress={(e) => { e.stopPropagation(); handleComplete(index); }}>
-                          <Check size={16} color="#059669" />
-                          <Text style={[styles.actionBtnText, { color: '#059669' }]}>Complete</Text>
-                        </TouchableOpacity>
-                      </>
-                    )}
+                {isActive && !isLoading && (
+                  <View style={{ flexDirection: 'row', gap: 12, marginTop: 12, width: '100%' }}>
+                    <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#FEE2E2', flex: 1, justifyContent: 'center' }]} onPress={(e) => { e.stopPropagation(); handleSkip(index); }}>
+                      <XCircle size={16} color="#DC2626" />
+                      <Text style={[styles.actionBtnText, { color: '#DC2626' }]}>Skip</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#D1FAE5', flex: 1, justifyContent: 'center' }]} onPress={(e) => { e.stopPropagation(); handleComplete(index); }}>
+                      <Check size={16} color="#059669" />
+                      <Text style={[styles.actionBtnText, { color: '#059669' }]}>Complete</Text>
+                    </TouchableOpacity>
                   </View>
                 )}
               </TouchableOpacity>
@@ -409,33 +538,33 @@ const DoctorSessionScreen = () => {
                       return <ActivityIndicator size="small" color={COLORS.primary} />;
                     }
 
-                    if (isReady) {
-                      return (
-                        <TouchableOpacity style={[styles.footerBtn, { backgroundColor: COLORS.primary }]} onPress={() => handleArrowRight(selectedAppIndex)}>
-                          <ArrowRight size={20} color="#FFF" />
-                          <Text style={styles.footerBtnText}>Call In Patient</Text>
-                        </TouchableOpacity>
-                      );
-                    }
-
-                    if (isActive) {
-                      return (
-                        <View style={{ flexDirection: 'row', gap: 12 }}>
-                          <TouchableOpacity style={[styles.footerBtn, { backgroundColor: '#FEE2E2', flex: 1 }]} onPress={() => handleSkip(selectedAppIndex)}>
-                            <XCircle size={20} color="#DC2626" />
-                            <Text style={[styles.footerBtnText, { color: '#DC2626' }]}>Skip</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity style={[styles.footerBtn, { backgroundColor: '#10B981', flex: 1 }]} onPress={() => handleComplete(selectedAppIndex)}>
-                            <Check size={20} color="#FFF" />
-                            <Text style={[styles.footerBtnText, { color: '#FFF' }]}>Complete</Text>
-                          </TouchableOpacity>
-                        </View>
-                      );
-                    }
-
                     return (
-                      <View style={[styles.footerBtn, { backgroundColor: '#E5E7EB' }]}>
-                        <Text style={[styles.footerBtnText, { color: '#6B7280' }]}>Status: {app.status.toUpperCase()}</Text>
+                      <View style={{ gap: 10 }}>
+                        {['pending', 'confirmed', 'ready', 'started', 'in'].includes(app.status) && (
+                          <View style={{ flexDirection: 'row', gap: 12 }}>
+                            <TouchableOpacity style={[styles.footerBtn, { backgroundColor: '#FEE2E2', flex: 1 }]} onPress={() => handleSkip(selectedAppIndex)}>
+                              <XCircle size={20} color="#DC2626" />
+                              <Text style={[styles.footerBtnText, { color: '#DC2626' }]}>Skip</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[styles.footerBtn, { backgroundColor: '#10B981', flex: 1 }]} onPress={() => handleComplete(selectedAppIndex)}>
+                              <Check size={20} color="#FFF" />
+                              <Text style={[styles.footerBtnText, { color: '#FFF' }]}>Complete</Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
+
+                        {!['pending', 'confirmed', 'ready', 'started', 'in'].includes(app.status) && (
+                          <View style={[styles.footerBtn, { backgroundColor: '#E5E7EB' }]}>
+                            <Text style={[styles.footerBtnText, { color: '#6B7280' }]}>Status: {app.status.toUpperCase()}</Text>
+                          </View>
+                        )}
+
+                        {['pending', 'confirmed', 'ready', 'started'].includes(app.status) && (
+                          <TouchableOpacity style={[styles.footerBtn, { backgroundColor: '#FEE2E2' }]} onPress={() => handleCancel(selectedAppIndex)}>
+                            <XCircle size={20} color="#DC2626" />
+                            <Text style={[styles.footerBtnText, { color: '#DC2626' }]}>Cancel Appointment</Text>
+                          </TouchableOpacity>
+                        )}
                       </View>
                     );
                   })()}
@@ -453,7 +582,22 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F4F6FB' },
   header: { paddingTop: Platform.OS === 'ios' ? 60 : 50, paddingHorizontal: 20, paddingBottom: 24, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
   headerRow: { flexDirection: 'row', alignItems: 'center' },
-  backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  refreshBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
   headerTitle: { fontSize: 20, fontWeight: '800', color: '#FFF' },
   headerSub: { fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 4 },
   content: { padding: 20, paddingBottom: 100 },
@@ -497,6 +641,10 @@ const styles = StyleSheet.create({
     borderColor: '#FDE68A',
     backgroundColor: '#FFFBEB',
     borderWidth: 2
+  },
+  patientCardNextIn: {
+    borderColor: '#FDBA74',
+    backgroundColor: '#FFF7ED'
   },
   queueCircle: {
     width: 44,

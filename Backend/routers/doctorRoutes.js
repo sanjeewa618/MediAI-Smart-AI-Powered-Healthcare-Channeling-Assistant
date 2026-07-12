@@ -9,7 +9,8 @@ import {
   deleteDoctorSchedule,
   getSpecialties,
   getDoctorAvailabilityForPatient,
-  getPatientDetailsForDoctor
+  getPatientDetailsForDoctor,
+  updateSessionState
 } from '../controllers/doctorController.js';
 import { protect } from '../middlewares/authMiddleware.js';
 import { doctorOnly } from '../middlewares/roleMiddleware.js';
@@ -28,6 +29,7 @@ router.use(protect);
 router.get('/dashboard', doctorOnly, getDoctorDashboard);
 router.put('/profile', doctorOnly, updateDoctorProfile);
 router.get('/patient/:id', doctorOnly, getPatientDetailsForDoctor);
+router.put('/session/:action', doctorOnly, updateSessionState);
 
 // Schedule Management
 router.get('/schedule', doctorOnly, getDoctorSchedule);

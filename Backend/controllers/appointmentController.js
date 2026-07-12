@@ -1,6 +1,7 @@
 import Appointment from '../model/Appointment.js';
 import User from '../model/User.js';
 import DoctorAvailability from '../model/DoctorAvailability.js';
+import DailySession from '../model/DailySession.js';
 
 // @desc    Create a new appointment
 // @route   POST /api/appointments
@@ -16,36 +17,42 @@ export const createAppointment = async (req, res) => {
     }
 
     // Find the corresponding slot to check maxPatients
-    // The timeSlot string is typically something like "09:00 AM - 09:30 AM"
-    // We match the exact slot from DoctorAvailability using doctor, startTime, endTime
     const [startPart, endPart] = timeSlot.split(' - ');
-    const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(date).getDay()];
+
+    // Fix Timezone issue with Date parsing.
+    // Strings like "YYYY-MM-DD" are parsed as UTC by default in JS.
+    // If the server is in a timezone west of UTC, it will evaluate to the previous day locally!
+    // Replacing '-' with '/' forces JS to parse it as local time.
+    const normalizedDateStr = typeof date === 'string' && date.includes('-') && !date.includes('T') ? date.replace(/-/g, '/') : date;
+    const appointmentDate = new Date(normalizedDateStr);
     
-    // Find slot (either specific to this day or repeating daily)
+    const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][appointmentDate.getDay()];
+    const dateStr = appointmentDate.getFullYear() + '-' + String(appointmentDate.getMonth() + 1).padStart(2, '0') + '-' + String(appointmentDate.getDate()).padStart(2, '0');
+    
+    // Find slot: match by time and any applicable schedule rule
+    // (matches the same logic used by the dashboard in doctorController)
     const slot = await DoctorAvailability.findOne({
       doctor,
       startTime: startPart,
       endTime: endPart,
-      $or: [{ day: dayOfWeek }, { repeat: 'daily' }]
+      $or: [
+        { day: dayOfWeek },              // Legacy weekday match (e.g. "Sat")
+        { day: dateStr },                 // Specific date override (e.g. "2026-07-12")
+        { repeat: 'daily' },             // Repeats every day
+        { repeat: 'weekly', day: dayOfWeek }  // Repeats weekly on this weekday
+      ]
     });
 
     if (!slot) {
       return res.status(400).json({ message: 'Selected time slot is not available for this doctor' });
     }
 
-    // Build a date range covering the whole selected day so the per-day
-    // queue number is calculated correctly regardless of the incoming
-    // date format.
-    const startOfDay = new Date(date);
+    // Build a date range covering the whole selected day
+    const startOfDay = new Date(appointmentDate);
     startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(date);
+    const endOfDay = new Date(appointmentDate);
     endOfDay.setHours(23, 59, 59, 999);
 
-    // Count non-cancelled bookings already placed for this doctor in this
-    // specific time slot on this date. This is the queue number for the
-    // next patient in that slot. Queue numbers are per doctor, per date,
-    // per time slot, reset daily, and must never exceed the slot's
-    // maxPatients limit.
     const existingInSlot = await Appointment.countDocuments({
       doctor,
       timeSlot,
@@ -57,14 +64,54 @@ export const createAppointment = async (req, res) => {
       return res.status(400).json({ message: 'This time slot is fully booked. Please choose another slot.' });
     }
 
+    // Check explicitly tracked daily session state
+    const sessionRecord = await DailySession.findOne({
+      doctor,
+      date: startOfDay,
+      timeSlot
+    });
+
+    let initialStatus = 'pending';
+
+    if (sessionRecord) {
+      if (sessionRecord.status === 'ended') {
+        return res.status(400).json({ message: 'This session has already ended. You cannot book appointments for this time slot anymore.' });
+      } else if (sessionRecord.status === 'started') {
+        const existingAppointments = await Appointment.find({
+          doctor,
+          timeSlot,
+          date: { $gte: startOfDay, $lte: endOfDay },
+          status: { $in: ['ready', 'started'] }
+        });
+        
+        const hasReady = existingAppointments.some(app => app.status === 'ready');
+        const hasStarted = existingAppointments.some(app => app.status === 'started');
+
+        if (!hasReady && !hasStarted) {
+          initialStatus = 'ready';
+        } else {
+          initialStatus = 'started';
+        }
+      }
+    } else {
+      // If no explicit session is tracked yet, auto-end if physical date is past today
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      if (startOfDay < today) {
+        return res.status(400).json({ message: 'This session has already ended. You cannot book appointments for this time slot anymore.' });
+      }
+    }
+
     const nextQueueNumber = existingInSlot + 1;
 
     const appointment = await Appointment.create({
       patient: req.user._id, // Automatically attach the logged-in patient
       doctor,
-      date,
+      date: appointmentDate,
       timeSlot,
       queueNumber: nextQueueNumber,
+      status: initialStatus,
       symptoms,
       notes
     });
@@ -94,7 +141,10 @@ export const getMyAppointments = async (req, res) => {
 
     // Optional date filter
     if (req.query.date) {
-      const queryDate = new Date(req.query.date);
+      const dateStr = String(req.query.date);
+      const normalizedDateStr = dateStr.includes('-') && !dateStr.includes('T') ? dateStr.replace(/-/g, '/') : dateStr;
+      const queryDate = new Date(normalizedDateStr);
+      
       const startOfDay = new Date(queryDate);
       startOfDay.setHours(0, 0, 0, 0);
       const endOfDay = new Date(queryDate);

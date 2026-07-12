@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, Platform, Modal, Animated, PanResponder, Dimensions, BackHandler } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, Platform, Modal, Animated, PanResponder, Dimensions, BackHandler, Alert } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
-import { Bell, Calendar, LogOut, X, Clock, FileEdit, Plus, Play, Users, CheckSquare, Activity, Search, MessageCircle } from 'lucide-react-native';
+import { Bell, Calendar, LogOut, X, Clock, FileEdit, Plus, Play, Users, CheckSquare, Activity, Search, MessageCircle, RefreshCcw } from 'lucide-react-native';
 
 const { height } = Dimensions.get('window');
 import DoctorBottomNavBar from '../../components/DoctorBottomNavBar';
@@ -75,36 +75,62 @@ const DoctorDashboard = () => {
     }, [])
   );
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [profileRes, dashboardRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/api/auth/me`, { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch(`${API_BASE_URL}/api/doctor/dashboard`, { headers: { 'Authorization': `Bearer ${token}` } })
-        ]);
+  const fetchDashboardData = async () => {
+    try {
+      const [profileRes, dashboardRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/auth/me`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${API_BASE_URL}/api/doctor/dashboard`, { headers: { 'Authorization': `Bearer ${token}` } })
+      ]);
 
-        const profileData = await profileRes.json();
-        if (profileRes.ok && profileData) {
-          const name = profileData.name || 'Doctor';
-          setDoctorName(name.startsWith('Dr.') ? name : `Dr. ${name}`);
-          setDoctorSpecialty(profileData.specialization || 'General Practitioner');
-        }
-
-        const dashboardData = await dashboardRes.json();
-        if (dashboardRes.ok && dashboardData.success) {
-          setTodaySlots(dashboardData.data.todaySlots || []);
-          setTodayAppointments(dashboardData.data.todayAppointments || []);
-          setStats(dashboardData.data.stats || { totalPatients: 0, todayAppointments: 0, pendingApprovals: 0 });
-        }
-      } catch (err) {
-        console.error('Failed to fetch dashboard data:', err);
+      const profileData = await profileRes.json();
+      if (profileRes.ok && profileData) {
+        const name = profileData.name || 'Doctor';
+        setDoctorName(name.startsWith('Dr.') ? name : `Dr. ${name}`);
+        setDoctorSpecialty(profileData.specialization || 'General Practitioner');
       }
-    };
 
+      const dashboardData = await dashboardRes.json();
+      if (dashboardRes.ok && dashboardData.success) {
+        setTodaySlots(dashboardData.data.todaySlots || []);
+        setTodayAppointments(dashboardData.data.todayAppointments || []);
+        setStats(dashboardData.data.stats || { totalPatients: 0, todayAppointments: 0, pendingApprovals: 0 });
+      }
+    } catch (err) {
+      console.error('Failed to fetch dashboard data:', err);
+    }
+  };
+
+  useEffect(() => {
     if (token) {
-      fetchData();
+      fetchDashboardData();
     }
   }, [token]);
+
+  const handleStartSessionFromDashboard = async (slot: any) => {
+    try {
+      const hasActiveSession = todaySlots.some(s => s.sessionStatus === 'started');
+      if (hasActiveSession) {
+        Alert.alert('Action Blocked', 'You cannot start a new session until the currently active session is ended.');
+        return;
+      }
+      const res = await fetch(`${API_BASE_URL}/api/doctor/session/start`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          date: new Date().toISOString(),
+          timeSlot: `${slot.startTime} - ${slot.endTime}`
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to start session');
+      }
+      fetchDashboardData();
+    } catch (error: any) {
+      console.error('Failed to start session from dashboard', error);
+      Alert.alert('Error', error.message || 'Failed to start session from dashboard');
+    }
+  };
 
   // Animation and PanResponder for Bottom Sheet
   const transitionAnim = useRef(new Animated.Value(height)).current;
@@ -169,8 +195,8 @@ const DoctorDashboard = () => {
               </View>
             </View>
             <View style={styles.headerRight}>
-              <TouchableOpacity style={styles.iconBtn} onPress={openTimeSlotModal}>
-                <Calendar size={20} color="#FFF" />
+              <TouchableOpacity style={styles.iconBtn} onPress={fetchDashboardData}>
+                <RefreshCcw size={20} color="#FFF" />
               </TouchableOpacity>
               <TouchableOpacity style={styles.iconBtn}>
                 <Bell size={20} color="#FFF" />
@@ -252,53 +278,65 @@ const DoctorDashboard = () => {
               <Text style={styles.emptyTitle}>No slots today</Text>
             </View>
           ) : (() => {
-            const nextSlotIndex = todaySlots.findIndex(slot => parseTime(slot.endTime) > currentTime);
+            const hasActiveSession = todaySlots.some(s => s.sessionStatus === 'started');
             
             return todaySlots.map((slot, idx) => {
               const timeSlotStr = `${slot.startTime} - ${slot.endTime}`;
               const patientsForSlot = todayAppointments.filter(app => app.timeSlot === timeSlotStr);
-              const isNext = idx === nextSlotIndex;
 
-              let timeRemainingText = '';
-              if (isNext) {
-                const timeRemainingMs = parseTime(slot.startTime) - currentTime;
-                if (timeRemainingMs > 0) {
-                  const mins = Math.floor(timeRemainingMs / 60000);
-                  if (mins > 60) {
-                    timeRemainingText = `Starts in ${Math.floor(mins / 60)}h ${mins % 60}m`;
-                  } else {
-                    timeRemainingText = `Starts in ${mins} min`;
-                  }
-                } else {
-                  timeRemainingText = `Active Now`;
-                }
-              }
+              const cardStyle = [
+                styles.slotCard,
+                slot.sessionStatus === 'started' && { backgroundColor: '#ECFDF5', borderColor: '#10B981', borderWidth: 1 },
+                slot.sessionStatus === 'ended' && { backgroundColor: '#FEF2F2', borderColor: '#DC2626', borderWidth: 1 }
+              ];
 
-              return (
+              const cardContent = (
                 <TouchableOpacity 
-                  key={slot._id || idx} 
-                  style={[styles.slotCard, isNext && styles.nextSlotCard]}
+                  style={cardStyle}
                   onPress={() => navigation.navigate('DoctorSession', { slot, appointments: patientsForSlot })}
                   activeOpacity={0.8}
                 >
                   <View style={styles.slotLeft}>
-                    <View style={[styles.slotIconBox, isNext && { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-                      <Clock size={20} color={isNext ? "#FFF" : COLORS.primary} />
+                    <View style={styles.slotIconBox}>
+                      <Clock size={20} color={COLORS.primary} />
                     </View>
                     <View>
-                      {isNext && <Text style={styles.upNextBadge}>UP NEXT</Text>}
-                      <Text style={[styles.slotTime, isNext && { color: '#FFF', fontSize: 16 }]}>{timeSlotStr}</Text>
-                      <Text style={[styles.slotMeta, isNext && { color: 'rgba(255,255,255,0.85)' }]}>
-                        {patientsForSlot.length} Patient{patientsForSlot.length !== 1 ? 's' : ''} {isNext ? `• ${timeRemainingText}` : ''}
+                      <Text style={styles.slotTime}>{timeSlotStr}</Text>
+                      <Text style={styles.slotMeta}>
+                        {patientsForSlot.length} Patient{patientsForSlot.length !== 1 ? 's' : ''}
                       </Text>
                     </View>
                   </View>
-                  <View style={[styles.startBtn, isNext && { backgroundColor: '#FFF' }]}>
-                    <Play size={14} color={isNext ? "#10B981" : "#FFF"} fill={isNext ? "#10B981" : "#FFF"} />
-                    <Text style={[styles.startBtnText, isNext && { color: "#10B981" }]}>Start</Text>
+                  <View style={{ flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+                    {slot.sessionStatus === 'started' ? (
+                      <View style={{ paddingVertical: 10 }}>
+                        <Text style={{ color: '#059669', fontWeight: '700', fontSize: 13 }}>Session Started</Text>
+                      </View>
+                    ) : slot.sessionStatus === 'ended' ? (
+                      <View style={{ paddingVertical: 10 }}>
+                        <Text style={{ color: '#DC2626', fontWeight: '700', fontSize: 13 }}>Session Ended</Text>
+                      </View>
+                    ) : (
+                      <TouchableOpacity 
+                        style={[styles.startBtn, hasActiveSession && { opacity: 0.5 }]}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          if (hasActiveSession) {
+                            Alert.alert('Session Active', 'You cannot start a new session until the currently active session is ended.');
+                            return;
+                          }
+                          handleStartSessionFromDashboard(slot);
+                        }}
+                      >
+                        <Play size={14} color="#FFF" fill="#FFF" />
+                        <Text style={styles.startBtnText}>Start</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </TouchableOpacity>
               );
+
+              return <View key={slot._id || idx}>{cardContent}</View>;
             });
           })()}
           <View style={{ height: 60 }} />
@@ -466,11 +504,12 @@ const styles = StyleSheet.create({
   nextSlotCard: {
     backgroundColor: '#10B981', // A bright emerald color
     borderWidth: 0,
-    transform: [{ scale: 1.02 }],
+    paddingVertical: 20,
     shadowColor: '#10B981',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 8,
   },
   upNextBadge: {
     color: '#D1FAE5',
@@ -656,16 +695,33 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   statusAvailable: {
-    backgroundColor: '#ECFDF5',
+    backgroundColor: '#D1FAE5',
   },
   statusBooked: {
-    backgroundColor: '#FEF2F2',
+    backgroundColor: '#FEE2E2',
   },
   statusPillText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#1F2937',
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#059669',
   },
+  statusPillBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusPillBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  statusStarted: { backgroundColor: '#D1FAE5' },
+  statusEnded: { backgroundColor: '#FEE2E2' },
+  statusPending: { backgroundColor: '#F3F4F6' },
+  statusStartedText: { color: '#059669', fontSize: 12, fontWeight: '700' },
+  statusEndedText: { color: '#DC2626', fontSize: 12, fontWeight: '700' },
+  statusPendingText: { color: '#6B7280', fontSize: 12, fontWeight: '700' },
 });
 
 export default DoctorDashboard;
