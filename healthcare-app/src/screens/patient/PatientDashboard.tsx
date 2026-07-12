@@ -415,9 +415,23 @@ const PatientDashboard = () => {
   const navigation = useNavigation<PatientDashboardProp>();
   const isLoggingOut = useRef(false);
   const { token } = useAuth();
-  const [patientName, setPatientName] = useState('Patient');
-  const [patientFullName, setPatientFullName] = useState('Patient Name');
-  const [patientEmail, setPatientEmail] = useState('patient@example.com');
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 12) {
+      return 'Good Morning 👋';
+    } else if (hour >= 12 && hour < 17) {
+      return 'Good Afternoon ☀️';
+    } else if (hour >= 17 && hour < 22) {
+      return 'Good Evening 🌆';
+    } else {
+      return 'Good Night 🌙';
+    }
+  };
+
+  const [patientName, setPatientName] = useState('Sanjeewa');
+  const [patientFullName, setPatientFullName] = useState('Sanjeewa');
+  const [patientEmail, setPatientEmail] = useState('sanjeewa@example.com');
   const [patientPhoto, setPatientPhoto] = useState('');
   const [activeAppointmentTab, setActiveAppointmentTab] = useState<'Doctor' | 'Lab'>('Doctor');
 
@@ -826,7 +840,7 @@ const PatientDashboard = () => {
               </TouchableOpacity>
 
               <View style={styles.headerTextContainer}>
-                <Text style={styles.greeting} numberOfLines={1}>Hello, {patientName} 👋</Text>
+                <Text style={styles.greeting} numberOfLines={1}>Hello! {patientName} 👋</Text>
                 <Text style={styles.subGreeting}>Take care of your health</Text>
               </View>
 

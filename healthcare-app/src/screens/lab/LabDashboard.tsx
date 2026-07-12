@@ -43,6 +43,20 @@ const LabDashboard = () => {
   );
 
   const { role, token } = useAuth();
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 12) {
+      return 'Good Morning 👋';
+    } else if (hour >= 12 && hour < 17) {
+      return 'Good Afternoon ☀️';
+    } else if (hour >= 17 && hour < 22) {
+      return 'Good Evening 🌆';
+    } else {
+      return 'Good Night 🌙';
+    }
+  };
+
   const [selectedLab, setSelectedLab] = useState<any>(null);
   const [userName, setUserName] = useState('');
   const [department, setDepartment] = useState('');
@@ -212,7 +226,7 @@ const LabDashboard = () => {
         <LinearGradient colors={COLORS.screenHeaderGradient as any} style={styles.headerGradient}>
           <View style={styles.headerContent}>
             <View>
-              <Text style={styles.welcomeText}>Hello {firstName} 👋</Text>
+              <Text style={styles.welcomeText}>{getGreeting()} {firstName}</Text>
               <Text style={styles.headerTitle}>{role === 'nurse' ? 'Nurse Portal' : 'Lab Portal'}</Text>
             </View>
             <View style={styles.headerActions}>

@@ -548,6 +548,10 @@ export const getSystemStats = async (req, res) => {
     const totalUsers = await User.countDocuments();
     const totalPatients = await User.countDocuments({ role: 'patient' });
     const totalDoctors = await User.countDocuments({ role: 'doctor' });
+    const approvedDoctors = await User.countDocuments({ 
+      role: 'doctor', 
+      status: { $in: ['approved', 'active', 'verified'] } 
+    });
     const totalNurses = await User.countDocuments({ role: 'nurse' });
     const totalAppointments = await Appointment.countDocuments();
     const totalLabBookings = await LabBooking.countDocuments();
@@ -558,6 +562,7 @@ export const getSystemStats = async (req, res) => {
         users: totalUsers,
         patients: totalPatients,
         doctors: totalDoctors,
+        approvedDoctors: approvedDoctors,
         nurses: totalNurses,
         appointments: totalAppointments + totalLabBookings,
         labBookings: totalLabBookings

@@ -789,7 +789,6 @@ const getSchedule = async (req, res, next) => {
     const slots = await LabSchedule.find({
       lab: resolvedLabId,
       date: { $gte: dayStart, $lte: dayEnd },
-      isActive: true,
     }).sort({ startTime: 1 });
 
     const enriched = await Promise.all(
@@ -882,7 +881,7 @@ const updateScheduleSlot = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Invalid slotId' });
     }
 
-    const allowedUpdates = ['startTime', 'endTime', 'maxPatients', 'nurse', 'room', 'type', 'isActive'];
+    const allowedUpdates = ['date', 'startTime', 'endTime', 'maxPatients', 'nurse', 'room', 'type', 'isActive'];
     const updates = {};
     for (const key of allowedUpdates) {
       if (req.body[key] !== undefined) updates[key] = req.body[key];
@@ -921,10 +920,10 @@ const deleteScheduleSlot = async (req, res, next) => {
       });
     }
 
-    const slot = await LabSchedule.findByIdAndUpdate(slotId, { isActive: false }, { new: true });
+    const slot = await LabSchedule.findByIdAndDelete(slotId);
     if (!slot) return res.status(404).json({ success: false, message: 'Schedule slot not found' });
 
-    res.status(200).json({ success: true, message: 'Schedule slot deactivated' });
+    res.status(200).json({ success: true, message: 'Schedule slot removed successfully' });
   } catch (err) {
     next(err);
   }

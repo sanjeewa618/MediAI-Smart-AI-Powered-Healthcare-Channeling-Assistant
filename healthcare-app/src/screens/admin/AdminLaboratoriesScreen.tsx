@@ -246,6 +246,7 @@ const AdminLaboratoriesScreen = () => {
       setSlotEditorVisible(false);
       setEditingSlot(null);
       await fetchSlots(selectedLab._id, selectedDate);
+      void fetchLabs();
       Alert.alert('Success', editingSlot ? 'Schedule slot updated.' : 'Schedule slot created.');
     } catch (error) {
       console.error('Save slot error:', error);
@@ -270,6 +271,7 @@ const AdminLaboratoriesScreen = () => {
         throw new Error(data?.message || 'Failed to update slot');
       }
       await fetchSlots(selectedLab?._id || '', selectedDate);
+      void fetchLabs();
       Alert.alert('Success', 'Schedule slot updated.');
     } catch (error) {
       console.error('Toggle slot error:', error);
@@ -292,6 +294,7 @@ const AdminLaboratoriesScreen = () => {
         throw new Error(data?.message || 'Failed to deactivate slot');
       }
       await fetchSlots(selectedLab?._id || '', selectedDate);
+      void fetchLabs();
       Alert.alert('Success', 'Schedule slot deactivated.');
     } catch (error) {
       console.error('Delete slot error:', error);
