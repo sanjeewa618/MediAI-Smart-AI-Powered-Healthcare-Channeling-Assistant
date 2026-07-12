@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, Dimensions, Animated, PanResponder, Pressable, StatusBar, Modal, BackHandler, Easing } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, Dimensions, Animated, PanResponder, Pressable, StatusBar, Modal, BackHandler, Easing, Alert } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import { Search, Calendar, User, FileText, Activity, MoreHorizontal, Home, Heart, Shield, MessageCircle, FileEdit, FlaskConical, ChevronRight, Baby, Droplets, Sparkles, Plus, Bell, LogOut, Pill, Truck, Settings, X, LifeBuoy, Stethoscope, Dna, Brain, Bone, Eye, Smile, Wallet, Clock, AlertCircle, Hourglass, Users, RefreshCw, CheckCircle, XCircle } from 'lucide-react-native';
 import BottomNavBar from '../../components/BottomNavBar';
@@ -92,12 +92,14 @@ const QueueAppointmentCard = ({
   appointment,
   queueInfo,
   onPress,
-  lastRefresh
+  lastRefresh,
+  onRequestAdmin
 }: {
   appointment: any;
   queueInfo?: any;
   onPress: () => void;
   lastRefresh?: Date | null;
+  onRequestAdmin?: (id: string) => void;
 }) => {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
@@ -130,17 +132,39 @@ const QueueAppointmentCard = ({
   const estimatedWait = queueInfo?.estimatedWaitMinutes ?? 0;
   const isYourTurn = patientsAhead === 0;
 
-  const waitHours = Math.floor(estimatedWait / 60);
-  const waitMinutes = estimatedWait % 60;
-  const waitLabel = estimatedWait === 0
-    ? "It's your turn!"
-    : waitHours > 0
-      ? `~${waitHours}h ${waitMinutes}m wait`
-      : `~${waitMinutes}m wait`;
+  let waitLabel = "It's your turn!";
+  if (estimatedWait > 0) {
+    const waitHours = Math.floor(estimatedWait / 60);
+    const waitMinutes = estimatedWait % 60;
+    waitLabel = waitHours > 0 ? `~${waitHours}h ${waitMinutes}m wait` : `~${waitMinutes}m wait`;
+  }
+
+  let statusText = waitLabel;
+  let statusColor = isYourTurn ? '#10B981' : patientsAhead <= 2 ? '#F59E0B' : COLORS.primary;
+  let statusBg = isYourTurn ? '#D1FAE5' : patientsAhead <= 2 ? '#FEF3C7' : '#F3F0FF';
+  let showRequestBtn = false;
+
+  const rawStatus = appointment?.status?.toLowerCase();
+  if (rawStatus === 'started') {
+    statusText = "The queue got started";
+    statusBg = '#FEF9C3';
+    statusColor = '#CA8A04';
+  } else if (rawStatus === 'ready') {
+    statusText = "Next your chance";
+    statusBg = '#D1FAE5';
+    statusColor = '#059669';
+  } else if (rawStatus === 'in') {
+    statusText = "Please come in";
+    statusBg = '#DBEAFE';
+    statusColor = '#2563EB';
+  } else if (rawStatus === 'skipped') {
+    statusText = "You are skipped";
+    statusBg = '#FEE2E2';
+    statusColor = '#DC2626';
+    showRequestBtn = true;
+  }
 
   const isLab = !!appointment?.testName;
-  const statusColor = isYourTurn ? '#10B981' : patientsAhead <= 2 ? '#F59E0B' : COLORS.primary;
-  const statusBg = isYourTurn ? '#D1FAE5' : patientsAhead <= 2 ? '#FEF3C7' : '#F3F0FF';
   const dateLabel = appointment?.date ? moment(appointment.date).format('ddd, DD MMM YYYY') : '';
   const timeLabel = appointment?.timeSlot || '';
   const displayName = isLab ? appointment.testName : (appointment?.doctor?.name || 'Doctor');
@@ -229,8 +253,15 @@ const QueueAppointmentCard = ({
         {/* Estimated Wait Banner */}
         <View style={[styles.waitBanner, { backgroundColor: statusBg }]}>
           <Hourglass size={14} color={statusColor} />
-          <Text style={[styles.waitBannerText, { color: statusColor }]}>{waitLabel}</Text>
-          {lastRefresh && (
+          <Text style={[styles.waitBannerText, { color: statusColor }]}>{statusText}</Text>
+          {showRequestBtn && onRequestAdmin ? (
+            <TouchableOpacity 
+              style={{ backgroundColor: '#DC2626', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}
+              onPress={() => onRequestAdmin(appointment._id)}
+            >
+              <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>Request Next In</Text>
+            </TouchableOpacity>
+          ) : lastRefresh && (
             <Text style={styles.refreshLabel}>
               · Updated {moment(lastRefresh).format('HH:mm:ss')}
             </Text>
@@ -428,6 +459,25 @@ const PatientDashboard = () => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [todayCompletedCount, setTodayCompletedCount] = useState(0);
   const [todayCancelledCount, setTodayCancelledCount] = useState(0);
+
+  const handleRequestAdmin = async (appointmentId: string) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/patient/request-next-in/${appointmentId}`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setRefreshTrigger(prev => prev + 1);
+        Alert.alert('Success', 'Request sent to admin successfully');
+      } else {
+        Alert.alert('Error', data.message || 'Failed to send request');
+      }
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Error', 'Server error');
+    }
+  };
 
   // Lab Availability
   const [labCategories, setLabCategories] = useState<any[]>([]);
@@ -1054,6 +1104,7 @@ const PatientDashboard = () => {
                       queueInfo={liveQueue.find((q) => q.appointmentId === appt._id)}
                       onPress={() => navigation.navigate('PatientAppointments')}
                       lastRefresh={lastQueueRefresh}
+                      onRequestAdmin={handleRequestAdmin}
                     />
                   </View>
                 ))}
@@ -1073,6 +1124,7 @@ const PatientDashboard = () => {
                       queueInfo={liveQueue.find((q) => q.appointmentId === appt._id)}
                       onPress={() => navigation.navigate('PatientAppointments')}
                       lastRefresh={lastQueueRefresh}
+                      onRequestAdmin={handleRequestAdmin}
                     />
                   </View>
                 ))}
