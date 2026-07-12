@@ -266,6 +266,95 @@ const AdminAppointmentsScreen = () => {
     }
   };
 
+  // PDF Receipt Generation for Doctor Bookings
+  const handleDownloadDoctorReceipt = async (appt: any) => {
+    try {
+      const formattedDate = moment(appt.date).format('DD MMMM YYYY');
+      const timeStr = appt.timeSlot || appt.time || 'N/A';
+      
+      const htmlContent = `
+        <html>
+          <body style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 30px; color: #1F2937;">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <h1 style="color: #6366f1; margin-bottom: 5px;">MediAI Smart Channeling</h1>
+              <p style="color: #6B7280; margin-top: 0; font-size: 14px;">Doctor Appointment E-Receipt</p>
+              
+              <!-- Payment Status Badge -->
+              <div style="margin-top: 10px; margin-bottom: 10px;">
+                <span style="display: inline-block; padding: 6px 16px; background-color: #D1FAE5; color: #065F46; font-weight: bold; border-radius: 20px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">
+                  PAID
+                </span>
+              </div>
+
+              <div style="display: inline-block; padding: 6px 12px; background-color: #EEF2FF; color: #4F46E5; font-weight: bold; border-radius: 20px; font-size: 14px; margin-top: 5px;">
+                Booking ID: #${appt._id ? appt._id.slice(-6).toUpperCase() : '9824X'}
+              </div>
+            </div>
+            
+            <hr style="border: 0; border-top: 1px solid #E5E7EB; margin-bottom: 30px;" />
+            
+            <h3 style="color: #6366f1; border-bottom: 2px solid #EEF2FF; padding-bottom: 8px;">Patient Information</h3>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #6B7280; width: 35%;"><strong>Patient Name</strong></td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #1F2937;">${appt.patient?.name || 'John Doe'}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #6B7280;"><strong>NIC / Passport</strong></td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #1F2937;">${appt.patient?.nic || 'N/A'}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #6B7280;"><strong>Mobile Number</strong></td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #1F2937;">${appt.patient?.phone || 'No phone number'}</td>
+              </tr>
+            </table>
+            
+            <h3 style="color: #6366f1; border-bottom: 2px solid #EEF2FF; padding-bottom: 8px;">Doctor & Appointment Details</h3>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #6B7280; width: 35%;"><strong>Doctor Name</strong></td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #1F2937; font-weight: bold;">${appt.doctor?.name || 'Dr. Not Assigned'}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #6B7280;"><strong>Specialty</strong></td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #1F2937;">${appt.doctor?.specialization || 'General Practitioner'}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #6B7280;"><strong>Date & Time</strong></td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #1F2937;">${formattedDate} at ${timeStr}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #6B7280;"><strong>Queue Number</strong></td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #6366f1; font-weight: bold; font-size: 16px;">Token #${appt.queueNumber || 1}</td>
+              </tr>
+            </table>
+
+            <div style="background-color: #F9FAFB; padding: 20px; border-radius: 12px; border: 1px solid #E5E7EB; text-align: right; margin-top: 20px;">
+              <span style="color: #6B7280; font-size: 14px; margin-right: 15px;">Total Consultation Fee Paid:</span>
+              <strong style="color: #6366f1; font-size: 20px;">LKR 2000.00</strong>
+            </div>
+            
+            <div style="text-align: center; margin-top: 50px; color: #9CA3AF; font-size: 12px;">
+              <p>Thank you for using MediAI. Please produce this receipt/e-token at the channeling center.</p>
+              <p style="margin-top: 5px;">MediAI Smart Healthcare Channeling Assistant &copy; 2026</p>
+            </div>
+          </body>
+        </html>
+      `;
+
+      const { uri } = await Print.printToFileAsync({ html: htmlContent });
+      
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri);
+      } else {
+        Alert.alert('Saved', 'Receipt saved to your documents.');
+      }
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Error', 'Failed to generate receipt PDF.');
+    }
+  };
+
   // Stats derived dynamically based on selectedType
   const stats = useMemo(() => {
     if (selectedType === 'doctor') {
@@ -516,46 +605,39 @@ const AdminAppointmentsScreen = () => {
                     <View style={styles.timeInfoRow}>
                       <View style={styles.infoCol}>
                         <Text style={styles.infoLabel}>Date</Text>
-                        <Text style={styles.infoVal}>{item.date}</Text>
+                        <Text style={styles.infoVal}>
+                          {moment(item.date).isValid() ? moment(item.date).format('YYYY-MM-DD') : item.date}
+                        </Text>
                       </View>
                       <View style={styles.infoCol}>
                         <Text style={styles.infoLabel}>Time</Text>
-                        <Text style={styles.infoVal}>{item.time}</Text>
+                        <Text style={styles.infoVal}>{item.timeSlot || item.time || 'N/A'}</Text>
+                      </View>
+                      <View style={styles.infoCol}>
+                        <Text style={styles.infoLabel}>Token</Text>
+                        <Text style={[styles.infoVal, { color: COLORS.primary }]}>Token  #  {item.queueNumber || 1}</Text>
                       </View>
                     </View>
                   </View>
 
                   {/* Doctor Card Status Actions */}
-                  {item.status === 'pending' && (
-                    <View style={styles.cardActions}>
-                      <TouchableOpacity 
-                        style={[styles.actionBtn, styles.btnConfirm]}
-                        onPress={() => handleUpdateStatus(item._id, 'confirmed')}
-                      >
-                        <Check size={16} color="#FFF" />
-                        <Text style={styles.actionBtnText}>Confirm</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity 
-                        style={[styles.actionBtn, styles.btnCancel]}
-                        onPress={() => handleUpdateStatus(item._id, 'cancelled')}
-                      >
-                        <X size={16} color="#FFF" />
-                        <Text style={styles.actionBtnText}>Cancel</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-
-                  {(item.status === 'confirmed' || item.status === 'scheduled') && (
-                    <View style={styles.cardActions}>
-                      <TouchableOpacity 
-                        style={[styles.actionBtn, styles.btnComplete]}
-                        onPress={() => handleUpdateStatus(item._id, 'completed')}
-                      >
-                        <CheckCircle size={16} color="#FFF" />
-                        <Text style={styles.actionBtnText}>Complete</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
+                  <View style={styles.cardActions}>
+                    <TouchableOpacity 
+                      style={[styles.actionBtn, { backgroundColor: COLORS.primaryLight }]}
+                      onPress={() => {
+                        setSelectedAppt(item);
+                        setReceiptModalVisible(true);
+                      }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: COLORS.primary }}>View Receipt</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.actionBtn, { backgroundColor: '#EFF6FF' }]}
+                      onPress={() => handleDownloadDoctorReceipt(item)}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#2563EB' }}>Download PDF</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               );
             } else {
@@ -689,91 +771,155 @@ const AdminAppointmentsScreen = () => {
                 <X size={20} color={COLORS.textHeader} />
               </TouchableOpacity>
             </View>
-
             {selectedAppt != null && (
               <ScrollView showsVerticalScrollIndicator={false}>
-                {/* Receipt Card Visual Layout */}
-                <View style={styles.receiptCardLayout}>
-                  {/* Status Banner */}
-                  <View style={[styles.receiptStatusBanner, { backgroundColor: selectedAppt.paymentMethod === 'Cash' ? '#FEF3C7' : '#D1FAE5' }]}>
-                    <Text style={[styles.receiptStatusText, { color: selectedAppt.paymentMethod === 'Cash' ? '#B45309' : '#065F46' }]}>
-                      {selectedAppt.paymentMethod === 'Cash' ? 'PAID AT HOSPITAL' : 'PAID'}
-                    </Text>
-                  </View>
-
-                  <Text style={styles.receiptTitleCenter}>MediAI Smart Channeling</Text>
-                  <Text style={styles.receiptSubCenter}>Lab Appointment E-Receipt</Text>
-                  <Text style={styles.receiptRefCenter}>Ref No: {selectedAppt.bookingRef}</Text>
-
-                  <View style={styles.receiptDividerLine} />
-
-                  <View style={styles.receiptDetailsSection}>
-                    <View style={styles.receiptDetailRow}>
-                      <Text style={styles.receiptDetailLabel}>Patient Name</Text>
-                      <Text style={styles.receiptDetailValue}>{selectedAppt.patient?.fullName}</Text>
-                    </View>
-                    <View style={styles.receiptDetailRow}>
-                      <Text style={styles.receiptDetailLabel}>NIC / Passport</Text>
-                      <Text style={styles.receiptDetailValue}>{selectedAppt.patient?.nic}</Text>
-                    </View>
-                    <View style={styles.receiptDetailRow}>
-                      <Text style={styles.receiptDetailLabel}>Phone Number</Text>
-                      <Text style={styles.receiptDetailValue}>{selectedAppt.patient?.mobile}</Text>
-                    </View>
-                    <View style={styles.receiptDetailRow}>
-                      <Text style={styles.receiptDetailLabel}>Gender</Text>
-                      <Text style={styles.receiptDetailValue}>{selectedAppt.patient?.gender}</Text>
-                    </View>
-
-                    <View style={styles.receiptDividerLine} />
-
-                    <View style={styles.receiptDetailRow}>
-                      <Text style={styles.receiptDetailLabel}>Lab Center</Text>
-                      <Text style={styles.receiptDetailValue}>{selectedAppt.lab?.name}</Text>
-                    </View>
-                    <View style={styles.receiptDetailRow}>
-                      <Text style={styles.receiptDetailLabel}>Lab Test</Text>
-                      <Text style={styles.receiptDetailValue}>{selectedAppt.lab?.description || 'Lab Test'}</Text>
-                    </View>
-                    <View style={styles.receiptDetailRow}>
-                      <Text style={styles.receiptDetailLabel}>Date & Time</Text>
-                      <Text style={styles.receiptDetailValue}>
-                        {moment(selectedAppt.appointmentDate).format('YYYY-MM-DD')} at {selectedAppt.scheduleSlot?.startTime || 'N/A'}
+                {selectedAppt.doctor ? (
+                  /* Doctor Receipt Card Visual Layout */
+                  <View style={styles.receiptCardLayout}>
+                    {/* Status Banner */}
+                    <View style={[styles.receiptStatusBanner, { backgroundColor: '#D1FAE5' }]}>
+                      <Text style={[styles.receiptStatusText, { color: '#065F46' }]}>
+                        PAID
                       </Text>
                     </View>
-                    <View style={styles.receiptDetailRow}>
-                      <Text style={styles.receiptDetailLabel}>Assigned Nurse</Text>
-                      <Text style={styles.receiptDetailValue}>Nurse {selectedAppt.scheduleSlot?.nurse || 'Assigned Nurse'}</Text>
-                    </View>
-                    <View style={styles.receiptDetailRow}>
-                      <Text style={styles.receiptDetailLabel}>Queue Token</Text>
-                      <Text style={[styles.receiptDetailValue, { color: COLORS.primary, fontWeight: '800' }]}>Token {selectedAppt.queueToken || 1}</Text>
-                    </View>
-                    <View style={styles.receiptDetailRow}>
-                      <Text style={styles.receiptDetailLabel}>Collection Method</Text>
-                      <Text style={styles.receiptDetailValue}>{selectedAppt.collectionMethod}</Text>
-                    </View>
-                    {selectedAppt.collectionMethod === 'Home' && (
-                      <View style={styles.receiptDetailRow}>
-                        <Text style={styles.receiptDetailLabel}>Home Address</Text>
-                        <Text style={styles.receiptDetailValue}>{selectedAppt.homeAddress}</Text>
-                      </View>
-                    )}
+
+                    <Text style={styles.receiptTitleCenter}>MediAI Smart Channeling</Text>
+                    <Text style={styles.receiptSubCenter}>Doctor Appointment E-Receipt</Text>
+                    <Text style={styles.receiptRefCenter}>Ref No: #{selectedAppt._id ? selectedAppt._id.slice(-6).toUpperCase() : '9824X'}</Text>
 
                     <View style={styles.receiptDividerLine} />
 
-                    <View style={styles.receiptPriceRow}>
-                      <Text style={styles.receiptPriceLabel}>Total Price</Text>
-                      <Text style={styles.receiptPriceValue}>{selectedAppt.lab?.price || 'LKR 1500'}</Text>
+                    <View style={styles.receiptDetailsSection}>
+                      <View style={styles.receiptDetailRow}>
+                        <Text style={styles.receiptDetailLabel}>Patient Name</Text>
+                        <Text style={styles.receiptDetailValue}>{selectedAppt.patient?.name || 'John Doe'}</Text>
+                      </View>
+                      <View style={styles.receiptDetailRow}>
+                        <Text style={styles.receiptDetailLabel}>NIC / Passport</Text>
+                        <Text style={styles.receiptDetailValue}>{selectedAppt.patient?.nic || 'N/A'}</Text>
+                      </View>
+                      <View style={styles.receiptDetailRow}>
+                        <Text style={styles.receiptDetailLabel}>Phone Number</Text>
+                        <Text style={styles.receiptDetailValue}>{selectedAppt.patient?.phone || 'No phone number'}</Text>
+                      </View>
+
+                      <View style={styles.receiptDividerLine} />
+
+                      <View style={styles.receiptDetailRow}>
+                        <Text style={styles.receiptDetailLabel}>Doctor Name</Text>
+                        <Text style={styles.receiptDetailValue}>{selectedAppt.doctor?.name || 'Dr. Not Assigned'}</Text>
+                      </View>
+                      <View style={styles.receiptDetailRow}>
+                        <Text style={styles.receiptDetailLabel}>Specialty</Text>
+                        <Text style={styles.receiptDetailValue}>{selectedAppt.doctor?.specialization || 'General Practitioner'}</Text>
+                      </View>
+                      <View style={styles.receiptDetailRow}>
+                        <Text style={styles.receiptDetailLabel}>Date & Time</Text>
+                        <Text style={styles.receiptDetailValue}>
+                          {moment(selectedAppt.date).format('YYYY-MM-DD')} at {selectedAppt.timeSlot || selectedAppt.time || 'N/A'}
+                        </Text>
+                      </View>
+                      <View style={styles.receiptDetailRow}>
+                        <Text style={styles.receiptDetailLabel}>Queue Number</Text>
+                        <Text style={[styles.receiptDetailValue, { color: COLORS.primary, fontWeight: '800' }]}>Token {selectedAppt.queueNumber || 1}</Text>
+                      </View>
+
+                      <View style={styles.receiptDividerLine} />
+
+                      <View style={styles.receiptPriceRow}>
+                        <Text style={styles.receiptPriceLabel}>Total Price</Text>
+                        <Text style={styles.receiptPriceValue}>LKR 2000.00</Text>
+                      </View>
                     </View>
                   </View>
-                </View>
+                ) : (
+                  /* Lab Receipt Card Visual Layout */
+                  <View style={styles.receiptCardLayout}>
+                    {/* Status Banner */}
+                    <View style={[styles.receiptStatusBanner, { backgroundColor: selectedAppt.paymentMethod === 'Cash' ? '#FEF3C7' : '#D1FAE5' }]}>
+                      <Text style={[styles.receiptStatusText, { color: selectedAppt.paymentMethod === 'Cash' ? '#B45309' : '#065F46' }]}>
+                        {selectedAppt.paymentMethod === 'Cash' ? 'PAID AT HOSPITAL' : 'PAID'}
+                      </Text>
+                    </View>
+
+                    <Text style={styles.receiptTitleCenter}>MediAI Smart Channeling</Text>
+                    <Text style={styles.receiptSubCenter}>Lab Appointment E-Receipt</Text>
+                    <Text style={styles.receiptRefCenter}>Ref No: {selectedAppt.bookingRef}</Text>
+
+                    <View style={styles.receiptDividerLine} />
+
+                    <View style={styles.receiptDetailsSection}>
+                      <View style={styles.receiptDetailRow}>
+                        <Text style={styles.receiptDetailLabel}>Patient Name</Text>
+                        <Text style={styles.receiptDetailValue}>{selectedAppt.patient?.fullName}</Text>
+                      </View>
+                      <View style={styles.receiptDetailRow}>
+                        <Text style={styles.receiptDetailLabel}>NIC / Passport</Text>
+                        <Text style={styles.receiptDetailValue}>{selectedAppt.patient?.nic}</Text>
+                      </View>
+                      <View style={styles.receiptDetailRow}>
+                        <Text style={styles.receiptDetailLabel}>Phone Number</Text>
+                        <Text style={styles.receiptDetailValue}>{selectedAppt.patient?.mobile}</Text>
+                      </View>
+                      <View style={styles.receiptDetailRow}>
+                        <Text style={styles.receiptDetailLabel}>Gender</Text>
+                        <Text style={styles.receiptDetailValue}>{selectedAppt.patient?.gender}</Text>
+                      </View>
+
+                      <View style={styles.receiptDividerLine} />
+
+                      <View style={styles.receiptDetailRow}>
+                        <Text style={styles.receiptDetailLabel}>Lab Center</Text>
+                        <Text style={styles.receiptDetailValue}>{selectedAppt.lab?.name}</Text>
+                      </View>
+                      <View style={styles.receiptDetailRow}>
+                        <Text style={styles.receiptDetailLabel}>Lab Test</Text>
+                        <Text style={styles.receiptDetailValue}>{selectedAppt.lab?.description || 'Lab Test'}</Text>
+                      </View>
+                      <View style={styles.receiptDetailRow}>
+                        <Text style={styles.receiptDetailLabel}>Date & Time</Text>
+                        <Text style={styles.receiptDetailValue}>
+                          {moment(selectedAppt.appointmentDate).format('YYYY-MM-DD')} at {selectedAppt.scheduleSlot?.startTime || 'N/A'}
+                        </Text>
+                      </View>
+                      <View style={styles.receiptDetailRow}>
+                        <Text style={styles.receiptDetailLabel}>Assigned Nurse</Text>
+                        <Text style={styles.receiptDetailValue}>Nurse {selectedAppt.scheduleSlot?.nurse || 'Assigned Nurse'}</Text>
+                      </View>
+                      <View style={styles.receiptDetailRow}>
+                        <Text style={styles.receiptDetailLabel}>Queue Token</Text>
+                        <Text style={[styles.receiptDetailValue, { color: COLORS.primary, fontWeight: '800' }]}>Token {selectedAppt.queueToken || 1}</Text>
+                      </View>
+                      <View style={styles.receiptDetailRow}>
+                        <Text style={styles.receiptDetailLabel}>Collection Method</Text>
+                        <Text style={styles.receiptDetailValue}>{selectedAppt.collectionMethod}</Text>
+                      </View>
+                      {selectedAppt.collectionMethod === 'Home' && (
+                        <View style={styles.receiptDetailRow}>
+                          <Text style={styles.receiptDetailLabel}>Home Address</Text>
+                          <Text style={styles.receiptDetailValue}>{selectedAppt.homeAddress}</Text>
+                        </View>
+                      )}
+
+                      <View style={styles.receiptDividerLine} />
+
+                      <View style={styles.receiptPriceRow}>
+                        <Text style={styles.receiptPriceLabel}>Total Price</Text>
+                        <Text style={styles.receiptPriceValue}>{selectedAppt.lab?.price || 'LKR 1500'}</Text>
+                      </View>
+                    </View>
+                  </View>
+                )}
 
                 <View style={[styles.modalBtnColumn, { marginTop: 20 }]}>
                   <TouchableOpacity 
                     style={styles.actionBtn}
                     onPress={() => {
-                      handleDownloadLabReceipt(selectedAppt);
+                      if (selectedAppt.doctor) {
+                        handleDownloadDoctorReceipt(selectedAppt);
+                      } else {
+                        handleDownloadLabReceipt(selectedAppt);
+                      }
                       setReceiptModalVisible(false);
                     }}
                   >
