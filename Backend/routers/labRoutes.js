@@ -17,7 +17,7 @@ router.get('/', getLabs);
 router.use(protect);
 
 router.get('/dashboard/stats', authorizeRoles('nurse', 'lab', 'admin'), getDashboardStats);
-router.get('/bookings', authorizeRoles('nurse', 'lab', 'admin'), listBookings);
+router.get('/bookings', authorizeRoles('patient', 'nurse', 'lab', 'admin'), listBookings);
 router.post('/bookings', authorizeRoles('patient'), createBooking);
 router.get('/bookings/:bookingRef', authorizeRoles('patient', 'nurse', 'lab', 'admin'), getBookingByRef);
 router.patch('/bookings/:id/status', authorizeRoles('nurse', 'lab', 'admin'), updateBookingStatus);

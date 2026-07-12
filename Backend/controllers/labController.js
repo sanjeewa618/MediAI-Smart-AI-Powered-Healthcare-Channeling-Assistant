@@ -528,7 +528,9 @@ const listBookings = async (req, res, next) => {
     const { labId, status, date, patientName, page = 1, limit = 20 } = req.query;
     const filter = {};
 
-    if (labId) {
+    if (req.user && req.user.role === 'patient') {
+      filter.patientUser = req.user._id;
+    } else if (labId) {
       if (!mongoose.isValidObjectId(labId)) {
         return res.status(400).json({ success: false, message: 'Invalid labId' });
       }

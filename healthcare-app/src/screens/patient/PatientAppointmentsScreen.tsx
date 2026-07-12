@@ -48,6 +48,7 @@ const PatientAppointmentsScreen = () => {
   const [activeCategory, setActiveCategory] = useState<'Doctor' | 'Lab'>('Doctor');
   const [activeTab, setActiveTab] = useState('Upcoming');
   const [doctorAppointments, setDoctorAppointments] = useState<any[]>([]);
+  const [labAppointments, setLabAppointments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useFocusEffect(
@@ -82,19 +83,57 @@ const PatientAppointmentsScreen = () => {
           }
         } catch (err) {
           console.error('Failed to fetch appointments:', err);
-        } finally {
-          setLoading(false);
         }
       };
 
+      const fetchLabAppointments = async () => {
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/labs/bookings`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          const data = await response.json();
+          
+          if (response.ok && data.success) {
+            const formatted = data.data.map((app: any) => {
+              let mappedStatus = 'Upcoming';
+              if (app.status === 'Completed') mappedStatus = 'Completed';
+              if (app.status === 'Cancelled') mappedStatus = 'Cancelled';
+              
+              return {
+                id: app._id,
+                name: app.lab?.name || 'General Lab',
+                lab: app.lab?.name || 'General Lab',
+                location: app.lab?.floor || 'Main Floor',
+                date: moment(app.appointmentDate).format('DD MMM YYYY'),
+                time: app.scheduleSlot ? `${app.scheduleSlot.startTime} - ${app.scheduleSlot.endTime}` : 'TBD',
+                status: mappedStatus,
+                exactStatus: app.status,
+                price: `Token: #${app.queueToken}`
+              };
+            });
+            setLabAppointments(formatted);
+          }
+        } catch (err) {
+          console.error('Failed to fetch lab appointments:', err);
+        }
+      };
+
+      const loadAll = async () => {
+        setLoading(true);
+        await Promise.all([fetchAppointments(), fetchLabAppointments()]);
+        setLoading(false);
+      };
+
       if (token) {
-        fetchAppointments();
+        loadAll();
       }
     }, [token])
   );
 
   const getFilteredAppointments = () => {
-    const data = activeCategory === 'Doctor' ? doctorAppointments : mockLabAppointments;
+    const data = activeCategory === 'Doctor' ? doctorAppointments : labAppointments;
     return data.filter(item => item.status === activeTab);
   };
 
@@ -157,7 +196,7 @@ const PatientAppointmentsScreen = () => {
         <View style={[styles.statusBadge, { backgroundColor: activeTab === 'Upcoming' ? '#F3F0FF' : activeTab === 'Completed' ? '#ECFDF5' : '#FEF2F2' }]}>
           {getStatusIcon(item.status)}
           <Text style={[styles.statusBadgeText, { color: activeTab === 'Upcoming' ? COLORS.primary : activeTab === 'Completed' ? '#10B981' : '#EF4444' }]}>
-            {item.status}
+            {item.exactStatus || item.status}
           </Text>
         </View>
       </View>

@@ -391,6 +391,7 @@ const PatientDashboard = () => {
   const [patientName, setPatientName] = useState('Patient');
   const [patientFullName, setPatientFullName] = useState('Patient Name');
   const [patientEmail, setPatientEmail] = useState('patient@example.com');
+  const [patientPhoto, setPatientPhoto] = useState('');
   const [activeAppointmentTab, setActiveAppointmentTab] = useState<'Doctor' | 'Lab'>('Doctor');
   
   const [upcomingDoctorAppointments, setUpcomingDoctorAppointments] = useState<any[]>([]);
@@ -499,28 +500,31 @@ const PatientDashboard = () => {
     }, [token])
   );
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
+  useFocusEffect(
+    useCallback(() => {
+      const fetchProfile = async () => {
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          const data = await response.json();
+          if (response.ok && data) {
+            setPatientName(data.name ? data.name.split(' ')[0] : 'Patient');
+            setPatientFullName(data.name || 'Patient Name');
+            setPatientEmail(data.email || 'patient@example.com');
+            setPatientPhoto(data.photo || '');
           }
-        });
-        const data = await response.json();
-        if (response.ok && data) {
-          setPatientName(data.name ? data.name.split(' ')[0] : 'Patient');
-          setPatientFullName(data.name || 'Patient Name');
-          setPatientEmail(data.email || 'patient@example.com');
+        } catch (err) {
+          console.error('Failed to fetch profile:', err);
         }
-      } catch (err) {
-        console.error('Failed to fetch profile:', err);
+      };
+      if (token) {
+        fetchProfile();
       }
-    };
-    if (token) {
-      fetchProfile();
-    }
-  }, [token]);
+    }, [token])
+  );
 
 
 
@@ -1181,7 +1185,7 @@ const PatientDashboard = () => {
               </TouchableOpacity>
 
               <Image
-                source={require('../../../assets/signup-image2.png')}
+                source={patientPhoto ? { uri: `${API_BASE_URL}${patientPhoto}` } : require('../../../assets/signup-image2.png')}
                 style={styles.menuAvatar}
               />
               <Text style={styles.menuUserName}>{patientFullName}</Text>
