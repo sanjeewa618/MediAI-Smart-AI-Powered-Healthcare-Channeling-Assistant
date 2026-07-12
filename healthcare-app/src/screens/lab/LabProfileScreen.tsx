@@ -6,11 +6,12 @@ import {
 import {
   ChevronLeft, Bell, Edit2, Camera, Mail, Phone,
   MapPin, Calendar, Award, Clock, Shield, ChevronRight,
-  Star, Activity, FileText, LogOut, Settings, User, X
+  Star, Activity, FileText, LogOut, Settings, User, X, Trash2, Plus
 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as ImagePicker from 'expo-image-picker';
 import NurseBottomNavBar from '../../components/NurseBottomNavBar';
 import { useAuth } from '../../context/AuthContext';
 
@@ -23,13 +24,6 @@ const STATIC_PROFILE_DATA = {
   completedThisMonth: 48,
   certifications: ['BMLS Certified', 'Phlebotomy Expert', 'BLS Certified'],
 };
-
-const STATS = [
-  { label: 'Tests Done', value: '1,284', icon: Activity, color: COLORS.primary },
-  { label: 'This Month', value: '48', icon: Calendar, color: '#10B981' },
-  { label: 'Accuracy', value: '99.2%', icon: Shield, color: '#6366F1' },
-  { label: 'Rating', value: '4.8★', icon: Star, color: '#F59E0B' },
-];
 
 const MENU_ITEMS = [
   { icon: FileText, label: 'My Reports', sublabel: 'View submitted reports', color: COLORS.primary, bg: COLORS.primaryLight, screen: 'LabReports' },
@@ -55,9 +49,29 @@ const LabProfileScreen: React.FC = () => {
     experienceYears: '5',
     joined: 'March 15, 2021',
     shift: '08:00 AM – 04:00 PM',
+    photo: '',
+    certifications: [] as string[],
   });
 
   const [editModalVisible, setEditModalVisible] = useState(false);
+  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
+  const [certificationsModalVisible, setCertificationsModalVisible] = useState(false);
+
+  // Stats state
+  const [stats, setStats] = useState({
+    totalTestsDone: 0,
+    completedThisMonth: 0,
+    accuracy: '99.2%',
+    rating: '4.8★',
+  });
+
+  // Password fields state
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  // Certifications input state
+  const [newCertText, setNewCertText] = useState('');
 
   const fetchProfile = async () => {
     try {
@@ -77,7 +91,9 @@ const LabProfileScreen: React.FC = () => {
           staffId: data.staffId || 'NUR-2021-0047',
           experienceYears: data.experienceYears ? String(data.experienceYears) : '5',
           joined: data.createdAt ? new Date(data.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'March 15, 2021',
-          shift: '08:00 AM – 04:00 PM'
+          shift: '08:00 AM – 04:00 PM',
+          photo: data.photo || '',
+          certifications: data.certifications || [],
         });
       }
     } catch (err) {
@@ -85,9 +101,31 @@ const LabProfileScreen: React.FC = () => {
     }
   };
 
+  const fetchStats = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/nurse/profile/stats`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setStats({
+          totalTestsDone: data.data.totalTestsDone || 0,
+          completedThisMonth: data.data.completedThisMonth || 0,
+          accuracy: data.data.accuracy || '99.2%',
+          rating: (data.data.rating || '4.8') + '★',
+        });
+      }
+    } catch (err) {
+      console.error('Failed to fetch nurse stats:', err);
+    }
+  };
+
   useEffect(() => {
     if (token) {
       fetchProfile();
+      fetchStats();
     }
   }, [token]);
 
@@ -115,6 +153,159 @@ const LabProfileScreen: React.FC = () => {
     }
   };
 
+  const handlePickImage = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert('Permission required', 'Permission to access gallery is required!');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        await handleUploadAvatar(asset.uri);
+      }
+    } catch (error) {
+      console.error('Image pick error:', error);
+      Alert.alert('Error', 'Failed to pick image.');
+    }
+  };
+
+  const handleUploadAvatar = async (uri: string) => {
+    try {
+      const formData = new FormData();
+      const filename = uri.split('/').pop() || 'avatar.jpg';
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : `image/jpeg`;
+
+      formData.append('avatar', {
+        uri: Platform.OS === 'android' ? uri : uri.replace('file://', ''),
+        name: filename,
+        type: type,
+      } as any);
+
+      const response = await fetch(`${API_BASE_URL}/api/nurse/profile/upload-avatar`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setProfileInfo((prev) => ({ ...prev, photo: data.photo }));
+        Alert.alert('Success', 'Profile picture updated successfully!');
+        fetchProfile();
+      } else {
+        Alert.alert('Upload Failed', data.message || 'Could not upload profile picture.');
+      }
+    } catch (error) {
+      console.error('Avatar upload error:', error);
+      Alert.alert('Error', 'Something went wrong while uploading profile picture.');
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      Alert.alert('Error', 'Please fill in all password fields.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      Alert.alert('Error', 'New password and confirmation do not match.');
+      return;
+    }
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ currentPassword, newPassword })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        Alert.alert('Success', 'Password changed successfully!');
+        setPasswordModalVisible(false);
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+      } else {
+        Alert.alert('Error', data.message || 'Failed to change password.');
+      }
+    } catch (error) {
+      console.error('Password change error:', error);
+      Alert.alert('Error', 'Network error changing password.');
+    }
+  };
+
+  const handleAddCertification = async () => {
+    if (!newCertText.trim()) return;
+    const updatedCerts = [...profileInfo.certifications, newCertText.trim()];
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/nurse/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          ...profileInfo,
+          certifications: updatedCerts
+        })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setProfileInfo((prev) => ({ ...prev, certifications: updatedCerts }));
+        setNewCertText('');
+        Alert.alert('Success', 'Certification added successfully!');
+      } else {
+        Alert.alert('Error', data.message || 'Failed to add certification.');
+      }
+    } catch (error) {
+      console.error('Add cert error:', error);
+      Alert.alert('Error', 'Network error adding certification.');
+    }
+  };
+
+  const handleRemoveCertification = async (index: number) => {
+    const updatedCerts = profileInfo.certifications.filter((_, idx) => idx !== index);
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/nurse/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          ...profileInfo,
+          certifications: updatedCerts
+        })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setProfileInfo((prev) => ({ ...prev, certifications: updatedCerts }));
+        Alert.alert('Success', 'Certification removed.');
+      } else {
+        Alert.alert('Error', data.message || 'Failed to remove certification.');
+      }
+    } catch (error) {
+      console.error('Remove cert error:', error);
+      Alert.alert('Error', 'Network error removing certification.');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
@@ -134,8 +325,15 @@ const LabProfileScreen: React.FC = () => {
           {/* Avatar Section */}
           <View style={styles.avatarSection}>
             <View style={styles.avatarWrapper}>
-              <Image source={{ uri: STATIC_PROFILE_DATA.photo }} style={styles.avatar} />
-              <TouchableOpacity style={styles.cameraBtn}>
+              <Image 
+                source={{ 
+                  uri: profileInfo.photo 
+                    ? (profileInfo.photo.startsWith('http') ? profileInfo.photo : `${API_BASE_URL}${profileInfo.photo}`) 
+                    : STATIC_PROFILE_DATA.photo 
+                }} 
+                style={styles.avatar} 
+              />
+              <TouchableOpacity style={styles.cameraBtn} onPress={handlePickImage}>
                 <Camera size={16} color="#FFF" />
               </TouchableOpacity>
               {onDuty && <View style={styles.onDutyDot} />}
@@ -162,7 +360,12 @@ const LabProfileScreen: React.FC = () => {
 
         {/* Stats Row */}
         <View style={styles.statsRow}>
-          {STATS.map((stat, idx) => (
+          {[
+            { label: 'Tests Done', value: String(stats.totalTestsDone), icon: Activity, color: COLORS.primary },
+            { label: 'This Month', value: String(stats.completedThisMonth), icon: Calendar, color: '#10B981' },
+            { label: 'Accuracy', value: stats.accuracy, icon: Shield, color: '#6366F1' },
+            { label: 'Rating', value: stats.rating, icon: Star, color: '#F59E0B' },
+          ].map((stat, idx) => (
             <View key={idx} style={[styles.statCard, { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2 }]}>
               <View style={[styles.statIconBox, { backgroundColor: stat.color + '18' }]}>
                 <stat.icon size={16} color={stat.color} />
@@ -206,14 +409,24 @@ const LabProfileScreen: React.FC = () => {
 
         {/* Certifications */}
         <View style={[styles.certCard, { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2 }]}>
-          <Text style={styles.certTitle}>Certifications</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <Text style={styles.certTitle}>Certifications</Text>
+            <TouchableOpacity style={styles.editBtn} onPress={() => setCertificationsModalVisible(true)}>
+              <Plus size={12} color={COLORS.primary} />
+              <Text style={styles.editBtnText}>Manage</Text>
+            </TouchableOpacity>
+          </View>
           <View style={styles.certList}>
-            {STATIC_PROFILE_DATA.certifications.map((cert, idx) => (
-              <View key={idx} style={styles.certBadge}>
-                <Award size={12} color={COLORS.primary} />
-                <Text style={styles.certText}>{cert}</Text>
-              </View>
-            ))}
+            {profileInfo.certifications && profileInfo.certifications.length > 0 ? (
+              profileInfo.certifications.map((cert, idx) => (
+                <View key={idx} style={styles.certBadge}>
+                  <Award size={12} color={COLORS.primary} />
+                  <Text style={styles.certText}>{cert}</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={{ fontSize: 13, color: COLORS.textSecondary, fontStyle: 'italic' }}>No certifications added yet.</Text>
+            )}
           </View>
         </View>
 
@@ -239,7 +452,17 @@ const LabProfileScreen: React.FC = () => {
             <TouchableOpacity
               key={idx}
               style={[styles.menuItem, idx < MENU_ITEMS.length - 1 && styles.menuItemBorder]}
-              onPress={() => item.screen && navigation.navigate(item.screen)}
+              onPress={() => {
+                if (item.screen) {
+                  navigation.navigate(item.screen);
+                } else if (item.label === 'Privacy & Security') {
+                  setPasswordModalVisible(true);
+                } else if (item.label === 'Certifications') {
+                  setCertificationsModalVisible(true);
+                } else if (item.label === 'Account Settings') {
+                  setEditModalVisible(true);
+                }
+              }}
             >
               <View style={[styles.menuIconBox, { backgroundColor: item.bg }]}>
                 <item.icon size={18} color={item.color} />
@@ -345,6 +568,121 @@ const LabProfileScreen: React.FC = () => {
                 <Text style={styles.saveBtnText}>Save Changes</Text>
               </TouchableOpacity>
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Change Password Modal */}
+      <Modal visible={passwordModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContentSmall}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Change Password</Text>
+              <TouchableOpacity onPress={() => setPasswordModalVisible(false)} style={styles.modalCloseBtn}>
+                <X size={20} color="#1F2937" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView contentContainerStyle={styles.modalBody} showsVerticalScrollIndicator={false}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Current Password</Text>
+                <TextInput
+                  style={styles.input}
+                  value={currentPassword}
+                  onChangeText={setCurrentPassword}
+                  secureTextEntry
+                  placeholder="Enter current password"
+                />
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>New Password</Text>
+                <TextInput
+                  style={styles.input}
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  secureTextEntry
+                  placeholder="Enter new password"
+                />
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Confirm New Password</Text>
+                <TextInput
+                  style={styles.input}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry
+                  placeholder="Confirm new password"
+                />
+              </View>
+              <TouchableOpacity style={styles.saveBtn} onPress={handleChangePassword}>
+                <Text style={styles.saveBtnText}>Update Password</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Certifications Management Modal */}
+      <Modal visible={certificationsModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContentSmall}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Manage Certifications</Text>
+              <TouchableOpacity onPress={() => setCertificationsModalVisible(false)} style={styles.modalCloseBtn}>
+                <X size={20} color="#1F2937" />
+              </TouchableOpacity>
+            </View>
+            <View style={{ maxHeight: 400 }}>
+              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 20 }}>
+                <TextInput
+                  style={[styles.input, { flex: 1 }]}
+                  value={newCertText}
+                  onChangeText={setNewCertText}
+                  placeholder="Add new certification"
+                />
+                <TouchableOpacity 
+                  style={[styles.saveBtn, { marginTop: 0, paddingHorizontal: 16, justifyContent: 'center' }]} 
+                  onPress={handleAddCertification}
+                >
+                  <Plus size={20} color="#FFF" />
+                </TouchableOpacity>
+              </View>
+              
+              <Text style={[styles.inputLabel, { marginBottom: 10 }]}>Active Certifications</Text>
+              
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 10 }}>
+                {profileInfo.certifications && profileInfo.certifications.length > 0 ? (
+                  profileInfo.certifications.map((cert, idx) => (
+                    <View 
+                      key={idx} 
+                      style={{ 
+                        flexDirection: 'row', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center', 
+                        paddingVertical: 12, 
+                        paddingHorizontal: 16, 
+                        backgroundColor: '#F8FAFC', 
+                        borderRadius: 12, 
+                        marginBottom: 8,
+                        borderWidth: 1,
+                        borderColor: '#E2E8F0'
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                        <Award size={16} color={COLORS.primary} />
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: COLORS.textHeader, flex: 1 }} numberOfLines={1}>{cert}</Text>
+                      </View>
+                      <TouchableOpacity onPress={() => handleRemoveCertification(idx)}>
+                        <Trash2 size={16} color="#EF4444" />
+                      </TouchableOpacity>
+                    </View>
+                  ))
+                ) : (
+                  <Text style={{ fontSize: 13, color: COLORS.textSecondary, fontStyle: 'italic', textAlign: 'center', marginTop: 20 }}>
+                    No certifications added yet.
+                  </Text>
+                )}
+              </ScrollView>
+            </View>
           </View>
         </View>
       </Modal>

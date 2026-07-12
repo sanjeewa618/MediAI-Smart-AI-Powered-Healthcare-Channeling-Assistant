@@ -44,6 +44,10 @@ const userSchema = new mongoose.Schema(
     consultationFee: { type: Number },
     totalConsultations: { type: String },
 
+    // Nurse & Lab Specific Profile
+    photo: { type: String },
+    certifications: [{ type: String }],
+
     // Verification workflow support for admin review
     verificationNotes: { type: String },
     verificationRequestedAt: { type: Date },
