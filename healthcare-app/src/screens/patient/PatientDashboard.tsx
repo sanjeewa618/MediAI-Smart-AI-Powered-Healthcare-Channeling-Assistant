@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, Dimensions, Animated, PanResponder, Pressable, StatusBar, Modal, BackHandler, Easing } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
-import { Search, Calendar, User, FileText, Activity, MoreHorizontal, Home, Heart, Shield, MessageCircle, FileEdit, FlaskConical, ChevronRight, Baby, Droplets, Sparkles, Plus, Bell, LogOut, Pill, Truck, Settings, X, LifeBuoy, Stethoscope, Dna, Brain, Bone, Eye, Smile, Wallet, Clock, AlertCircle, CheckCircle2, Hourglass, Users, RefreshCw } from 'lucide-react-native';
+import { Search, Calendar, User, FileText, Activity, MoreHorizontal, Home, Heart, Shield, MessageCircle, FileEdit, FlaskConical, ChevronRight, Baby, Droplets, Sparkles, Plus, Bell, LogOut, Pill, Truck, Settings, X, LifeBuoy, Stethoscope, Dna, Brain, Bone, Eye, Smile, Wallet, Clock, AlertCircle, Hourglass, Users } from 'lucide-react-native';
 import BottomNavBar from '../../components/BottomNavBar';
 import { useAuth } from '../../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -92,14 +92,12 @@ const QueueAppointmentCard = ({
   appointment,
   queueInfo,
   onPress,
-  lastRefresh,
-  onRequestNextIn
+  lastRefresh
 }: {
   appointment: any;
   queueInfo?: any;
   onPress: () => void;
   lastRefresh?: Date | null;
-  onRequestNextIn?: (appointmentId: string) => void;
 }) => {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
@@ -148,79 +146,6 @@ const QueueAppointmentCard = ({
   const displayName = isLab ? appointment.testName : (appointment?.doctor?.name || 'Doctor');
   const displaySpec = isLab ? (appointment.room || 'Room 01') : (appointment?.doctor?.specialization || 'Consultation');
   const displayHospital = isLab ? 'Laboratory' : (appointment?.doctor?.hospital || '');
-
-  // Custom status UI overrides
-  let finalStatusBg = statusBg;
-  let finalStatusColor = statusColor;
-  let customBannerContent = null;
-  let showPulse = false;
-
-  const apptStatus = appointment?.status;
-
-  if (apptStatus === 'started') {
-    finalStatusBg = '#FEF08A'; // Vibrant yellow
-    finalStatusColor = '#854D0E';
-    showPulse = true;
-    customBannerContent = (
-      <>
-        <Activity size={16} color={finalStatusColor} />
-        <Text style={[styles.waitBannerText, { color: finalStatusColor, fontWeight: '700' }]}>The queue got started</Text>
-      </>
-    );
-  } else if (apptStatus === 'ready') {
-    finalStatusBg = '#BAE6FD'; // Light blue
-    finalStatusColor = '#0284C7';
-    showPulse = true;
-    customBannerContent = (
-      <>
-        <CheckCircle2 size={16} color={finalStatusColor} />
-        <Text style={[styles.waitBannerText, { color: finalStatusColor, fontWeight: '700' }]}>Next your chance</Text>
-      </>
-    );
-  } else if (apptStatus === 'in' || apptStatus === 'nextIn') {
-    finalStatusBg = '#A7F3D0'; // Mint green
-    finalStatusColor = '#047857';
-    showPulse = true;
-    customBannerContent = (
-      <>
-        <Activity size={16} color={finalStatusColor} />
-        <Text style={[styles.waitBannerText, { color: finalStatusColor, fontWeight: '800', fontSize: 16 }]}>Please come in</Text>
-      </>
-    );
-  } else if (apptStatus === 'skipped') {
-    finalStatusBg = '#FECACA'; // Light red
-    finalStatusColor = '#B91C1C';
-    customBannerContent = (
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <AlertCircle size={16} color={finalStatusColor} />
-          <Text style={[styles.waitBannerText, { color: finalStatusColor, fontWeight: '700', marginLeft: 6 }]}>You are skipped</Text>
-        </View>
-        <TouchableOpacity 
-          style={{ backgroundColor: '#EF4444', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 }}
-          onPress={(e) => {
-            e.stopPropagation();
-            if (onRequestNextIn) onRequestNextIn(appointment._id);
-          }}
-        >
-          <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '700' }}>Send request to admin</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  } else {
-    // Default wait banner (pending, confirmed)
-    customBannerContent = (
-      <>
-        <Hourglass size={14} color={finalStatusColor} />
-        <Text style={[styles.waitBannerText, { color: finalStatusColor }]}>{waitLabel}</Text>
-        {lastRefresh && (
-          <Text style={styles.refreshLabel}>
-            · Updated {moment(lastRefresh).format('HH:mm:ss')}
-          </Text>
-        )}
-      </>
-    );
-  }
 
   return (
     <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={styles.queueCardOuter}>
@@ -302,8 +227,14 @@ const QueueAppointmentCard = ({
         </View>
 
         {/* Estimated Wait Banner */}
-        <View style={[styles.waitBanner, { backgroundColor: finalStatusBg }, showPulse && { borderColor: finalStatusColor, borderWidth: 1 }]}>
-          {customBannerContent}
+        <View style={[styles.waitBanner, { backgroundColor: statusBg }]}>
+          <Hourglass size={14} color={statusColor} />
+          <Text style={[styles.waitBannerText, { color: statusColor }]}>{waitLabel}</Text>
+          {lastRefresh && (
+            <Text style={styles.refreshLabel}>
+              · Updated {moment(lastRefresh).format('HH:mm:ss')}
+            </Text>
+          )}
         </View>
       </LinearGradient>
     </TouchableOpacity>
@@ -501,74 +432,49 @@ const PatientDashboard = () => {
   const [labSlotsLoading, setLabSlotsLoading] = useState(false);
   const [dashboardLabs, setDashboardLabs] = useState<any[]>([]);
 
-  const [todayCompletedCount, setTodayCompletedCount] = useState(0);
-  const [todayCancelledCount, setTodayCancelledCount] = useState(0);
-
-  const fetchQueue = useCallback(async () => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/patient/dashboard`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const json = await res.json();
-      if (res.ok && json.success) {
-        const startOfToday = moment().startOf('day');
-        const endOfTwoDays = moment().add(2, 'days').endOf('day');
-        const filterNextTwoDays = (appts: any[]) => {
-          if (!appts) return [];
-          return appts.filter(appt => {
-            if (appt.status === 'cancelled' || appt.status === 'completed') return false;
-            const dateInRange = moment(appt.date).isBetween(startOfToday, endOfTwoDays, null, '[]');
-            if (!dateInRange) return false;
-            return true;
-          });
-        };
-        const filterUnique = (appts: any[]) => {
-          const seen = new Set();
-          return appts.filter(a => {
-            if (!a || !a._id) return true;
-            const dup = seen.has(a._id);
-            seen.add(a._id);
-            return !dup;
-          });
-        };
-        setUpcomingDoctorAppointments(filterUnique(filterNextTwoDays(json.data.doctorAppointments)));
-        setUpcomingLabAppointments(filterUnique(filterNextTwoDays(json.data.labAppointments)));
-        setLiveQueue(json.data.liveQueue || []);
-        setTodayCompletedCount(json.data.todayCompletedCount || 0);
-        setTodayCancelledCount(json.data.todayCancelledCount || 0);
-        setLastQueueRefresh(new Date());
-      }
-    } catch (e) {
-      console.error('Queue fetch error:', e);
-    }
-  }, [token]);
-
-  const handleRequestNextIn = async (appointmentId: string) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/patient/request-next-in/${appointmentId}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      const data = await response.json();
-      if (response.ok && data.success) {
-        fetchQueue();
-      }
-    } catch (error) {
-      console.error('Failed to request nextIn:', error);
-    }
-  };
-
   useFocusEffect(
     useCallback(() => {
+      const fetchQueue = async () => {
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/patient/dashboard`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const json = await res.json();
+          if (res.ok && json.success) {
+            const startOfToday = moment().startOf('day');
+            const endOfTwoDays = moment().add(2, 'days').endOf('day');
+            const filterNextTwoDays = (appts: any[]) => {
+              if (!appts) return [];
+              return appts.filter(appt => {
+                const dateInRange = moment(appt.date).isBetween(startOfToday, endOfTwoDays, null, '[]');
+                if (!dateInRange) return false;
+                return !isApptExpiredFrontend(appt.date, appt.timeSlot);
+              });
+            };
+            const filterUnique = (appts: any[]) => {
+              const seen = new Set();
+              return appts.filter(a => {
+                if (!a || !a._id) return true;
+                const dup = seen.has(a._id);
+                seen.add(a._id);
+                return !dup;
+              });
+            };
+            setUpcomingDoctorAppointments(filterUnique(filterNextTwoDays(json.data.doctorAppointments)));
+            setUpcomingLabAppointments(filterUnique(filterNextTwoDays(json.data.labAppointments)));
+            setLiveQueue(json.data.liveQueue || []);
+            setLastQueueRefresh(new Date());
+          }
+        } catch (e) {
+          console.error('Queue fetch error:', e);
+        }
+      };
       if (token) {
         fetchQueue();
         const interval = setInterval(fetchQueue, 30000);
         return () => clearInterval(interval);
       }
-    }, [token, fetchQueue])
+    }, [token])
   );
 
   useFocusEffect(
@@ -927,9 +833,9 @@ const PatientDashboard = () => {
               <View style={styles.headerActions}>
                 <TouchableOpacity
                   style={styles.headerActionButton}
-                  onPress={fetchQueue}
+                  onPress={() => setAppointmentModalVisible(true)}
                 >
-                  <RefreshCw size={20} color="#FFFFFF" />
+                  <Calendar size={20} color="#FFFFFF" />
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.headerActionButton, { marginLeft: 10 }]}>
                   <Bell size={20} color="#FFFFFF" />
@@ -955,31 +861,6 @@ const PatientDashboard = () => {
             <View style={styles.searchContainer}>
               <Search size={20} color="#9CA3AF" />
               <Text style={styles.searchPlaceholder}>Search doctors, hospitals, tests...</Text>
-            </View>
-          </StaggeredView>
-
-          {/* Today's Summary Cards */}
-          <StaggeredView delay={250}>
-            <View style={{ flexDirection: 'row', paddingHorizontal: 25, marginTop: 15, justifyContent: 'space-between' }}>
-              <View style={[styles.summaryCard, { backgroundColor: '#ECFDF5' }]}>
-                <View style={[styles.summaryIconWrap, { backgroundColor: '#D1FAE5' }]}>
-                  <CheckCircle2 size={18} color="#10B981" />
-                </View>
-                <View style={{ marginLeft: 10 }}>
-                  <Text style={styles.summaryCardValue}>{todayCompletedCount}</Text>
-                  <Text style={styles.summaryCardLabel}>Completed Today</Text>
-                </View>
-              </View>
-
-              <View style={[styles.summaryCard, { backgroundColor: '#FEF2F2' }]}>
-                <View style={[styles.summaryIconWrap, { backgroundColor: '#FEE2E2' }]}>
-                  <X size={18} color="#EF4444" />
-                </View>
-                <View style={{ marginLeft: 10 }}>
-                  <Text style={styles.summaryCardValue}>{todayCancelledCount}</Text>
-                  <Text style={styles.summaryCardLabel}>Cancelled Today</Text>
-                </View>
-              </View>
             </View>
           </StaggeredView>
 
@@ -1145,7 +1026,6 @@ const PatientDashboard = () => {
                       queueInfo={liveQueue.find((q) => q.appointmentId === appt._id)}
                       onPress={() => navigation.navigate('PatientAppointments')}
                       lastRefresh={lastQueueRefresh}
-                      onRequestNextIn={handleRequestNextIn}
                     />
                   </View>
                 ))}
@@ -1910,38 +1790,10 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   searchPlaceholder: {
-    marginLeft: 10,
-    fontSize: 15,
-    color: '#9CA3AF',
-    flex: 1
+    marginLeft: 12,
+    color: COLORS.textSecondary,
+    fontSize: 14
   },
-  summaryCard: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    marginHorizontal: 5,
-  },
-  summaryIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  summaryCardValue: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#111827',
-  },
-  summaryCardLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#6B7280',
-    marginTop: 2,
-  },
-
   aiCard: {
     borderRadius: 20,
     padding: 20,
