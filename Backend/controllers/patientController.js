@@ -4,6 +4,7 @@ import Appointment from '../model/Appointment.js';
 import LabTest from '../model/LabTest.js';
 import LabBooking from '../model/LabBooking.js';
 import MedicalRecord from '../model/MedicalRecord.js';
+import PDFDocument from 'pdfkit';
 
 // Helper: builds a live queue snapshot for a list of appointments.
 // For each appointment, the queue snapshot contains:
@@ -54,6 +55,53 @@ const buildQueueSnapshots = async (appointments) => {
       totalInSlot,
       patientsAhead: ahead,
       currentlyServing: currentlyServing?.queueNumber || 1,
+      estimatedWaitMinutes
+    });
+  }
+  return snapshots;
+};
+
+const buildLabQueueSnapshots = async (bookings) => {
+  const snapshots = [];
+  for (const booking of bookings) {
+    const bookingDate = new Date(booking.appointmentDate || booking.date);
+    const startOfDay = new Date(bookingDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(bookingDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const labId = booking.lab?._id || booking.lab;
+    const slotId = booking.scheduleSlot?._id || booking.scheduleSlot;
+
+    if (!labId || !slotId) continue;
+
+    // Total active (non-cancelled) bookings in the same lab + scheduleSlot + day
+    const totalInSlot = await LabBooking.countDocuments({
+      lab: labId,
+      scheduleSlot: slotId,
+      appointmentDate: { $gte: startOfDay, $lte: endOfDay },
+      status: { $ne: 'Cancelled' }
+    });
+
+    // Find the lowest queue token that is still in 'Pending' or 'Confirmed' or 'Checked-In'
+    const currentlyServing = await LabBooking.findOne({
+      lab: labId,
+      scheduleSlot: slotId,
+      appointmentDate: { $gte: startOfDay, $lte: endOfDay },
+      status: { $in: ['Pending', 'Confirmed', 'Checked-In'] }
+    })
+      .sort({ queueToken: 1 })
+      .select('queueToken');
+
+    const ahead = Math.max(0, (booking.queueToken || 1) - (currentlyServing?.queueToken || 1));
+    const estimatedWaitMinutes = ahead * 10;
+
+    snapshots.push({
+      appointmentId: booking._id,
+      queueNumber: booking.queueToken || 1,
+      totalInSlot,
+      patientsAhead: ahead,
+      currentlyServing: currentlyServing?.queueToken || 1,
       estimatedWaitMinutes
     });
   }
@@ -159,8 +207,10 @@ export const getDashboardData = async (req, res) => {
       room: booking.scheduleSlot?.room || 'Room 01'
     }));
 
-    // 3. Build live queue snapshots for the upcoming doctor appointments.
-    const liveQueue = await buildQueueSnapshots(doctorAppointments);
+    // 3. Build live queue snapshots for the upcoming doctor appointments and lab bookings.
+    const doctorQueue = await buildQueueSnapshots(doctorAppointments);
+    const labQueue = await buildLabQueueSnapshots(activeLabBookings);
+    const liveQueue = [...doctorQueue, ...labQueue];
 
     // 4. Fetch counts for today's completed and cancelled doctor appointments
     const todayCompletedCount = await Appointment.countDocuments({

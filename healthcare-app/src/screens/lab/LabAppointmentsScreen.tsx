@@ -68,7 +68,7 @@ const LabAppointmentsScreen: React.FC = () => {
   
   const [department, setDepartment] = useState('');
   const [appointments, setAppointments] = useState<any[]>([]);
-  const [stats, setStats] = useState({ todayTotal: 0, pending: 0, completed: 0, urgent: 0 });
+  const [stats, setStats] = useState({ todayTotal: 0, pending: 0, processing: 0, completed: 0 });
   const [loading, setLoading] = useState(false);
 
   const fetchProfile = async () => {
@@ -88,7 +88,7 @@ const LabAppointmentsScreen: React.FC = () => {
   const fetchAppointments = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/labs/bookings`, {
+      const res = await fetch(`${API_BASE_URL}/api/labs/bookings?limit=1000`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
@@ -100,14 +100,14 @@ const LabAppointmentsScreen: React.FC = () => {
         const todayStr = moment().format('YYYY-MM-DD');
         const todayApps = list.filter((b: any) => moment(b.appointmentDate).format('YYYY-MM-DD') === todayStr).length;
         const pendingApps = list.filter((b: any) => b.status === 'Pending').length;
+        const processingApps = list.filter((b: any) => ['Confirmed', 'Checked-In', 'Sample-Collected', 'Testing'].includes(b.status)).length;
         const completedApps = list.filter((b: any) => b.status === 'Completed').length;
-        const urgentApps = list.filter((b: any) => b.paymentStatus === 'Paid' && b.status === 'Pending').length;
 
         setStats({
           todayTotal: todayApps,
           pending: pendingApps,
+          processing: processingApps,
           completed: completedApps,
-          urgent: urgentApps,
         });
 
         // Show alert if there is a new pending booking
@@ -219,10 +219,10 @@ const LabAppointmentsScreen: React.FC = () => {
   }, [modalVisible]);
 
   const dynamicStats = [
-    { label: 'Today Apps', value: String(stats.todayTotal), icon: CalendarIcon, color: COLORS.primary },
-    { label: 'Pending', value: String(stats.pending), icon: Clock, color: COLORS.warning },
-    { label: 'Completed', value: String(stats.completed), icon: CheckCircle, color: COLORS.success },
-    { label: 'Urgent', value: String(stats.urgent), icon: AlertCircle, color: COLORS.error },
+    { label: 'Today Appointments', value: String(stats.todayTotal), icon: CalendarIcon, color: COLORS.primary, desc: 'Schedules booked for today' },
+    { label: 'Pending', value: String(stats.pending), icon: Clock, color: COLORS.warning, desc: 'Booking is not confirmed yet' },
+    { label: 'Processing', value: String(stats.processing), icon: Activity, color: '#0EA5E9', desc: 'Patient is arriving/test is in progress' },
+    { label: 'Completed', value: String(stats.completed), icon: CheckCircle, color: COLORS.success, desc: 'Appointment finished & report collected' },
   ];
 
   const dynamicFilterTabs = ['All', department || 'Lab Category'];
@@ -276,11 +276,18 @@ const LabAppointmentsScreen: React.FC = () => {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsScroll}>
           {dynamicStats.map((stat, idx) => (
             <View key={idx} style={styles.statCard}>
-              <View style={[styles.statIconWrapper, { backgroundColor: stat.color + '1A' }]}>
-                <stat.icon size={20} color={stat.color} />
-              </View>
-              <Text style={styles.statValue}>{stat.value}</Text>
               <Text style={styles.statLabel}>{stat.label}</Text>
+              
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10, marginBottom: 6, width: '100%' }}>
+                <Text style={styles.statValue}>{stat.value}</Text>
+                <View style={[styles.statIconWrapper, { backgroundColor: stat.color + '1A', marginBottom: 0 }]}>
+                  <stat.icon size={20} color={stat.color} />
+                </View>
+              </View>
+
+              {stat.desc ? (
+                <Text style={styles.statDesc}>{stat.desc}</Text>
+              ) : null}
             </View>
           ))}
         </ScrollView>
@@ -548,7 +555,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF', 
     padding: 16, 
     borderRadius: 20, 
-    minWidth: 140,
+    width: 170,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
@@ -557,7 +564,8 @@ const styles = StyleSheet.create({
   },
   statIconWrapper: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   statValue: { fontSize: 22, fontWeight: '800', color: COLORS.textHeader },
-  statLabel: { fontSize: 12, color: COLORS.textSecondary, marginTop: 4, fontWeight: '500' },
+  statLabel: { fontSize: 12, color: COLORS.textHeader, marginTop: 4, fontWeight: '700' },
+  statDesc: { fontSize: 10, color: COLORS.textSecondary, marginTop: 4, fontWeight: '500', lineHeight: 13 },
   alertContainer: { 
     marginHorizontal: 20, 
     backgroundColor: COLORS.primaryLight, 

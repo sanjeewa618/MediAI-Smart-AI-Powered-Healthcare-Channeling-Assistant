@@ -140,14 +140,14 @@ const QueueAppointmentCard = ({
       ? `~${waitHours}h ${waitMinutes}m wait`
       : `~${waitMinutes}m wait`;
 
+  const isLab = !!appointment?.testName;
   const statusColor = isYourTurn ? '#10B981' : patientsAhead <= 2 ? '#F59E0B' : COLORS.primary;
   const statusBg = isYourTurn ? '#D1FAE5' : patientsAhead <= 2 ? '#FEF3C7' : '#F3F0FF';
-
   const dateLabel = appointment?.date ? moment(appointment.date).format('ddd, DD MMM YYYY') : '';
   const timeLabel = appointment?.timeSlot || '';
-  const doctorName = appointment?.doctor?.name || 'Doctor';
-  const specialization = appointment?.doctor?.specialization || 'Consultation';
-  const hospital = appointment?.doctor?.hospital || '';
+  const displayName = isLab ? appointment.testName : (appointment?.doctor?.name || 'Doctor');
+  const displaySpec = isLab ? (appointment.room || 'Room 01') : (appointment?.doctor?.specialization || 'Consultation');
+  const displayHospital = isLab ? 'Laboratory' : (appointment?.doctor?.hospital || '');
 
   // Custom status UI overrides
   let finalStatusBg = statusBg;
@@ -225,21 +225,25 @@ const QueueAppointmentCard = ({
   return (
     <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={styles.queueCardOuter}>
       <LinearGradient
-        colors={getGradientForDate(appointment?.date)}
+        colors={isLab ? (isYourTurn ? ['#2563EB', '#1D4ED8'] : ['#3B82F6', '#2563EB']) : (isYourTurn ? ['#065F46', '#10B981'] : ['#5F0FFF', '#8B3DFF'])}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.queueCardGradient}
       >
-        {/* Top Row: Doctor Info + Live Status Pill */}
+        {/* Top Row: Doctor/Lab Info + Live Status Pill */}
         <View style={styles.queueCardTopRow}>
           <View style={styles.queueDoctorInfo}>
-            <View style={styles.queueDoctorAvatar}>
-              <Stethoscope size={20} color="#FFFFFF" />
+            <View style={[styles.queueDoctorAvatar, isLab && { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+              {isLab ? (
+                <FlaskConical size={20} color="#FFFFFF" />
+              ) : (
+                <Stethoscope size={20} color="#FFFFFF" />
+              )}
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.queueDoctorName} numberOfLines={1}>{doctorName}</Text>
+              <Text style={styles.queueDoctorName} numberOfLines={1}>{displayName}</Text>
               <Text style={styles.queueDoctorSpec} numberOfLines={1}>
-                {specialization}{hospital ? `  •  ${hospital}` : ''}
+                {displaySpec}{displayHospital ? `  •  ${displayHospital}` : ''}
               </Text>
             </View>
           </View>
@@ -495,6 +499,7 @@ const PatientDashboard = () => {
   const [labCategories, setLabCategories] = useState<any[]>([]);
   const [labSlotCounts, setLabSlotCounts] = useState<{ [catId: string]: number }>({});
   const [labSlotsLoading, setLabSlotsLoading] = useState(false);
+  const [dashboardLabs, setDashboardLabs] = useState<any[]>([]);
 
   const [todayCompletedCount, setTodayCompletedCount] = useState(0);
   const [todayCancelledCount, setTodayCancelledCount] = useState(0);
@@ -584,6 +589,7 @@ const PatientDashboard = () => {
           const cats = catsData.data || [];
           const labs = labsData.data || [];
           setLabCategories(cats);
+          setDashboardLabs(labs);
           // For each category, sum available slots across all labs in that category
           const counts: { [catId: string]: number } = {};
           await Promise.all(cats.map(async (cat: any) => {
@@ -1153,40 +1159,14 @@ const PatientDashboard = () => {
             upcomingLabAppointments.length > 0 ? (
               <View style={styles.appointmentSubSection}>
                 {upcomingLabAppointments.map((appt, idx) => (
-                  <TouchableOpacity
-                    key={idx}
-                    style={[styles.mainAppointmentCard, SHADOWS.small, { marginBottom: 15, padding: 0, overflow: 'hidden', borderWidth: 0 }]}
-                    onPress={() => navigation.navigate('Reports')}
-                    activeOpacity={0.9}
-                  >
-                    <LinearGradient
-                      colors={getGradientForDate(appt.date)}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={{ padding: 16, flexDirection: 'row', alignItems: 'center' }}
-                    >
-                      <View style={[styles.mainAppIconWrap, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-                        <FlaskConical size={28} color="#FFF" />
-                      </View>
-                      <View style={styles.mainAppInfo}>
-                        <Text style={[styles.mainAppTitle, { color: '#FFF' }]}>
-                          {appt.testName || 'Lab Test'}
-                        </Text>
-                        <Text style={[styles.mainAppSub, { color: 'rgba(255,255,255,0.8)' }]}>
-                          Lab Visit  •  {moment(appt.date).format('DD MMM')}  •  {appt.timeSlot || 'TBD'}
-                        </Text>
-                        <View style={[styles.countdownPill, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-                          <Activity size={11} color="#FFF" />
-                          <Text style={[styles.countdownText, { color: '#FFF' }]}>
-                            {appt.queueNumber
-                              ? `Queue #${appt.queueNumber}`
-                              : 'Upcoming'}
-                          </Text>
-                        </View>
-                      </View>
-                      <ChevronRight size={20} color="rgba(255,255,255,0.6)" />
-                    </LinearGradient>
-                  </TouchableOpacity>
+                  <View key={idx} style={{ marginBottom: 15 }}>
+                    <QueueAppointmentCard
+                      appointment={appt}
+                      queueInfo={liveQueue.find((q) => q.appointmentId === appt._id)}
+                      onPress={() => navigation.navigate('PatientAppointments')}
+                      lastRefresh={lastQueueRefresh}
+                    />
+                  </View>
                 ))}
               </View>
             ) : (
@@ -1260,6 +1240,14 @@ const PatientDashboard = () => {
                     'X-Ray': '🦴', 'MRI': '🧲', 'CT Scan': '📡', 'Ultrasound': '🔊'
                   };
                   const emoji = catIcons[cat.name] || '🔬';
+                  const catLabs = dashboardLabs.filter((l: any) => {
+                    const catId = l.category?._id || l.category;
+                    return catId?.toString() === cat._id?.toString();
+                  });
+                  const labWithPhoto = catLabs.find((l: any) => l.assignedNurse?.photo);
+                  const imageUrl = labWithPhoto?.assignedNurse?.photo 
+                    ? `${API_BASE_URL}${labWithPhoto.assignedNurse.photo}` 
+                    : null;
                   return (
                     <TouchableOpacity
                       key={cat._id}
@@ -1280,7 +1268,14 @@ const PatientDashboard = () => {
                       onPress={() => navigation.navigate('LabAvailability')}
                       activeOpacity={0.8}
                     >
-                      <Text style={{ fontSize: 28, marginBottom: 8 }}>{emoji}</Text>
+                      {imageUrl ? (
+                        <Image 
+                          source={{ uri: imageUrl }} 
+                          style={{ width: 44, height: 44, borderRadius: 22, marginBottom: 8 }} 
+                        />
+                      ) : (
+                        <Text style={{ fontSize: 28, marginBottom: 8 }}>{emoji}</Text>
+                      )}
                       <Text style={{ fontSize: 13, fontWeight: '700', color: '#1E293B', marginBottom: 6 }} numberOfLines={2}>
                         {cat.name}
                       </Text>

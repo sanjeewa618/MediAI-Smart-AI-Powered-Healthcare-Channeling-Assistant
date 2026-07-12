@@ -1,5 +1,5 @@
 import express from 'express';
-import { getDashboardData, getLiveQueueStatus, updateProfile, uploadInsuranceDocument, getPatientStats, getPatientReports, uploadPatientReport, uploadPatientAvatar, requestAdminNextIn } from '../controllers/patientController.js';
+import { getDashboardData, getLiveQueueStatus, updateProfile, uploadInsuranceDocument, getPatientStats, getPatientReports, uploadPatientReport, uploadPatientAvatar, getCompletedAppointments, generateAppointmentPdf } from '../controllers/patientController.js';
 import { protect } from '../middlewares/authMiddleware.js';
 import { patientOnly } from '../middlewares/roleMiddleware.js';
 import upload from '../middlewares/uploadMiddleware.js';
@@ -19,5 +19,7 @@ router.post('/profile/upload-avatar', upload.single('avatar'), uploadPatientAvat
 router.post('/upload-insurance', upload.single('insuranceCard'), uploadInsuranceDocument);
 router.get('/reports', getPatientReports);
 router.post('/reports/upload', upload.single('reportFile'), uploadPatientReport);
+router.get('/completed-appointments', getCompletedAppointments);
+router.get('/reports/generate-pdf/:type/:id', generateAppointmentPdf);
 
 export default router;

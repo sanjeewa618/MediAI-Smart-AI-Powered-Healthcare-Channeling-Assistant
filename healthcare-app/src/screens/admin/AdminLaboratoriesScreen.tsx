@@ -42,6 +42,7 @@ type LabRecord = {
     name?: string;
     shift?: string;
   } | null;
+  slotsCount?: number;
 };
 
 type ScheduleSlot = {
@@ -357,54 +358,76 @@ const AdminLaboratoriesScreen = () => {
           ) : null}
 
           <Text style={styles.sectionHeading}>Laboratory Rooms</Text>
-          {labs.map(item => {
-            const statusStyles = getStatusStyles(item.status);
-            const isUpdating = updatingLabId === item._id;
-            return (
-              <View key={item._id} style={[styles.labCard, SHADOWS.light]}>
-                <View style={styles.labInfoRow}>
-                  <View style={[styles.iconWrap, { backgroundColor: item.status === 'Available' ? '#ECFDF5' : '#FFF7ED' }]}>
-                    <FlaskConical size={24} color={item.status === 'Available' ? '#10B981' : '#EA580C'} />
+          {(() => {
+            const seen = new Set();
+            return labs
+              .sort((a, b) => (b.slotsCount || 0) - (a.slotsCount || 0))
+              .filter(item => {
+                let key = (item.name || '').toLowerCase();
+                if (key.includes('blood')) key = 'blood';
+                else if (key.includes('diabetes')) key = 'diabetes';
+                else key = key.trim();
+
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+              });
+          })().map(item => {
+              const statusStyles = getStatusStyles(item.status);
+              const isUpdating = updatingLabId === item._id;
+              return (
+                <View key={item._id} style={[styles.labCard, SHADOWS.light]}>
+                  <View style={styles.labInfoRow}>
+                    <View style={[styles.iconWrap, { backgroundColor: item.status === 'Available' ? '#ECFDF5' : '#FFF7ED' }]}>
+                      <FlaskConical size={24} color={item.status === 'Available' ? '#10B981' : '#EA580C'} />
+                    </View>
+                    <View style={styles.labDetails}>
+                      <Text style={styles.labName}>{item.name}</Text>
+                      <Text style={styles.labLocation}>{item.floor || 'Floor not set'}</Text>
+                      {item.openTime || item.closeTime ? (
+                        <Text style={styles.labLoad}>
+                          {item.openTime || '--:--'} - {item.closeTime || '--:--'}
+                        </Text>
+                      ) : null}
+                      <Text style={{ fontSize: 13, color: COLORS.textSecondary, marginTop: 5, fontWeight: '600' }}>
+                        Nurse: <Text style={{ color: COLORS.primary }}>{item.assignedNurse?.name || 'Not Assigned'}</Text>
+                      </Text>
+                      <Text style={{ fontSize: 13, color: COLORS.textSecondary, marginTop: 2, fontWeight: '600' }}>
+                        Active Slots: <Text style={{ color: '#10B981' }}>{item.slotsCount || 0}</Text>
+                      </Text>
+                    </View>
+                    <View style={[styles.statusBadge, { backgroundColor: statusStyles.bg }]}>
+                      <Text style={[styles.statusText, { color: statusStyles.color }]}>
+                        {item.status}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={styles.labDetails}>
-                    <Text style={styles.labName}>{item.name}</Text>
-                    <Text style={styles.labLocation}>{item.floor || 'Floor not set'}</Text>
-                    <Text style={styles.labLoad}>
-                      {item.openTime || '--:--'} - {item.closeTime || '--:--'}
-                    </Text>
-                  </View>
-                  <View style={[styles.statusBadge, { backgroundColor: statusStyles.bg }]}>
-                    <Text style={[styles.statusText, { color: statusStyles.color }]}>
-                      {item.status}
-                    </Text>
+
+                  <View style={styles.divider} />
+
+                  <View style={styles.actionsRow}>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { borderColor: COLORS.primary }]}
+                      onPress={() => openSlotManager(item)}
+                    >
+                      <Clock size={14} color={COLORS.primary} />
+                      <Text style={[styles.actionBtnText, { color: COLORS.primary }]}>Manage Slots</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { borderColor: item.status === 'Maintenance' ? '#10B981' : '#EF4444' }]}
+                      onPress={() => void updateLabStatus(item)}
+                      disabled={isUpdating}
+                    >
+                      <Settings size={14} color={item.status === 'Maintenance' ? '#10B981' : '#EF4444'} />
+                      <Text style={[styles.actionBtnText, { color: item.status === 'Maintenance' ? '#10B981' : '#EF4444' }]}>
+                        {isUpdating ? 'Updating...' : item.status === 'Maintenance' ? 'Set Active' : 'Set Maintenance'}
+                      </Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
-
-                <View style={styles.divider} />
-
-                <View style={styles.actionsRow}>
-                  <TouchableOpacity
-                    style={[styles.actionBtn, { borderColor: COLORS.primary }]}
-                    onPress={() => openSlotManager(item)}
-                  >
-                    <Clock size={14} color={COLORS.primary} />
-                    <Text style={[styles.actionBtnText, { color: COLORS.primary }]}>Manage Slots</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.actionBtn, { borderColor: item.status === 'Maintenance' ? '#10B981' : '#EF4444' }]}
-                    onPress={() => void updateLabStatus(item)}
-                    disabled={isUpdating}
-                  >
-                    <Settings size={14} color={item.status === 'Maintenance' ? '#10B981' : '#EF4444'} />
-                    <Text style={[styles.actionBtnText, { color: item.status === 'Maintenance' ? '#10B981' : '#EF4444' }]}>
-                      {isUpdating ? 'Updating...' : item.status === 'Maintenance' ? 'Set Active' : 'Set Maintenance'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            );
-          })}
+              );
+            })}
 
           <View style={{ height: 40 }} />
         </ScrollView>

@@ -163,9 +163,24 @@ const getLabs = async (req, res, next) => {
     const skip = (pageNum - 1) * pageSize;
     const paginatedLabs = labs.slice(skip, skip + pageSize);
 
+    // Group active slot counts by lab
+    const labIds = paginatedLabs.map(l => l._id);
+    const schedules = await LabSchedule.find({ lab: { $in: labIds } });
+    const slotCountsMap = {};
+    schedules.forEach(sched => {
+      const idStr = sched.lab.toString();
+      slotCountsMap[idStr] = (slotCountsMap[idStr] || 0) + 1;
+    });
+
+    const populatedLabs = paginatedLabs.map(l => {
+      const obj = l.toObject();
+      obj.slotsCount = slotCountsMap[obj._id.toString()] || 0;
+      return obj;
+    });
+
     res.status(200).json({
       success: true,
-      data: paginatedLabs,
+      data: populatedLabs,
       meta: {
         total: finalTotal,
         page: pageNum,
