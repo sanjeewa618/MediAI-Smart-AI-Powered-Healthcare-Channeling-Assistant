@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, Platform, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { TrendingUp, Users, Calendar, Clock, Star, Activity, ChevronRight } from 'lucide-react-native';
@@ -6,32 +6,57 @@ import { COLORS, SHADOWS } from '../../theme/theme';
 import DoctorBottomNavBar from '../../components/DoctorBottomNavBar';
 import NurseBottomNavBar from '../../components/NurseBottomNavBar';
 import { useNavigation } from '@react-navigation/native';
+import { useAuth } from '../../context/AuthContext';
+import { ActivityIndicator } from 'react-native';
 
-const STATS = [
-  { label: 'Total Patients', value: '248', icon: Users, color: '#3B82F6', bg: '#EFF6FF' },
-  { label: 'This Month', value: '42', icon: Calendar, color: '#10B981', bg: '#ECFDF5' },
-  { label: 'Avg. Rating', value: '4.9', icon: Star, color: '#F59E0B', bg: '#FFFBEB' },
-  { label: 'Hours Worked', value: '186h', icon: Clock, color: '#7C3AED', bg: '#EDE9FE' },
-];
-
-const WEEKLY = [
-  { day: 'Mon', count: 8, max: 10 },
-  { day: 'Tue', count: 6, max: 10 },
-  { day: 'Wed', count: 10, max: 10 },
-  { day: 'Thu', count: 4, max: 10 },
-  { day: 'Fri', count: 9, max: 10 },
-  { day: 'Sat', count: 3, max: 10 },
-];
-
-const TOP_CONDITIONS = [
-  { name: 'Hypertension', count: 38, pct: 78 },
-  { name: 'Diabetes Type 2', count: 25, pct: 52 },
-  { name: 'Cardiac Arrhythmia', count: 18, pct: 37 },
-  { name: 'Chest Pain', count: 12, pct: 25 },
-];
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
 
 const DoctorReportsScreen = () => {
   const navigation = useNavigation<any>();
+  const { token } = useAuth();
+  const [loading, setLoading] = useState(true);
+  
+  const [statsData, setStatsData] = useState([
+    { label: 'Total Patients', value: '-', icon: Users, color: '#3B82F6', bg: '#EFF6FF' },
+    { label: 'This Month', value: '-', icon: Calendar, color: '#10B981', bg: '#ECFDF5' },
+    { label: 'Avg. Rating', value: '-', icon: Star, color: '#F59E0B', bg: '#FFFBEB' },
+    { label: 'Hours Worked', value: '-', icon: Clock, color: '#7C3AED', bg: '#EDE9FE' },
+  ]);
+  
+  const [weeklyData, setWeeklyData] = useState<any[]>([]);
+  const [topConditions, setTopConditions] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/doctor/analytics`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const json = await res.json();
+        
+        if (res.ok && json.success) {
+          const { stats, weekly, topConditions } = json.data;
+          
+          setStatsData([
+            { label: 'Total Patients', value: stats.totalPatients, icon: Users, color: '#3B82F6', bg: '#EFF6FF' },
+            { label: 'This Month', value: stats.thisMonth, icon: Calendar, color: '#10B981', bg: '#ECFDF5' },
+            { label: 'Avg. Rating', value: stats.avgRating, icon: Star, color: '#F59E0B', bg: '#FFFBEB' },
+            { label: 'Hours Worked', value: stats.hoursWorked, icon: Clock, color: '#7C3AED', bg: '#EDE9FE' },
+          ]);
+          setWeeklyData(weekly);
+          setTopConditions(topConditions);
+        }
+      } catch (err) {
+        console.error('Failed to fetch analytics', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    if (token) fetchAnalytics();
+  }, [token]);
+
+  const monthName = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
 
   return (
   <SafeAreaView style={styles.safe}>
@@ -42,15 +67,21 @@ const DoctorReportsScreen = () => {
         </TouchableOpacity>
         <View style={styles.headerTextWrap}>
           <Text style={styles.headerTitle}>Reports & Analytics</Text>
-          <Text style={styles.headerSub}>Your performance overview – May 2026</Text>
+          <Text style={styles.headerSub}>Your performance overview – {monthName}</Text>
         </View>
       </View>
     </LinearGradient>
 
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       {/* Stat Cards */}
+      {loading ? (
+        <View style={{ padding: 40, alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#8B3DFF" />
+        </View>
+      ) : (
+        <>
       <View style={styles.statsGrid}>
-        {STATS.map(s => (
+        {statsData.map(s => (
           <View key={s.label} style={[styles.statCard, SHADOWS.small]}>
             <View style={[styles.statIcon, { backgroundColor: s.bg }]}>
               <s.icon size={20} color={s.color} />
@@ -68,7 +99,7 @@ const DoctorReportsScreen = () => {
           <Text style={styles.sectionTitle}>Weekly Patients</Text>
         </View>
         <View style={styles.barChart}>
-          {WEEKLY.map(w => (
+          {weeklyData.map(w => (
             <View key={w.day} style={styles.barCol}>
               <View style={styles.barTrack}>
                 <View style={[styles.bar, { height: `${(w.count / w.max) * 100}%` as any }]}>
@@ -88,7 +119,7 @@ const DoctorReportsScreen = () => {
           <TrendingUp size={18} color={COLORS.primary} />
           <Text style={styles.sectionTitle}>Top Conditions Treated</Text>
         </View>
-        {TOP_CONDITIONS.map(c => (
+        {topConditions.map(c => (
           <View key={c.name} style={styles.condRow}>
             <View style={styles.condInfo}>
               <Text style={styles.condName}>{c.name}</Text>
@@ -101,6 +132,8 @@ const DoctorReportsScreen = () => {
           </View>
         ))}
       </View>
+      </>
+      )}
 
       <View style={{ height: 20 }} />
     </ScrollView>
