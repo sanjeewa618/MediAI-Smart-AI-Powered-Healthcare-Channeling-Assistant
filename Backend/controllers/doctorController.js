@@ -439,6 +439,19 @@ export const updateSessionState = async (req, res) => {
           { $set: { status: 'ended' } }
         );
       }
+    } else if (action === 'end') {
+      const endOfDay = new Date(targetDate);
+      endOfDay.setHours(23, 59, 59, 999);
+      
+      await Appointment.updateMany(
+        { 
+          doctor: req.user._id, 
+          date: { $gte: targetDate, $lte: endOfDay }, 
+          timeSlot, 
+          status: { $nin: ['completed', 'cancelled'] } 
+        },
+        { $set: { status: 'cancelled' } }
+      );
     }
 
     const session = await DailySession.findOneAndUpdate(

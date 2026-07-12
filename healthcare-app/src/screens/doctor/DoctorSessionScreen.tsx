@@ -51,7 +51,7 @@ const DoctorSessionScreen = () => {
   // Initialize session state if already started previously
   useEffect(() => {
     if (sessionState === 'pending') {
-      const isAlreadyStarted = patients.some(p => ['started', 'ready', 'in', 'completed', 'skipped'].includes(p.status));
+      const isAlreadyStarted = patients.some(p => p && ['started', 'ready', 'in', 'completed', 'skipped'].includes(p.status));
       if (isAlreadyStarted) {
         setSessionState('started');
       }
@@ -99,8 +99,16 @@ const DoctorSessionScreen = () => {
                 })
               });
               
+              const updatedPatients = [...patients];
+              updatedPatients.forEach(p => {
+                if (p && !['completed', 'cancelled'].includes(p.status)) {
+                  p.status = 'cancelled';
+                }
+              });
+              setPatients(updatedPatients);
+
               setSessionState('ended');
-              Alert.alert('Session Ended', 'New patients can no longer book this session.');
+              Alert.alert('Session Ended', 'Remaining patients have been cancelled.');
             } catch (error) {
               Alert.alert('Error', 'Failed to end session.');
             }
@@ -337,7 +345,7 @@ const DoctorSessionScreen = () => {
               {sessionState === 'started' ? 'Session is Active' : sessionState === 'ended' ? 'Session Ended' : 'Ready to Start?'}
             </Text>
             <Text style={styles.sessionControlSub}>
-              {patients.filter(p => !['skipped', 'completed'].includes(p.status)).length} Patient(s) left
+              {patients.filter(p => p && !['skipped', 'completed', 'cancelled'].includes(p.status)).length} Patient(s) left
             </Text>
           </View>
           
@@ -367,12 +375,14 @@ const DoctorSessionScreen = () => {
           </View>
         ) : (
           patients.map((app: any, index: number) => {
+            if (!app) return null;
             const isLoading = loadingAppId === app._id;
             const isActive = app.status === 'in';
             const isReady = app.status === 'ready';
             const isNextIn = app.status === 'nextIn';
             const isSkipped = app.status === 'skipped';
             const isCompleted = app.status === 'completed';
+            const isCancelled = app.status === 'cancelled';
 
             return (
               <TouchableOpacity 
@@ -382,7 +392,7 @@ const DoctorSessionScreen = () => {
                   isActive && styles.patientCardIn,
                   isReady && styles.patientCardReady,
                   isNextIn && styles.patientCardNextIn,
-                  (isSkipped || isCompleted) && { opacity: 0.5 },
+                  (isSkipped || isCompleted || isCancelled) && { opacity: 0.5 },
                   isActive && { flexDirection: 'column', alignItems: 'stretch' }
                 ]}
                 onPress={() => openPatientProfile(index)}
@@ -542,14 +552,18 @@ const DoctorSessionScreen = () => {
                     return (
                       <View style={{ gap: 10 }}>
                         {['pending', 'confirmed', 'ready', 'started', 'in'].includes(app.status) && (
-                          <View style={{ flexDirection: 'row', gap: 12 }}>
-                            <TouchableOpacity style={[styles.footerBtn, { backgroundColor: '#FEE2E2', flex: 1 }]} onPress={() => handleSkip(selectedAppIndex)}>
-                              <XCircle size={20} color="#DC2626" />
-                              <Text style={[styles.footerBtnText, { color: '#DC2626' }]}>Skip</Text>
+                          <View style={{ flexDirection: 'row', gap: 8 }}>
+                            <TouchableOpacity style={[styles.footerBtn, { backgroundColor: '#FEF3C7', flex: 1 }]} onPress={() => handleSkip(selectedAppIndex)}>
+                              <ArrowRight size={18} color="#D97706" />
+                              <Text style={[styles.footerBtnText, { color: '#D97706', fontSize: 13 }]} numberOfLines={1}>Skip</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[styles.footerBtn, { backgroundColor: '#FEE2E2', flex: 1 }]} onPress={() => handleCancel(selectedAppIndex)}>
+                              <XCircle size={18} color="#DC2626" />
+                              <Text style={[styles.footerBtnText, { color: '#DC2626', fontSize: 13 }]} numberOfLines={1}>Cancel</Text>
                             </TouchableOpacity>
                             <TouchableOpacity style={[styles.footerBtn, { backgroundColor: '#10B981', flex: 1 }]} onPress={() => handleComplete(selectedAppIndex)}>
-                              <Check size={20} color="#FFF" />
-                              <Text style={[styles.footerBtnText, { color: '#FFF' }]}>Complete</Text>
+                              <Check size={18} color="#FFF" />
+                              <Text style={[styles.footerBtnText, { color: '#FFF', fontSize: 13 }]} numberOfLines={1}>Complete</Text>
                             </TouchableOpacity>
                           </View>
                         )}
@@ -558,13 +572,6 @@ const DoctorSessionScreen = () => {
                           <View style={[styles.footerBtn, { backgroundColor: '#E5E7EB' }]}>
                             <Text style={[styles.footerBtnText, { color: '#6B7280' }]}>Status: {app.status.toUpperCase()}</Text>
                           </View>
-                        )}
-
-                        {['pending', 'confirmed', 'ready', 'started'].includes(app.status) && (
-                          <TouchableOpacity style={[styles.footerBtn, { backgroundColor: '#FEE2E2' }]} onPress={() => handleCancel(selectedAppIndex)}>
-                            <XCircle size={20} color="#DC2626" />
-                            <Text style={[styles.footerBtnText, { color: '#DC2626' }]}>Cancel Appointment</Text>
-                          </TouchableOpacity>
                         )}
                       </View>
                     );
