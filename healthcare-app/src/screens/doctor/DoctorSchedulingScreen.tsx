@@ -174,15 +174,44 @@ const DoctorSchedulingScreen = () => {
     setShowModal(true);
   };
 
+  const parseTime = (timeStr: string) => {
+    if (!timeStr) return 0;
+    const [time, modifier] = timeStr.split(' ');
+    let [hours, minutes] = time.split(':').map(Number);
+    if (modifier === 'PM' && hours < 12) hours += 12;
+    if (modifier === 'AM' && hours === 12) hours = 0;
+    return hours * 60 + minutes;
+  };
+
   const checkConflict = (start: string, end: string, excludeId?: string) => {
+    const startMin = parseTime(start);
+    const endMin = parseTime(end);
+
+    if (endMin <= startMin) {
+      return 'End time must be strictly after start time';
+    }
+
     const existing = daySlots.filter(s => s.id !== excludeId);
-    return existing.some(s => s.startTime === start || s.endTime === end || s.startTime === end);
+    const overlap = existing.some(s => {
+      const eStart = parseTime(s.startTime);
+      const eEnd = parseTime(s.endTime);
+      // Overlap condition: one interval starts before the other ends, AND ends after the other starts
+      return startMin < eEnd && endMin > eStart;
+    });
+
+    if (overlap) {
+      return 'This time overlaps with an existing slot';
+    }
+    
+    return null;
   };
 
   const saveSlot = async () => {
     if (!form.startTime || !form.endTime) { setConflict('Please fill start and end time'); return; }
-    if (checkConflict(form.startTime, form.endTime, selectedSlot?.id)) {
-      setConflict('⚠ This slot already has an appointment or overlaps with another slot.');
+    
+    const conflictMsg = checkConflict(form.startTime, form.endTime, selectedSlot?.id);
+    if (conflictMsg) {
+      setConflict('⚠ ' + conflictMsg);
       return;
     }
     
@@ -376,6 +405,7 @@ const DoctorSchedulingScreen = () => {
                   mode="time"
                   is24Hour={false}
                   display="default"
+                  minuteInterval={30}
                   onChange={onStartTimeChange}
                 />
               )}
@@ -392,6 +422,7 @@ const DoctorSchedulingScreen = () => {
                   mode="time"
                   is24Hour={false}
                   display="default"
+                  minuteInterval={30}
                   onChange={onEndTimeChange}
                 />
               )}

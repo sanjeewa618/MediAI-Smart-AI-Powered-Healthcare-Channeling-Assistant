@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, ScrollView,
-  TouchableOpacity, Platform, Modal, ActivityIndicator, Alert, Linking
+  TouchableOpacity, Platform, Modal, ActivityIndicator, Alert, Linking, TextInput
 } from 'react-native';
-import { Calendar, Clock, Video, User, ChevronRight, ChevronLeft, X, Activity, FileText } from 'lucide-react-native';
+import { Calendar, Clock, Video, User, ChevronRight, ChevronLeft, X, Activity, FileText, Search } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import DoctorBottomNavBar from '../../components/DoctorBottomNavBar';
@@ -86,6 +86,12 @@ const DoctorAppointmentsScreen = () => {
   
   const [appointments, setAppointments] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredAppointments = appointments.filter(appt => 
+    appt.patient?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    appt.notes?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   // Profile Modal State
   const [profileModalVisible, setProfileModalVisible] = useState(false);
@@ -163,9 +169,25 @@ const DoctorAppointmentsScreen = () => {
             <ChevronRight size={22} color="#FFF" style={{ transform: [{ rotate: '180deg' }] }} />
           </TouchableOpacity>
           <View style={styles.headerTextWrap}>
-            <Text style={styles.headerTitle}>Appointments</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={styles.headerTitle}>Appointments</Text>
+              <View style={styles.countBadge}>
+                <Text style={styles.countBadgeText}>{appointments.length}</Text>
+              </View>
+            </View>
             <Text style={styles.headerSub}>{getDayLabel()}</Text>
           </View>
+        </View>
+
+        <View style={styles.searchContainer}>
+          <Search size={20} color="#9CA3AF" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search patients..."
+            placeholderTextColor="#9CA3AF"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
         </View>
       </LinearGradient>
 
@@ -258,8 +280,13 @@ const DoctorAppointmentsScreen = () => {
             <Calendar size={48} color={COLORS.border} />
             <Text style={styles.emptyText}>No appointments for this date</Text>
           </View>
+        ) : filteredAppointments.length === 0 ? (
+          <View style={styles.centerBox}>
+            <Search size={48} color={COLORS.border} />
+            <Text style={styles.emptyText}>No patients match your search</Text>
+          </View>
         ) : (
-          appointments.map((appt, idx) => {
+          filteredAppointments.map((appt, idx) => {
             const patientName = appt.patient?.name || 'Unknown Patient';
             const issueText = appt.notes || 'Consultation'; 
             
@@ -401,18 +428,46 @@ const DoctorAppointmentsScreen = () => {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F4F6FB' },
-  header: {
-    paddingTop: Platform.OS === 'ios' ? 60 : 50,
-    paddingHorizontal: 20,
-    paddingBottom: 24,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
+  header: { 
+    paddingTop: Platform.OS === 'ios' ? 60 : 40, 
+    paddingHorizontal: 20, 
+    paddingBottom: 20, 
+    borderBottomLeftRadius: 30, 
+    borderBottomRightRadius: 30 
   },
-  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  headerTextWrap: { flex: 1 },
-  backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+  headerRow: { flexDirection: 'row', alignItems: 'center' },
+  backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+  headerTextWrap: { marginLeft: 15 },
   headerTitle: { fontSize: 24, fontWeight: '800', color: '#FFF' },
-  headerSub: { fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 4 },
+  headerSub: { fontSize: 14, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
+  countBadge: {
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  countBadgeText: {
+    color: '#FFF',
+    fontSize: 25,
+    fontWeight: '700',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    marginTop: 20,
+    paddingHorizontal: 12,
+    height: 44,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: '#1F2937',
+  },
   
   monthHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 4 },
   monthTitleContainer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
