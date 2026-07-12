@@ -103,7 +103,15 @@ export const createAppointment = async (req, res) => {
       }
     }
 
-    const nextQueueNumber = existingInSlot + 1;
+    const maxQueueAppt = await Appointment.findOne({
+      doctor,
+      timeSlot,
+      date: { $gte: startOfDay, $lte: endOfDay }
+    }).sort('-queueNumber').select('queueNumber');
+
+    const nextQueueNumber = maxQueueAppt && typeof maxQueueAppt.queueNumber === 'number' 
+      ? maxQueueAppt.queueNumber + 1 
+      : 1;
 
     const appointment = await Appointment.create({
       patient: req.user._id, // Automatically attach the logged-in patient
