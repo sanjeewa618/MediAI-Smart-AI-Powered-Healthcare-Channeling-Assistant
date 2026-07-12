@@ -63,7 +63,25 @@ const DoctorSessionScreen = () => {
     if (sessionStarted) {
       Alert.alert('End Session', 'Are you sure you want to end this session?', [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'End', onPress: () => setSessionStarted(false), style: 'destructive' }
+        { 
+          text: 'End', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const updatedPatients = [...patients];
+              const promises = updatedPatients.map(p => {
+                if (p.status !== 'completed' && p.status !== 'pending' && p.status !== 'cancelled') {
+                  p.status = 'cancelled';
+                  return updatePatientStatus(p._id, 'cancelled');
+                }
+                return Promise.resolve();
+              });
+              await Promise.all(promises);
+              setPatients(updatedPatients);
+              setSessionStarted(false);
+            } catch (error) {}
+          }
+        }
       ]);
       return;
     }
@@ -153,6 +171,26 @@ const DoctorSessionScreen = () => {
       setPatients(updatedPatients);
       setProfileModalVisible(false);
     } catch (error) {}
+  };
+
+  const handleCancel = async (appIndex: number) => {
+    Alert.alert('Cancel Appointment', 'Are you sure you want to cancel this appointment?', [
+      { text: 'No', style: 'cancel' },
+      { 
+        text: 'Yes, Cancel', 
+        style: 'destructive',
+        onPress: async () => {
+          const updatedPatients = [...patients];
+          const currentPatient = updatedPatients[appIndex];
+          try {
+            await updatePatientStatus(currentPatient._id, 'cancelled');
+            currentPatient.status = 'cancelled';
+            setPatients(updatedPatients);
+            setProfileModalVisible(false);
+          } catch (error) {}
+        }
+      }
+    ]);
   };
 
   const openPatientProfile = async (appIndex: number) => {
@@ -409,33 +447,33 @@ const DoctorSessionScreen = () => {
                       return <ActivityIndicator size="small" color={COLORS.primary} />;
                     }
 
-                    if (isReady) {
-                      return (
-                        <TouchableOpacity style={[styles.footerBtn, { backgroundColor: COLORS.primary }]} onPress={() => handleArrowRight(selectedAppIndex)}>
-                          <ArrowRight size={20} color="#FFF" />
-                          <Text style={styles.footerBtnText}>Call In Patient</Text>
-                        </TouchableOpacity>
-                      );
-                    }
-
-                    if (isActive) {
-                      return (
-                        <View style={{ flexDirection: 'row', gap: 12 }}>
-                          <TouchableOpacity style={[styles.footerBtn, { backgroundColor: '#FEE2E2', flex: 1 }]} onPress={() => handleSkip(selectedAppIndex)}>
-                            <XCircle size={20} color="#DC2626" />
-                            <Text style={[styles.footerBtnText, { color: '#DC2626' }]}>Skip</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity style={[styles.footerBtn, { backgroundColor: '#10B981', flex: 1 }]} onPress={() => handleComplete(selectedAppIndex)}>
-                            <Check size={20} color="#FFF" />
-                            <Text style={[styles.footerBtnText, { color: '#FFF' }]}>Complete</Text>
-                          </TouchableOpacity>
-                        </View>
-                      );
-                    }
-
                     return (
-                      <View style={[styles.footerBtn, { backgroundColor: '#E5E7EB' }]}>
-                        <Text style={[styles.footerBtnText, { color: '#6B7280' }]}>Status: {app.status.toUpperCase()}</Text>
+                      <View style={{ gap: 10 }}>
+                        {['pending', 'confirmed', 'ready', 'started', 'in'].includes(app.status) && (
+                          <View style={{ flexDirection: 'row', gap: 12 }}>
+                            <TouchableOpacity style={[styles.footerBtn, { backgroundColor: '#FEE2E2', flex: 1 }]} onPress={() => handleSkip(selectedAppIndex)}>
+                              <XCircle size={20} color="#DC2626" />
+                              <Text style={[styles.footerBtnText, { color: '#DC2626' }]}>Skip</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[styles.footerBtn, { backgroundColor: '#10B981', flex: 1 }]} onPress={() => handleComplete(selectedAppIndex)}>
+                              <Check size={20} color="#FFF" />
+                              <Text style={[styles.footerBtnText, { color: '#FFF' }]}>Complete</Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
+
+                        {!['pending', 'confirmed', 'ready', 'started', 'in'].includes(app.status) && (
+                          <View style={[styles.footerBtn, { backgroundColor: '#E5E7EB' }]}>
+                            <Text style={[styles.footerBtnText, { color: '#6B7280' }]}>Status: {app.status.toUpperCase()}</Text>
+                          </View>
+                        )}
+
+                        {['pending', 'confirmed', 'ready', 'started'].includes(app.status) && (
+                          <TouchableOpacity style={[styles.footerBtn, { backgroundColor: '#FEE2E2' }]} onPress={() => handleCancel(selectedAppIndex)}>
+                            <XCircle size={20} color="#DC2626" />
+                            <Text style={[styles.footerBtnText, { color: '#DC2626' }]}>Cancel Appointment</Text>
+                          </TouchableOpacity>
+                        )}
                       </View>
                     );
                   })()}
