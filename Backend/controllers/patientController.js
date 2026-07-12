@@ -167,15 +167,13 @@ export const getDashboardData = async (req, res) => {
     const rawDoctorAppointments = await Appointment.find({
       patient: req.user._id,
       date: { $gte: today },
-      status: { $in: ['pending', 'confirmed'] }
+      status: { $in: ['pending', 'confirmed', 'started', 'ready', 'in', 'skipped', 'nextIn'] }
     })
       .populate('doctor', 'name specialization hospital')
       .sort({ date: 1, timeSlot: 1 })
       .limit(10);
 
-    const doctorAppointments = rawDoctorAppointments
-      .filter(appt => !isAppointmentExpired(appt.date, appt.timeSlot))
-      .slice(0, 5);
+    const doctorAppointments = rawDoctorAppointments.slice(0, 5);
 
     // 2. Fetch upcoming lab tests from LabBooking
     const rawLabBookings = await LabBooking.find({
@@ -188,12 +186,7 @@ export const getDashboardData = async (req, res) => {
       .sort({ appointmentDate: 1 })
       .limit(10);
 
-    const activeLabBookings = rawLabBookings.filter(booking => {
-      const timeRange = booking.scheduleSlot 
-        ? `${booking.scheduleSlot.startTime} - ${booking.scheduleSlot.endTime}`
-        : booking.timeSlot || '09:00 AM';
-      return !isAppointmentExpired(booking.appointmentDate, timeRange);
-    });
+    const activeLabBookings = rawLabBookings;
 
     const labAppointments = activeLabBookings.slice(0, 5).map(booking => ({
       _id: booking._id,
@@ -214,12 +207,45 @@ export const getDashboardData = async (req, res) => {
     const labQueue = await buildLabQueueSnapshots(activeLabBookings);
     const liveQueue = [...doctorQueue, ...labQueue];
 
+    // 4. Fetch counts for today's completed and cancelled doctor appointments + lab appointments
+    const endOfToday = new Date(today.getTime());
+    endOfToday.setHours(23, 59, 59, 999);
+
+    const todayCompletedDoctorCount = await Appointment.countDocuments({
+      patient: req.user._id,
+      date: { $gte: today, $lte: endOfToday },
+      status: 'completed'
+    });
+    
+    const todayCancelledDoctorCount = await Appointment.countDocuments({
+      patient: req.user._id,
+      date: { $gte: today, $lte: endOfToday },
+      status: 'cancelled'
+    });
+
+    const todayCompletedLabCount = await LabBooking.countDocuments({
+      patientUser: req.user._id,
+      appointmentDate: { $gte: today, $lte: endOfToday },
+      status: 'Completed'
+    });
+
+    const todayCancelledLabCount = await LabBooking.countDocuments({
+      patientUser: req.user._id,
+      appointmentDate: { $gte: today, $lte: endOfToday },
+      status: 'Cancelled'
+    });
+
+    const todayCompletedCount = todayCompletedDoctorCount + todayCompletedLabCount;
+    const todayCancelledCount = todayCancelledDoctorCount + todayCancelledLabCount;
+
     res.json({
       success: true,
       data: {
         doctorAppointments,
         labAppointments,
-        liveQueue
+        liveQueue,
+        todayCompletedCount,
+        todayCancelledCount
       }
     });
   } catch (error) {

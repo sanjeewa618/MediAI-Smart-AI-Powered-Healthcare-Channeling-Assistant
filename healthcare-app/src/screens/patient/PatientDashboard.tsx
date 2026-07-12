@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, Dimensions, Animated, PanResponder, Pressable, StatusBar, Modal, BackHandler, Easing } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
-import { Search, Calendar, User, FileText, Activity, MoreHorizontal, Home, Heart, Shield, MessageCircle, FileEdit, FlaskConical, ChevronRight, Baby, Droplets, Sparkles, Plus, Bell, LogOut, Pill, Truck, Settings, X, LifeBuoy, Stethoscope, Dna, Brain, Bone, Eye, Smile, Wallet, Clock, AlertCircle, Hourglass, Users } from 'lucide-react-native';
+import { Search, Calendar, User, FileText, Activity, MoreHorizontal, Home, Heart, Shield, MessageCircle, FileEdit, FlaskConical, ChevronRight, Baby, Droplets, Sparkles, Plus, Bell, LogOut, Pill, Truck, Settings, X, LifeBuoy, Stethoscope, Dna, Brain, Bone, Eye, Smile, Wallet, Clock, AlertCircle, Hourglass, Users, RefreshCw, CheckCircle, XCircle } from 'lucide-react-native';
 import BottomNavBar from '../../components/BottomNavBar';
 import { useAuth } from '../../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -425,6 +425,9 @@ const PatientDashboard = () => {
   const [upcomingLabAppointments, setUpcomingLabAppointments] = useState<any[]>([]);
   const [liveQueue, setLiveQueue] = useState<any[]>([]);
   const [lastQueueRefresh, setLastQueueRefresh] = useState<Date | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [todayCompletedCount, setTodayCompletedCount] = useState(0);
+  const [todayCancelledCount, setTodayCancelledCount] = useState(0);
 
   // Lab Availability
   const [labCategories, setLabCategories] = useState<any[]>([]);
@@ -446,9 +449,7 @@ const PatientDashboard = () => {
             const filterNextTwoDays = (appts: any[]) => {
               if (!appts) return [];
               return appts.filter(appt => {
-                const dateInRange = moment(appt.date).isBetween(startOfToday, endOfTwoDays, null, '[]');
-                if (!dateInRange) return false;
-                return !isApptExpiredFrontend(appt.date, appt.timeSlot);
+                return moment(appt.date).isBetween(startOfToday, endOfTwoDays, null, '[]');
               });
             };
             const filterUnique = (appts: any[]) => {
@@ -463,6 +464,8 @@ const PatientDashboard = () => {
             setUpcomingDoctorAppointments(filterUnique(filterNextTwoDays(json.data.doctorAppointments)));
             setUpcomingLabAppointments(filterUnique(filterNextTwoDays(json.data.labAppointments)));
             setLiveQueue(json.data.liveQueue || []);
+            setTodayCompletedCount(json.data.todayCompletedCount || 0);
+            setTodayCancelledCount(json.data.todayCancelledCount || 0);
             setLastQueueRefresh(new Date());
           }
         } catch (e) {
@@ -474,7 +477,7 @@ const PatientDashboard = () => {
         const interval = setInterval(fetchQueue, 30000);
         return () => clearInterval(interval);
       }
-    }, [token])
+    }, [token, refreshTrigger])
   );
 
   useFocusEffect(
@@ -526,7 +529,7 @@ const PatientDashboard = () => {
         }
       };
       if (token) fetchLabAvailability();
-    }, [token])
+    }, [token, refreshTrigger])
   );
 
   useFocusEffect(
@@ -552,7 +555,7 @@ const PatientDashboard = () => {
       if (token) {
         fetchProfile();
       }
-    }, [token])
+    }, [token, refreshTrigger])
   );
 
 
@@ -833,9 +836,9 @@ const PatientDashboard = () => {
               <View style={styles.headerActions}>
                 <TouchableOpacity
                   style={styles.headerActionButton}
-                  onPress={() => setAppointmentModalVisible(true)}
+                  onPress={() => setRefreshTrigger(prev => prev + 1)}
                 >
-                  <Calendar size={20} color="#FFFFFF" />
+                  <RefreshCw size={20} color="#FFFFFF" />
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.headerActionButton, { marginLeft: 10 }]}>
                   <Bell size={20} color="#FFFFFF" />
@@ -875,6 +878,31 @@ const PatientDashboard = () => {
               <X size={18} color={COLORS.textSecondary} />
             </TouchableOpacity>
           )}
+
+          {/* Summary Cards */}
+          <StaggeredView delay={250}>
+            <View style={styles.summaryCardsRow}>
+              <View style={[styles.summaryCard, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0', borderWidth: 1 }]}>
+                <View style={[styles.summaryCardIconWrap, { backgroundColor: '#DCFCE7' }]}>
+                  <CheckCircle size={20} color="#16A34A" />
+                </View>
+                <View style={styles.summaryCardTextWrap}>
+                  <Text style={styles.summaryCardValue}>{todayCompletedCount}</Text>
+                  <Text style={styles.summaryCardLabel}>Completed</Text>
+                </View>
+              </View>
+
+              <View style={[styles.summaryCard, { backgroundColor: '#FEF2F2', borderColor: '#FECACA', borderWidth: 1 }]}>
+                <View style={[styles.summaryCardIconWrap, { backgroundColor: '#FEE2E2' }]}>
+                  <XCircle size={20} color="#DC2626" />
+                </View>
+                <View style={styles.summaryCardTextWrap}>
+                  <Text style={styles.summaryCardValue}>{todayCancelledCount}</Text>
+                  <Text style={styles.summaryCardLabel}>Cancelled</Text>
+                </View>
+              </View>
+            </View>
+          </StaggeredView>
 
           {/* AI Health Assistant Card */}
           <StaggeredView delay={300}>
@@ -2391,6 +2419,48 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#6B7280',
     fontWeight: '600',
+  },
+  summaryCardsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    marginTop: 10,
+    marginBottom: 10,
+  },
+  summaryCard: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 16,
+    marginHorizontal: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  summaryCardIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  summaryCardTextWrap: {
+    flex: 1,
+  },
+  summaryCardValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: COLORS.textHeader,
+  },
+  summaryCardLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+    marginTop: 2,
   }
 });
 
