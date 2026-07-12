@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, Platform, Modal, Animated, PanResponder, Dimensions, BackHandler } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, Platform, Modal, Animated, PanResponder, Dimensions, BackHandler, Alert } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
-import { Bell, Calendar, LogOut, X, Clock, FileEdit, Plus, Play, Users, CheckSquare, Activity, Search, MessageCircle } from 'lucide-react-native';
+import { Bell, Calendar, LogOut, X, Clock, FileEdit, Plus, Play, Users, CheckSquare, Activity, Search, MessageCircle, RefreshCcw } from 'lucide-react-native';
 
 const { height } = Dimensions.get('window');
 import DoctorBottomNavBar from '../../components/DoctorBottomNavBar';
@@ -108,7 +108,12 @@ const DoctorDashboard = () => {
 
   const handleStartSessionFromDashboard = async (slot: any) => {
     try {
-      await fetch(`${API_BASE_URL}/api/doctor/session/start`, {
+      const hasActiveSession = todaySlots.some(s => s.sessionStatus === 'started');
+      if (hasActiveSession) {
+        Alert.alert('Action Blocked', 'You cannot start a new session until the currently active session is ended.');
+        return;
+      }
+      const res = await fetch(`${API_BASE_URL}/api/doctor/session/start`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({
@@ -116,23 +121,16 @@ const DoctorDashboard = () => {
           timeSlot: `${slot.startTime} - ${slot.endTime}`
         })
       });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to start session');
+      }
       fetchDashboardData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to start session from dashboard', error);
+      Alert.alert('Error', error.message || 'Failed to start session from dashboard');
     }
   };
-
-  // Pulse Animation for Up Next Card
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.03, duration: 1000, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true })
-      ])
-    ).start();
-  }, []);
 
   // Animation and PanResponder for Bottom Sheet
   const transitionAnim = useRef(new Animated.Value(height)).current;
@@ -197,8 +195,8 @@ const DoctorDashboard = () => {
               </View>
             </View>
             <View style={styles.headerRight}>
-              <TouchableOpacity style={styles.iconBtn} onPress={openTimeSlotModal}>
-                <Calendar size={20} color="#FFF" />
+              <TouchableOpacity style={styles.iconBtn} onPress={fetchDashboardData}>
+                <RefreshCcw size={20} color="#FFF" />
               </TouchableOpacity>
               <TouchableOpacity style={styles.iconBtn}>
                 <Bell size={20} color="#FFF" />
@@ -280,31 +278,14 @@ const DoctorDashboard = () => {
               <Text style={styles.emptyTitle}>No slots today</Text>
             </View>
           ) : (() => {
-            const nextSlotIndex = todaySlots.findIndex(slot => parseTime(slot.endTime) > currentTime);
+            const hasActiveSession = todaySlots.some(s => s.sessionStatus === 'started');
             
             return todaySlots.map((slot, idx) => {
               const timeSlotStr = `${slot.startTime} - ${slot.endTime}`;
               const patientsForSlot = todayAppointments.filter(app => app.timeSlot === timeSlotStr);
-              const isNext = idx === nextSlotIndex;
-
-              let timeRemainingText = '';
-              if (isNext) {
-                const timeRemainingMs = parseTime(slot.startTime) - currentTime;
-                if (timeRemainingMs > 0) {
-                  const mins = Math.floor(timeRemainingMs / 60000);
-                  if (mins > 60) {
-                    timeRemainingText = `Starts in ${Math.floor(mins / 60)}h ${mins % 60}m`;
-                  } else {
-                    timeRemainingText = `Starts in ${mins} min`;
-                  }
-                } else {
-                  timeRemainingText = `Active Now`;
-                }
-              }
 
               const cardStyle = [
                 styles.slotCard,
-                isNext && styles.nextSlotCard,
                 slot.sessionStatus === 'started' && { backgroundColor: '#ECFDF5', borderColor: '#10B981', borderWidth: 1 },
                 slot.sessionStatus === 'ended' && { backgroundColor: '#FEF2F2', borderColor: '#DC2626', borderWidth: 1 }
               ];
@@ -316,14 +297,13 @@ const DoctorDashboard = () => {
                   activeOpacity={0.8}
                 >
                   <View style={styles.slotLeft}>
-                    <View style={[styles.slotIconBox, isNext && { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-                      <Clock size={20} color={isNext ? "#FFF" : COLORS.primary} />
+                    <View style={styles.slotIconBox}>
+                      <Clock size={20} color={COLORS.primary} />
                     </View>
                     <View>
-                      {isNext && <Text style={styles.upNextBadge}>UP NEXT</Text>}
-                      <Text style={[styles.slotTime, isNext && { color: '#FFF', fontSize: 16 }]}>{timeSlotStr}</Text>
-                      <Text style={[styles.slotMeta, isNext && { color: 'rgba(255,255,255,0.85)' }]}>
-                        {patientsForSlot.length} Patient{patientsForSlot.length !== 1 ? 's' : ''} {isNext ? `• ${timeRemainingText}` : ''}
+                      <Text style={styles.slotTime}>{timeSlotStr}</Text>
+                      <Text style={styles.slotMeta}>
+                        {patientsForSlot.length} Patient{patientsForSlot.length !== 1 ? 's' : ''}
                       </Text>
                     </View>
                   </View>
@@ -338,27 +318,23 @@ const DoctorDashboard = () => {
                       </View>
                     ) : (
                       <TouchableOpacity 
-                        style={[styles.startBtn, isNext && { backgroundColor: '#FFF' }]}
+                        style={[styles.startBtn, hasActiveSession && { opacity: 0.5 }]}
                         onPress={(e) => {
                           e.stopPropagation();
+                          if (hasActiveSession) {
+                            Alert.alert('Session Active', 'You cannot start a new session until the currently active session is ended.');
+                            return;
+                          }
                           handleStartSessionFromDashboard(slot);
                         }}
                       >
-                        <Play size={14} color={isNext ? "#10B981" : "#FFF"} fill={isNext ? "#10B981" : "#FFF"} />
-                        <Text style={[styles.startBtnText, isNext && { color: "#10B981" }]}>Start</Text>
+                        <Play size={14} color="#FFF" fill="#FFF" />
+                        <Text style={styles.startBtnText}>Start</Text>
                       </TouchableOpacity>
                     )}
                   </View>
                 </TouchableOpacity>
               );
-
-              if (isNext) {
-                return (
-                  <Animated.View key={slot._id || idx} style={{ transform: [{ scale: pulseAnim }] }}>
-                    {cardContent}
-                  </Animated.View>
-                );
-              }
 
               return <View key={slot._id || idx}>{cardContent}</View>;
             });

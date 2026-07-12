@@ -77,7 +77,21 @@ export const createAppointment = async (req, res) => {
       if (sessionRecord.status === 'ended') {
         return res.status(400).json({ message: 'This session has already ended. You cannot book appointments for this time slot anymore.' });
       } else if (sessionRecord.status === 'started') {
-        initialStatus = 'started';
+        const existingAppointments = await Appointment.find({
+          doctor,
+          timeSlot,
+          date: { $gte: startOfDay, $lte: endOfDay },
+          status: { $in: ['ready', 'started'] }
+        });
+        
+        const hasReady = existingAppointments.some(app => app.status === 'ready');
+        const hasStarted = existingAppointments.some(app => app.status === 'started');
+
+        if (!hasReady && !hasStarted) {
+          initialStatus = 'ready';
+        } else {
+          initialStatus = 'started';
+        }
       }
     } else {
       // If no explicit session is tracked yet, auto-end if physical date is past today

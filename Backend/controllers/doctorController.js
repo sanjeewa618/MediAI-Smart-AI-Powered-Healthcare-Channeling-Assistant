@@ -399,20 +399,39 @@ export const getPatientDetailsForDoctor = async (req, res) => {
 export const updateSessionState = async (req, res) => {
   try {
     const { action } = req.params; // 'start' or 'end'
-    const { date, timeSlot } = req.body;
+    const { timeSlot } = req.body;
     
     if (!['start', 'end'].includes(action)) {
       return res.status(400).json({ message: 'Invalid action' });
     }
     
-    if (!date || !timeSlot) {
-      return res.status(400).json({ message: 'Date and timeSlot are required' });
+    if (!timeSlot) {
+      return res.status(400).json({ message: 'timeSlot is required' });
     }
 
-    const targetDate = new Date(date);
+    // Use server time to perfectly match getDoctorDashboard's todayStart
+    const targetDate = new Date();
     targetDate.setHours(0, 0, 0, 0);
 
     const newStatus = action === 'start' ? 'started' : 'ended';
+
+    if (action === 'start') {
+      const activeSession = await DailySession.findOne({
+        doctor: req.user._id,
+        date: targetDate,
+        status: 'started'
+      });
+
+      if (activeSession && activeSession.timeSlot !== timeSlot) {
+        // Self-healing: The frontend blocks starting if a visible session is active.
+        // If we reach here, it's either a ghost session (deleted slot) or concurrent bypass.
+        // We auto-end any dangling started sessions to maintain the single-session constraint.
+        await DailySession.updateMany(
+          { doctor: req.user._id, date: targetDate, status: 'started' },
+          { $set: { status: 'ended' } }
+        );
+      }
+    }
 
     const session = await DailySession.findOneAndUpdate(
       { doctor: req.user._id, date: targetDate, timeSlot },
