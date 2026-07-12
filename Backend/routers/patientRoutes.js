@@ -12,6 +12,7 @@ router.use(patientOnly);
 
 router.get('/dashboard', getDashboardData);
 router.get('/queue/:appointmentId', getLiveQueueStatus);
+router.put('/request-next-in/:appointmentId', requestAdminNextIn);
 router.get('/stats', getPatientStats);
 router.put('/profile', updateProfile);
 router.post('/profile/upload-avatar', upload.single('avatar'), uploadPatientAvatar);
