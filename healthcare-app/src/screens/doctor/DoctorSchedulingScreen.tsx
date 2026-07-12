@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Modal, TextInput, Platform, Switch } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Modal, TextInput, Platform, Switch, Alert, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Plus, Clock, Trash2, Edit3, X, CheckCircle, AlertCircle, ChevronRight, ChevronLeft, Calendar } from 'lucide-react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
@@ -81,6 +81,12 @@ const DoctorSchedulingScreen = () => {
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
   const [form, setForm] = useState({ startTime: '', endTime: '', consultType: 'Physical', maxPatients: '10', notes: '', repeat: 'none', physical: true, video: false });
   const [conflict, setConflict] = useState('');
+  
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [slotToDelete, setSlotToDelete] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
   
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
@@ -248,15 +254,49 @@ const DoctorSchedulingScreen = () => {
     }
   };
 
-  const deleteSlot = async (id: string) => {
+  const confirmDelete = (id: string) => {
+    Alert.alert('Delete Slot', 'Do you really want to delete this time slot?', [
+      { text: 'No', style: 'cancel' },
+      { 
+        text: 'Yes', 
+        style: 'destructive',
+        onPress: () => {
+          setSlotToDelete(id);
+          setDeletePassword('');
+          setDeleteError('');
+          setShowPasswordModal(true);
+        }
+      }
+    ]);
+  };
+
+  const deleteSlot = async () => {
+    if (!slotToDelete || !deletePassword) {
+      setDeleteError('Password is required');
+      return;
+    }
+    setDeleteError('');
+    setIsDeleting(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/doctor/schedule/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/doctor/schedule/${slotToDelete}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify({ password: deletePassword })
       });
-      if (res.ok) fetchSlots();
+      const data = await res.json();
+      if (res.ok) {
+        setShowPasswordModal(false);
+        fetchSlots();
+      } else {
+        setDeleteError(data.message || 'Incorrect password');
+      }
     } catch (err) {
-      console.error(err);
+      setDeleteError('Network error. Please try again.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -362,7 +402,7 @@ const DoctorSchedulingScreen = () => {
                     <TouchableOpacity onPress={() => openEditModal(slot)} style={styles.iconBtn}>
                       <Edit3 size={16} color={COLORS.primary} />
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={() => deleteSlot(slot.id)} style={styles.iconBtn}>
+                    <TouchableOpacity onPress={() => confirmDelete(slot.id)} style={styles.iconBtn}>
                       <Trash2 size={16} color={COLORS.error} />
                     </TouchableOpacity>
                   </View>
@@ -521,6 +561,51 @@ const DoctorSchedulingScreen = () => {
           <Plus size={24} color="#FFF" />
         </LinearGradient>
       </TouchableOpacity>
+
+      {/* Password Modal for Deletion */}
+      <Modal visible={showPasswordModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalBox, { maxHeight: '50%' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Confirm Deletion</Text>
+              <TouchableOpacity onPress={() => setShowPasswordModal(false)}>
+                <X size={22} color="#4B5563" />
+              </TouchableOpacity>
+            </View>
+            <Text style={{ fontSize: 14, color: '#4B5563', marginBottom: 15 }}>
+              Please enter your account password to delete this schedule slot.
+            </Text>
+            
+            <Text style={styles.fieldLabel}>Password</Text>
+            <TextInput 
+              style={styles.input} 
+              placeholder="Enter password" 
+              placeholderTextColor="#9CA3AF" 
+              secureTextEntry 
+              value={deletePassword} 
+              onChangeText={setDeletePassword} 
+            />
+            
+            {deleteError ? (
+              <View style={styles.conflictBox}>
+                <AlertCircle size={16} color={COLORS.error} />
+                <Text style={styles.conflictText}>{deleteError}</Text>
+              </View>
+            ) : null}
+
+            <View style={styles.modalBtns}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowPasswordModal(false)}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.saveBtn, { backgroundColor: COLORS.error }]} onPress={deleteSlot} disabled={isDeleting}>
+                <View style={[styles.saveBtnGrad, { backgroundColor: COLORS.error }]}>
+                  {isDeleting ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={styles.saveBtnText}>Delete Slot</Text>}
+                </View>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <DoctorBottomNavBar />
       <NurseBottomNavBar />

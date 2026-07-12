@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
 import User from '../model/User.js';
 import Appointment from '../model/Appointment.js';
 import DoctorAvailability from '../model/DoctorAvailability.js';
@@ -224,10 +225,23 @@ export const updateDoctorSchedule = async (req, res) => {
 // @access  Private (Doctor only)
 export const deleteDoctorSchedule = async (req, res) => {
   try {
+    const { password } = req.body;
+    
+    if (!password) {
+      return res.status(400).json({ message: 'Password is required to delete a schedule slot' });
+    }
+
+    const user = await User.findById(req.user._id).select('+password');
+    const isMatch = await bcrypt.compare(password, user.password);
+
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Incorrect password' });
+    }
+
     const slot = await DoctorAvailability.findOne({ _id: req.params.id, doctor: req.user._id });
     
     if (!slot) {
-      return res.status(404).json({ message: 'Schedule slot not found or unauthorized' });
+      return res.status(404).json({ message: 'Schedule slot not found' });
     }
 
     await slot.deleteOne();
