@@ -13,9 +13,13 @@ import {
   FileText, ArrowRight, Check, Timer, FlaskConical, Shield, Bell
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/types';
+import { useAuth } from '../../context/AuthContext';
+import moment from 'moment';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
 
 type BookingFlowRouteProp = RouteProp<RootStackParamList, 'LabBookingFlow'>;
 type NavigationProp = StackNavigationProp<RootStackParamList, 'LabBookingFlow'>;
@@ -58,6 +62,17 @@ const LabBookingFlowScreen = () => {
     name: ''
   });
 
+  useFocusEffect(
+    React.useCallback(() => {
+      if (initialDate) {
+        setSelectedDate(initialDate);
+      }
+      if (initialTime) {
+        setSelectedTime(initialTime);
+      }
+    }, [initialDate, initialTime])
+  );
+
   const handleAddToCalendar = () => {
     Alert.alert(
       "Added to Calendar",
@@ -99,9 +114,103 @@ const LabBookingFlowScreen = () => {
     'Done'
   ];
 
-  const handleNext = () => {
-    if (currentStep < 10) {
-      setCurrentStep(currentStep + 1);
+  const { token } = useAuth();
+  const [bookingLoading, setBookingLoading] = useState(false);
+  const [bookingRefId, setBookingRefId] = useState('MED-LAB-2026-482');
+  const [queueTokenNum, setQueueTokenNum] = useState(22);
+
+  const handleNext = async () => {
+    // Step 2 Validation (Patient Information)
+    if (currentStep === 2) {
+      if (!patientDetails.fullName.trim()) {
+        Alert.alert('Required Field', 'Please enter your full name.');
+        return;
+      }
+      if (!patientDetails.nic.trim()) {
+        Alert.alert('Required Field', 'Please enter your NIC or Passport.');
+        return;
+      }
+      if (!patientDetails.mobile.trim()) {
+        Alert.alert('Required Field', 'Please enter your mobile number.');
+        return;
+      }
+    }
+
+    // Step 3 Validation (Collection Method Address)
+    if (currentStep === 3 && collectionMethod === 'Home') {
+      if (!patientDetails.address.trim()) {
+        Alert.alert('Required Field', 'Please enter your home address for sample collection.');
+        return;
+      }
+    }
+
+    // Step 5 Validation (Payment Card Details)
+    if (currentStep === 5 && paymentMethod === 'Card') {
+      if (!cardDetails.name.trim()) {
+        Alert.alert('Required Field', 'Please enter the cardholder name.');
+        return;
+      }
+      if (!cardDetails.number.trim()) {
+        Alert.alert('Required Field', 'Please enter your card number.');
+        return;
+      }
+      if (!cardDetails.expiry.trim()) {
+        Alert.alert('Required Field', 'Please enter the card expiry date (MM/YY).');
+        return;
+      }
+      if (!cardDetails.cvv.trim()) {
+        Alert.alert('Required Field', 'Please enter the card CVV number.');
+        return;
+      }
+    }
+
+    if (currentStep === 5) {
+      setBookingLoading(true);
+      try {
+        const scheduleSlotId = (route.params as any)?.scheduleSlotId;
+        const payload = {
+          labId: lab.id,
+          scheduleSlotId,
+          appointmentDate: selectedDate,
+          timeSlot: selectedTime || '09:00 AM',
+          patient: {
+            fullName: patientDetails.fullName.trim(),
+            nic: patientDetails.nic.trim(),
+            gender: patientDetails.gender,
+            mobile: patientDetails.mobile.trim()
+          },
+          collectionMethod,
+          homeAddress: collectionMethod === 'Home' ? patientDetails.address.trim() : 'Hospital',
+          paymentMethod,
+        };
+
+        const res = await fetch(`${API_BASE_URL}/api/labs/bookings`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+          setBookingRefId(data.data.bookingRef);
+          setQueueTokenNum(data.data.queueToken);
+          setCurrentStep(6);
+        } else {
+          Alert.alert('Booking Error', data.message || 'Failed to create booking.');
+        }
+      } catch (err) {
+        console.error(err);
+        Alert.alert('Error', 'An error occurred while confirming booking.');
+      } finally {
+        setBookingLoading(false);
+      }
+    } else {
+      if (currentStep < 10) {
+        setCurrentStep(currentStep + 1);
+      }
     }
   };
 
@@ -194,10 +303,10 @@ const LabBookingFlowScreen = () => {
     </View>
   );
 
-  const renderStep3 = () => (
-    <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Patient Information</Text>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+  const renderStep3 = () => {
+    return (
+      <View style={styles.stepContent}>
+        <Text style={styles.stepTitle}>Patient Information</Text>
         <View style={styles.inputGroup}>
           <Text style={styles.inputLabel}>Full Name</Text>
           <TextInput 
@@ -255,9 +364,9 @@ const LabBookingFlowScreen = () => {
             onChangeText={(v) => setPatientDetails({...patientDetails, medicalNotes: v})}
           />
         </View>
-      </KeyboardAvoidingView>
-    </View>
-  );
+      </View>
+    );
+  };
 
   const renderStep4 = () => (
     <View style={styles.stepContent}>
@@ -284,7 +393,13 @@ const LabBookingFlowScreen = () => {
       {collectionMethod === 'Home' && (
         <View style={[styles.homeDetails, SHADOWS.small]}>
           <Text style={styles.inputLabel}>Home Address</Text>
-          <TextInput style={styles.input} placeholder="Enter your full address" multiline />
+          <TextInput 
+            style={styles.input} 
+            placeholder="Enter your full address" 
+            multiline 
+            value={patientDetails.address}
+            onChangeText={(v) => setPatientDetails({...patientDetails, address: v})}
+          />
           <Text style={[styles.inputLabel, { marginTop: 15 }]}>Landmark</Text>
           <TextInput style={styles.input} placeholder="Near Supermarket, etc." />
         </View>
@@ -323,7 +438,7 @@ const LabBookingFlowScreen = () => {
         
         <View style={styles.reviewItem}>
           <Calendar size={18} color="#6B7280" />
-          <Text style={styles.reviewItemText}>{selectedDate} May 2026</Text>
+          <Text style={styles.reviewItemText}>{moment(selectedDate).format('DD MMMM YYYY')}</Text>
         </View>
         <View style={styles.reviewItem}>
           <Clock size={18} color="#6B7280" />
@@ -436,24 +551,26 @@ const LabBookingFlowScreen = () => {
   );
 
   const renderSuccess = () => (
-    <View style={styles.successContent}>
-      <LinearGradient
-        colors={['#ECFDF5', '#FFF']}
-        style={styles.successBg}
-      >
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#ECFDF5' }}>
+      <StatusBar barStyle="dark-content" />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}>
+        <LinearGradient
+          colors={['#ECFDF5', '#FFF']}
+          style={styles.successBg}
+        >
         <Text style={styles.successTitle}>Booking Confirmed!</Text>
         <Text style={styles.successSub}>Your lab test has been scheduled successfully.</Text>
         
         <View style={[styles.ticketCard, SHADOWS.medium]}>
           <View style={styles.ticketHeader}>
             <Text style={styles.ticketLabel}>Booking ID</Text>
-            <Text style={styles.ticketID}>#MED-LAB-2026-482</Text>
+            <Text style={styles.ticketID}>#{bookingRefId}</Text>
           </View>
           
           <View style={styles.ticketRow}>
             <View style={styles.ticketItem}>
               <Text style={styles.ticketLabel}>Token</Text>
-              <Text style={styles.tokenValue}>22</Text>
+              <Text style={styles.tokenValue}>{queueTokenNum}</Text>
             </View>
             <View style={styles.ticketItem}>
               <Text style={styles.ticketLabel}>Room</Text>
@@ -466,7 +583,7 @@ const LabBookingFlowScreen = () => {
           <View style={styles.ticketDetails}>
             <View style={styles.ticketDetailRow}>
               <Text style={styles.ticketDetailLabel}>Date</Text>
-              <Text style={styles.ticketDetailValue}>{selectedDate} May, 2026</Text>
+              <Text style={styles.ticketDetailValue}>{moment(selectedDate).format('DD MMMM YYYY')}</Text>
             </View>
             <View style={styles.ticketDetailRow}>
               <Text style={styles.ticketDetailLabel}>Time</Text>
@@ -482,8 +599,8 @@ const LabBookingFlowScreen = () => {
         <View style={[styles.queueInfoCard, SHADOWS.small]}>
           <Activity size={20} color={COLORS.primary} />
           <View style={styles.queueTextSection}>
-            <Text style={styles.queueMainText}>Queue Status: 18 People Ahead</Text>
-            <Text style={styles.queueSubText}>Estimated Wait: 25 mins</Text>
+            <Text style={styles.queueMainText}>Queue Status: {Math.max(0, queueTokenNum - 1)} People Ahead</Text>
+            <Text style={styles.queueSubText}>Estimated Wait: {Math.max(0, queueTokenNum - 1) * 5} mins</Text>
           </View>
         </View>
 
@@ -505,6 +622,7 @@ const LabBookingFlowScreen = () => {
           </TouchableOpacity>
         </View>
       </LinearGradient>
+    </ScrollView>
 
       {/* Reminder Modal */}
       <Modal
@@ -543,8 +661,12 @@ const LabBookingFlowScreen = () => {
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
+
+  if (currentStep === 6) {
+    return renderSuccess();
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -562,17 +684,23 @@ const LabBookingFlowScreen = () => {
 
       {currentStep < 6 && renderStepIndicator()}
 
-      <ScrollView 
-        showsVerticalScrollIndicator={false} 
-        contentContainerStyle={styles.scrollContent}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
-        {currentStep === 1 && renderStep1()}
-        {currentStep === 2 && renderStep3()}
-        {currentStep === 3 && renderStep4()}
-        {currentStep === 4 && renderStep5()}
-        {currentStep === 5 && renderStep6()}
-        {currentStep === 6 && renderSuccess()}
-      </ScrollView>
+        <ScrollView 
+          showsVerticalScrollIndicator={false} 
+          contentContainerStyle={styles.scrollContent}
+        >
+          {currentStep === 1 && renderStep1()}
+          {currentStep === 2 && renderStep3()}
+          {currentStep === 3 && renderStep4()}
+          {currentStep === 4 && renderStep5()}
+          {currentStep === 5 && renderStep6()}
+          {currentStep === 6 && renderSuccess()}
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       {currentStep < 6 && (
         <View style={styles.footer}>

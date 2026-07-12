@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -6,218 +6,298 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
-  Dimensions,
-  Platform
+  ActivityIndicator,
+  Alert,
+  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SHADOWS } from '../../theme/theme';
-import { 
-  ArrowLeft, 
-  TrendingUp, 
-  Users, 
-  Calendar, 
-  Brain, 
+import { useAuth } from '../../context/AuthContext';
+import {
+  ArrowLeft,
+  TrendingUp,
+  Users,
+  Calendar,
+  Brain,
   ChevronRight,
-  TrendingDown,
-  CreditCard,
-  Clock
+  RefreshCw,
+  Clock,
+  Stethoscope,
 } from 'lucide-react-native';
 import AdminBottomNavBar from '../../components/AdminBottomNavBar';
 
-const { width } = Dimensions.get('window');
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
+
+type Timeframe = 'weekly' | 'monthly' | 'yearly';
+
+type AnalyticsData = {
+  timeframe: Timeframe;
+  range: {
+    start: string;
+    end: string;
+    label: string;
+  };
+  summary: {
+    totalUsers: number;
+    activeUsers: number;
+    newUsers: number;
+    totalAppointments: number;
+    completedAppointments: number;
+    pendingAppointments: number;
+    aiAnalyses: number;
+    aiUniqueSpecialists: number;
+  };
+  userStats: {
+    total: number;
+    active: number;
+    new: number;
+  };
+  appointmentTrend: Array<{ label: string; value: number }>;
+  specialtyBreakdown: Array<{ label: string; count: number; percentage: number; color: string }>;
+  aiStats: {
+    totalAnalyses: number;
+    topSpecialist: string;
+    specialistBreakdown: Array<{ label: string; count: number }>;
+  };
+  aiRecent: Array<{
+    id: string;
+    query: string;
+    response: string;
+    specialist: string;
+    createdAt: string;
+  }>;
+  userTrend: Array<{ label: string; value: number }>;
+};
+
+const TIMEFRAME_OPTIONS: Array<{ key: Timeframe; label: string }> = [
+  { key: 'weekly', label: 'Weekly' },
+  { key: 'monthly', label: 'Monthly' },
+  { key: 'yearly', label: 'Yearly' },
+];
 
 const AnalyticsScreen = () => {
   const navigation = useNavigation<any>();
-  const [timeframe, setTimeframe] = useState<'weekly' | 'monthly' | 'yearly'>('monthly');
+  const { token } = useAuth();
+  const [timeframe, setTimeframe] = useState<Timeframe>('monthly');
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Custom data for charts depending on timeframe
-  const userStats = {
-    total: 1380,
-    active: 942,
-    new: timeframe === 'weekly' ? 24 : timeframe === 'monthly' ? 104 : 850
+  const loadAnalytics = async () => {
+    if (!token) {
+      setLoading(false);
+      Alert.alert('Authentication required', 'Please sign in as an admin to view analytics.');
+      return;
+    }
+
+    setRefreshing(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/analytics?timeframe=${timeframe}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.message || 'Failed to load analytics');
+      }
+
+      setAnalytics(data.data as AnalyticsData);
+    } catch (error) {
+      console.error('Load analytics error:', error);
+      Alert.alert('Error', 'Unable to load analytics from the backend.');
+      setAnalytics(null);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
-  const appointmentData = [
-    { label: 'Cardiology', count: 48, percentage: 40, color: '#7B2FF7' },
-    { label: 'Pediatrics', count: 36, percentage: 30, color: '#3B82F6' },
-    { label: 'Dermatology', count: 24, percentage: 20, color: '#10B981' },
-    { label: 'Neurology', count: 12, percentage: 10, color: '#F59E0B' },
-  ];
+  useEffect(() => {
+    void loadAnalytics();
+  }, [timeframe, token]);
 
-  const weeklyTrend = [
-    { day: 'Mon', value: 30 },
-    { day: 'Tue', value: 45 },
-    { day: 'Wed', value: 65 },
-    { day: 'Thu', value: 50 },
-    { day: 'Fri', value: 80 },
-    { day: 'Sat', value: 95 },
-    { day: 'Sun', value: 40 },
-  ];
+  const userActivityPercent = useMemo(() => {
+    if (!analytics || analytics.userStats.total === 0) return 0;
+    return Math.round((analytics.userStats.active / analytics.userStats.total) * 100);
+  }, [analytics]);
+
+  const appointmentPeak = useMemo(() => {
+    if (!analytics?.appointmentTrend.length) return 0;
+    return Math.max(...analytics.appointmentTrend.map(item => item.value), 1);
+  }, [analytics]);
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.wrapper}>
-      {/* Top Header */}
-      <LinearGradient colors={COLORS.screenHeaderGradient as any} style={styles.headerGradient}>
-        <View style={styles.headerTop}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.navigate('AdminDashboard')}>
-            <ArrowLeft size={24} color="#FFF" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Analytics & Statistics</Text>
-          <View style={{ width: 44 }} />
-        </View>
-
-        {/* Timeframe Switcher */}
-        <View style={styles.tabContainer}>
-          {(['weekly', 'monthly', 'yearly'] as const).map(item => (
-            <TouchableOpacity 
-              key={item}
-              style={[styles.tab, timeframe === item && styles.activeTab]}
-              onPress={() => setTimeframe(item)}
-            >
-              <Text style={[styles.tabText, timeframe === item && styles.activeTabText]}>
-                {item.charAt(0).toUpperCase() + item.slice(1)}
-              </Text>
+        <LinearGradient colors={COLORS.screenHeaderGradient as any} style={styles.headerGradient}>
+          <View style={styles.headerTop}>
+            <TouchableOpacity style={styles.backButton} onPress={() => navigation.navigate('AdminDashboard')}>
+              <ArrowLeft size={24} color="#FFF" />
             </TouchableOpacity>
-          ))}
-        </View>
-      </LinearGradient>
-
-      <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContentContainer}>
-        {/* Core summary card */}
-        <View style={[styles.summaryCard, SHADOWS.medium]}>
-          <View style={styles.summaryMeta}>
-            <Text style={styles.summaryTitle}>Growth & Activity</Text>
-            <Text style={styles.summarySub}>Overall appointments are up 12% compared to last period.</Text>
-          </View>
-          <View style={styles.trendRow}>
-            <TrendingUp size={20} color="#10B981" />
-            <Text style={styles.trendText}>+12.4%</Text>
-          </View>
-        </View>
-
-        {/* User Stats Widget (Bar Chart Mock) */}
-        <Text style={styles.sectionHeading}>User Account Statistics</Text>
-        <View style={[styles.chartCard, SHADOWS.light]}>
-          <View style={styles.chartHeader}>
-            <Users size={20} color={COLORS.primary} />
-            <Text style={styles.chartTitle}>Active vs Registered Users</Text>
-          </View>
-          
-          <View style={styles.userStatsRow}>
-            <View style={styles.userStatItem}>
-              <Text style={styles.userStatVal}>{userStats.total}</Text>
-              <Text style={styles.userStatLabel}>Registered</Text>
+            <View style={styles.headerTitleWrap}>
+              <Text style={styles.headerTitle}>Analytics & Statistics</Text>
+              <Text style={styles.headerSubtitle}>Live aggregated metrics from the admin backend</Text>
             </View>
-            <View style={styles.userStatDivider} />
-            <View style={styles.userStatItem}>
-              <Text style={styles.userStatVal}>{userStats.active}</Text>
-              <Text style={styles.userStatLabel}>Active Now</Text>
-            </View>
-            <View style={styles.userStatDivider} />
-            <View style={styles.userStatItem}>
-              <Text style={styles.userStatVal}>+{userStats.new}</Text>
-              <Text style={styles.userStatLabel}>New Signups</Text>
-            </View>
+            <TouchableOpacity style={styles.refreshButton} onPress={() => void loadAnalytics()}>
+              <RefreshCw size={18} color="#FFF" />
+            </TouchableOpacity>
           </View>
 
-          {/* Graphical Bar */}
-          <View style={styles.barProgressBg}>
-            <View style={[styles.barProgressFill, { width: `${(userStats.active / userStats.total) * 100}%`, backgroundColor: COLORS.primary }]} />
-          </View>
-          <View style={styles.barLegends}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: COLORS.primary }]} />
-              <Text style={styles.legendText}>Active ({Math.round((userStats.active / userStats.total) * 100)}%)</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#E5E7EB' }]} />
-              <Text style={styles.legendText}>Inactive</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Appointments stats widget (Vertical Bar Chart Mock) */}
-        <Text style={styles.sectionHeading}>Weekly Appointment Trend</Text>
-        <View style={[styles.chartCard, SHADOWS.light]}>
-          <View style={styles.chartHeader}>
-            <Calendar size={20} color="#3B82F6" />
-            <Text style={styles.chartTitle}>Daily Bookings Count</Text>
-          </View>
-
-          <View style={styles.verticalChartContainer}>
-            {weeklyTrend.map((item, index) => (
-              <View key={index} style={styles.verticalBarColumn}>
-                <View style={styles.barWrapper}>
-                  <LinearGradient 
-                    colors={['#3B82F6', '#60A5FA']} 
-                    style={[styles.verticalBarFill, { height: `${(item.value / 100) * 100}%` }]} 
-                  />
-                  <Text style={styles.barValText}>{item.value}</Text>
-                </View>
-                <Text style={styles.barLabel}>{item.day}</Text>
-              </View>
+          <View style={styles.tabContainer}>
+            {TIMEFRAME_OPTIONS.map(item => (
+              <TouchableOpacity
+                key={item.key}
+                style={[styles.tab, timeframe === item.key && styles.activeTab]}
+                onPress={() => setTimeframe(item.key)}
+              >
+                <Text style={[styles.tabText, timeframe === item.key && styles.activeTabText]}>{item.label}</Text>
+              </TouchableOpacity>
             ))}
           </View>
-        </View>
+        </LinearGradient>
 
-        {/* Doctor and specialty stats widget (Pie-List Mock) */}
-        <Text style={styles.sectionHeading}>Top Specialties Channelled</Text>
-        <View style={[styles.chartCard, SHADOWS.light]}>
-          <View style={styles.chartHeader}>
-            <Users size={20} color="#10B981" />
-            <Text style={styles.chartTitle}>Appointment Shares by Department</Text>
+        <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContentContainer}>
+          <View style={[styles.summaryCard, SHADOWS.medium]}>
+            <View style={styles.summaryMeta}>
+              <Text style={styles.summaryTitle}>Growth & Activity</Text>
+              <Text style={styles.summarySub}>
+                {analytics ? `Range: ${analytics.range.label}` : 'Loading live metrics from the selected timeframe.'}
+              </Text>
+            </View>
+            <View style={styles.trendRow}>
+              <TrendingUp size={20} color="#10B981" />
+              <Text style={styles.trendText}>{analytics ? `+${userActivityPercent}%` : '—'}</Text>
+            </View>
           </View>
 
-          <View style={styles.pieListContainer}>
-            {appointmentData.map((item, index) => (
-              <View key={index} style={styles.pieListItem}>
-                <View style={styles.pieListMeta}>
-                  <View style={[styles.bulletDot, { backgroundColor: item.color }]} />
-                  <Text style={styles.pieListLabel}>{item.label}</Text>
-                </View>
-                <View style={styles.pieBarTrack}>
-                  <View style={[styles.pieBarFill, { width: `${item.percentage}%`, backgroundColor: item.color }]} />
-                </View>
-                <Text style={styles.pieListPercent}>{item.percentage}% ({item.count})</Text>
+          {loading || refreshing ? (
+            <View style={styles.loadingCard}>
+              <ActivityIndicator size="large" color={COLORS.primary} />
+              <Text style={styles.loadingText}>Loading live analytics...</Text>
+            </View>
+          ) : null}
+
+          <Text style={styles.sectionHeading}>User Account Statistics</Text>
+          <View style={[styles.chartCard, SHADOWS.light]}>
+            <View style={styles.chartHeader}>
+              <Users size={20} color={COLORS.primary} />
+              <Text style={styles.chartTitle}>Active vs Registered Users</Text>
+            </View>
+
+            <View style={styles.userStatsRow}>
+              <View style={styles.userStatItem}>
+                <Text style={styles.userStatVal}>{analytics?.userStats.total ?? 0}</Text>
+                <Text style={styles.userStatLabel}>Registered</Text>
               </View>
-            ))}
-          </View>
-        </View>
-
-        {/* AI Monitoring Center widget summary */}
-        <Text style={styles.sectionHeading}>AI Health Assistant Usage</Text>
-        <View style={[styles.chartCard, SHADOWS.light, { marginBottom: 30 }]}>
-          <View style={styles.chartHeader}>
-            <Brain size={20} color="#8B5CF6" />
-            <Text style={styles.chartTitle}>Symptom Analysis Load</Text>
-          </View>
-
-          <View style={styles.aiWidgetInfo}>
-            <View style={styles.aiStatItem}>
-              <Text style={styles.aiStatVal}>352</Text>
-              <Text style={styles.aiStatLabel}>Total Analyses</Text>
+              <View style={styles.userStatDivider} />
+              <View style={styles.userStatItem}>
+                <Text style={styles.userStatVal}>{analytics?.userStats.active ?? 0}</Text>
+                <Text style={styles.userStatLabel}>Active Now</Text>
+              </View>
+              <View style={styles.userStatDivider} />
+              <View style={styles.userStatItem}>
+                <Text style={styles.userStatVal}>+{analytics?.userStats.new ?? 0}</Text>
+                <Text style={styles.userStatLabel}>New Signups</Text>
+              </View>
             </View>
-            <View style={styles.aiStatItem}>
-              <Text style={styles.aiStatVal}>98.2%</Text>
-              <Text style={styles.aiStatLabel}>Accuracy rating</Text>
+
+            <View style={styles.barProgressBg}>
+              <View style={[styles.barProgressFill, { width: `${userActivityPercent}%`, backgroundColor: COLORS.primary }]} />
             </View>
-            <View style={styles.aiStatItem}>
-              <Text style={styles.aiStatVal}>1.4s</Text>
-              <Text style={styles.aiStatLabel}>Avg Latency</Text>
+            <View style={styles.barLegends}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: COLORS.primary }]} />
+                <Text style={styles.legendText}>Active ({userActivityPercent}%)</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#E5E7EB' }]} />
+                <Text style={styles.legendText}>Inactive</Text>
+              </View>
             </View>
           </View>
 
-          <TouchableOpacity 
-            style={styles.aiMonitorLink}
-            onPress={() => navigation.navigate('AdminAIMonitoring')}
-          >
-            <Text style={styles.aiMonitorLinkText}>Open AI Monitoring Center</Text>
-            <ChevronRight size={16} color={COLORS.primary} />
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+          <Text style={styles.sectionHeading}>Appointment Trend</Text>
+          <View style={[styles.chartCard, SHADOWS.light]}>
+            <View style={styles.chartHeader}>
+              <Calendar size={20} color="#3B82F6" />
+              <Text style={styles.chartTitle}>Bookings Across the Selected Range</Text>
+            </View>
+
+            <View style={styles.verticalChartContainer}>
+              {(analytics?.appointmentTrend || []).map((item, index) => {
+                const heightPercent = appointmentPeak > 0 ? (item.value / appointmentPeak) * 100 : 0;
+                return (
+                  <View key={`${item.label}-${index}`} style={styles.verticalBarColumn}>
+                    <View style={styles.barWrapper}>
+                      <LinearGradient
+                        colors={['#3B82F6', '#60A5FA']}
+                        style={[styles.verticalBarFill, { height: `${Math.max(heightPercent, 6)}%` }]}
+                      />
+                      <Text style={styles.barValText}>{item.value}</Text>
+                    </View>
+                    <Text style={styles.barLabel}>{item.label}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+
+          <Text style={styles.sectionHeading}>Top Specialties Channelled</Text>
+          <View style={[styles.chartCard, SHADOWS.light]}>
+            <View style={styles.chartHeader}>
+              <Stethoscope size={20} color="#10B981" />
+              <Text style={styles.chartTitle}>Appointment Shares by Department</Text>
+            </View>
+
+            <View style={styles.pieListContainer}>
+              {(analytics?.specialtyBreakdown || []).map((item, index) => (
+                <View key={`${item.label}-${index}`} style={styles.pieListItem}>
+                  <View style={styles.pieListMeta}>
+                    <View style={[styles.bulletDot, { backgroundColor: item.color }]} />
+                    <Text style={styles.pieListLabel}>{item.label}</Text>
+                  </View>
+                  <View style={styles.pieBarTrack}>
+                    <View style={[styles.pieBarFill, { width: `${item.percentage}%`, backgroundColor: item.color }]} />
+                  </View>
+                  <Text style={styles.pieListPercent}>{item.percentage}% ({item.count})</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          <Text style={styles.sectionHeading}>AI Health Assistant Usage</Text>
+          <View style={[styles.chartCard, SHADOWS.light, { marginBottom: 30 }]}>
+            <View style={styles.chartHeader}>
+              <Brain size={20} color="#8B5CF6" />
+              <Text style={styles.chartTitle}>Symptom Analysis Load</Text>
+            </View>
+
+            <View style={styles.aiWidgetInfo}>
+              <View style={styles.aiStatItem}>
+                <Text style={styles.aiStatVal}>{analytics?.aiStats.totalAnalyses ?? 0}</Text>
+                <Text style={styles.aiStatLabel}>Total Analyses</Text>
+              </View>
+              <View style={styles.aiStatItem}>
+                <Text style={styles.aiStatVal}>{analytics?.summary.aiUniqueSpecialists ?? 0}</Text>
+                <Text style={styles.aiStatLabel}>Specialists</Text>
+              </View>
+              <View style={styles.aiStatItem}>
+                <Text style={styles.aiStatVal}>{analytics?.aiStats.topSpecialist || 'N/A'}</Text>
+                <Text style={styles.aiStatLabel}>Top Specialist</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.aiMonitorLink}
+              onPress={() => navigation.navigate('AdminAIMonitoring')}
+            >
+              <Text style={styles.aiMonitorLinkText}>Open AI Monitoring Center</Text>
+              <ChevronRight size={16} color={COLORS.primary} />
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
       </View>
       <AdminBottomNavBar />
     </SafeAreaView>
@@ -227,23 +307,24 @@ const AnalyticsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background
+    backgroundColor: COLORS.background,
   },
   wrapper: {
-    flex: 1
+    flex: 1,
   },
   headerGradient: {
     paddingTop: Platform.OS === 'ios' ? 30 : 40,
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
-    paddingBottom: 16
+    paddingBottom: 16,
   },
   headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    marginBottom: 20
+    marginBottom: 20,
+    gap: 12,
   },
   backButton: {
     width: 44,
@@ -253,15 +334,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  headerTitleWrap: {
+    flex: 1,
+    alignItems: 'center',
+  },
   headerTitle: {
     fontSize: 20,
     fontWeight: '900',
     color: '#FFF',
   },
+  headerSubtitle: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.85)',
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  refreshButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   tabContainer: {
     flexDirection: 'row',
     paddingHorizontal: 20,
-    gap: 8
+    gap: 8,
   },
   tab: {
     flex: 1,
@@ -287,6 +386,19 @@ const styles = StyleSheet.create({
   scrollContentContainer: {
     paddingHorizontal: 20,
     paddingTop: 20,
+  },
+  loadingCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 24,
+    padding: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  loadingText: {
+    marginTop: 8,
+    color: COLORS.textSecondary,
+    fontWeight: '600',
   },
   summaryCard: {
     flexDirection: 'row',
@@ -420,12 +532,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.textSecondary,
   },
-  // Vertical Bars
   verticalChartContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
-    height: 150,
+    minHeight: 150,
     paddingTop: 20,
     paddingBottom: 10,
   },
@@ -441,6 +552,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     alignItems: 'center',
     position: 'relative',
+    overflow: 'hidden',
   },
   verticalBarFill: {
     width: '100%',
@@ -459,7 +571,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 8,
   },
-  // Pie List
   pieListContainer: {
     flexDirection: 'column',
     gap: 12,
@@ -504,7 +615,6 @@ const styles = StyleSheet.create({
     width: 70,
     textAlign: 'right',
   },
-  // AI widget
   aiWidgetInfo: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -518,15 +628,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   aiStatVal: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '900',
     color: COLORS.textHeader,
+    textAlign: 'center',
   },
   aiStatLabel: {
     fontSize: 11,
     color: COLORS.textSecondary,
     fontWeight: '600',
     marginTop: 4,
+    textAlign: 'center',
   },
   aiMonitorLink: {
     flexDirection: 'row',

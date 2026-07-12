@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, 
   TextInput, SafeAreaView, Platform, StatusBar, Modal, Dimensions,
@@ -6,32 +6,32 @@ import {
 } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import { 
-  Search, Bell, ArrowLeft, Filter, FlaskConical, Clock, ChevronRight, 
+  Search, Bell, ArrowLeft, Filter, FlaskConical, Clock, ChevronLeft, ChevronRight, 
   CheckCircle2, AlertCircle, Calendar, User, MapPin, 
   Activity, Heart, Droplets, Baby, Sun, Shield, 
   Stethoscope, Microscope, Thermometer, Brain, Bone, Eye, Smile, X, ArrowRight
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import BottomNavBar from '../../components/BottomNavBar';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/types';
 import { useAuth } from '../../context/AuthContext';
+import moment from 'moment';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'LabAvailability'>;
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const labCategories = [
   { id: '1', name: 'Blood Test', icon: '🩸', color: '#FEE2E2' },
   { id: '2', name: 'Urine Test', icon: '🧪', color: '#FEF3C7' },
-  { id: '3', name: 'X-Ray', icon: '🦴', color: '#E0F2FE' },
-  { id: '4', name: 'MRI Scan', icon: '🧠', color: '#FCE7F3' },
-  { id: '5', name: 'CT Scan', icon: '🔬', color: '#F3E8FF' },
-  { id: '6', name: 'ECG', icon: '❤️', color: '#ECFDF5' },
-  { id: '7', name: 'Ultrasound', icon: '👶', color: '#FFF1F2' },
+  { id: '3', name: 'Diabetes', icon: '🍬', color: '#E0F2FE' },
+  { id: '4', name: 'Heart', icon: '❤️', color: '#FCE7F3' },
+  { id: '5', name: 'Liver', icon: '🧬', color: '#FDF2F8' },
+  { id: '6', name: 'Pregnancy', icon: '🤰', color: '#FFF1F2' }
 ];
 
 const mockLabs = [
@@ -132,45 +132,54 @@ const mockLabs = [
   }
 ];
 
-const dates = [
-  { id: '1', day: 'Mon', date: '12' },
-  { id: '2', day: 'Tue', date: '13' },
-  { id: '3', day: 'Wed', date: '14' },
-  { id: '4', day: 'Thu', date: '15' },
-  { id: '5', day: 'Fri', date: '16' },
-  { id: '6', day: 'Sat', date: '17' },
-];
+const getUpcomingDays = () => {
+  const list = [];
+  for (let i = 0; i < 14; i++) {
+    const m = moment().add(i, 'days');
+    list.push({
+      id: String(i + 1),
+      day: m.format('ddd'),
+      date: m.format('D'),
+      fullDate: m.format('YYYY-MM-DD')
+    });
+  }
+  return list;
+};
 
 const timeSlotsData: any = {
-  '12': [
-    { time: '08:00 AM', status: 'Available' },
-    { time: '09:30 AM', status: 'Busy' },
-    { time: '11:00 AM', status: 'Available' },
-  ],
-  '13': [
-    { time: '10:00 AM', status: 'Available' },
-    { time: '11:30 AM', status: 'Available' },
-    { time: '01:00 PM', status: 'Busy' },
-  ],
-  'default': [
-    { time: '08:00 AM', status: 'Available' },
-    { time: '10:00 AM', status: 'Available' },
-    { time: '12:00 PM', status: 'Busy' },
-    { time: '02:00 PM', status: 'Closed' },
-  ]
+  'default': []
 };
 
 const LabAvailabilityScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const [selectedCategory, setSelectedCategory] = useState('1');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedDate, setSelectedDate] = useState('13');
+  const [selectedDate, setSelectedDate] = useState(moment().format('YYYY-MM-DD'));
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedLabForAvailability, setSelectedLabForAvailability] = useState<any>(null);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState('');
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
+  const [currentMonthYear, setCurrentMonthYear] = useState(moment().format('MMMM YYYY'));
+
+  const dates = useMemo(() => {
+    const list = getUpcomingDays();
+    const exists = list.some(d => d.fullDate === selectedDate);
+    if (!exists && selectedDate) {
+      const m = moment(selectedDate);
+      list.push({
+        id: 'custom-selected',
+        day: m.format('ddd'),
+        date: m.format('D'),
+        fullDate: selectedDate
+      });
+      list.sort((a, b) => a.fullDate.localeCompare(b.fullDate));
+    }
+    return list;
+  }, [selectedDate]);
 
   // Animation for Swipe to Close
   const panY = useRef(new Animated.Value(0)).current;
+  const greyShadow = { shadowColor: '#94A3B8', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 };
 
   const panResponder = useRef(
     PanResponder.create({
@@ -194,57 +203,185 @@ const LabAvailabilityScreen = () => {
   ).current;
 
   const { token } = useAuth();
-  const [dbNurses, setDbNurses] = useState<any[]>([]);
+  const [dbLabs, setDbLabs] = useState<any[]>([]);
+  const [dbCategories, setDbCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dbSlots, setDbSlots] = useState<any[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [availableSlotsCount, setAvailableSlotsCount] = useState<{[key: string]: number}>({});
+
+  useFocusEffect(
+    useCallback(() => {
+      const fetchLabsAndCategories = async () => {
+        setLoading(true);
+        try {
+          const [catsRes, labsRes] = await Promise.all([
+            fetch(`${API_BASE_URL}/api/labs/categories`),
+            fetch(`${API_BASE_URL}/api/labs?limit=100`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            })
+          ]);
+          const catsData = await catsRes.json();
+          const labsData = await labsRes.json();
+          if (catsData.success) setDbCategories(catsData.data || []);
+          if (labsData.success) setDbLabs(labsData.data || []);
+        } catch (error) {
+          console.error('Error fetching labs:', error);
+        } finally {
+          setLoading(false);
+        }
+      };
+      if (token) fetchLabsAndCategories();
+    }, [token])
+  );
 
   useEffect(() => {
-    const fetchNurses = async () => {
+    const fetchDbSlots = async () => {
+      if (!selectedLabForAvailability) return;
+      setSlotsLoading(true);
       try {
-        const response = await fetch(`${API_BASE_URL}/api/nurse`, {
+        const fullDateStr = selectedDate;
+        const res = await fetch(`${API_BASE_URL}/api/labs/${selectedLabForAvailability.id}/availability?date=${fullDateStr}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        const data = await response.json();
-        if (response.ok && data.success) {
-          setDbNurses(data.data);
+        const data = await res.json();
+        if (res.ok && data.success) {
+          setDbSlots(data.data?.slots || []);
+        } else {
+          setDbSlots([]);
         }
-      } catch (error) {
-        console.error('Error fetching nurses:', error);
+      } catch (err) {
+        console.error(err);
+        setDbSlots([]);
       } finally {
-        setLoading(false);
+        setSlotsLoading(false);
       }
     };
-    if (token) fetchNurses();
-  }, [token]);
 
-  const selectedCategoryName = labCategories.find(c => c.id === selectedCategory)?.name || '';
+    if (token && selectedLabForAvailability) {
+      fetchDbSlots();
+    }
+  }, [selectedLabForAvailability, selectedDate, token]);
 
-  const filteredLabs = dbNurses
-    .filter(nurse => nurse.department === selectedCategoryName)
-    .filter(nurse => 
-      nurse.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      (nurse.department || '').toLowerCase().includes(searchQuery.toLowerCase())
+  useEffect(() => {
+    setSelectedTimeSlot('');
+  }, [selectedDate, selectedLabForAvailability]);
+
+  const selectedCategoryObj = dbCategories.find(c => c.name?.toLowerCase() === (labCategories.find(lc => lc.id === selectedCategory)?.name?.toLowerCase()));
+
+  const seenNurses = new Set();
+  const filteredLabs = dbLabs
+    .filter(lab => {
+      // Must have an assigned nurse
+      if (!lab.assignedNurse) return false;
+
+      const nurseId = (lab.assignedNurse?._id || lab.assignedNurse).toString();
+      
+      // If we've already displayed a lab card for this nurse, filter it out to prevent duplicates
+      if (seenNurses.has(nurseId)) {
+        return false;
+      }
+
+      if (!selectedCategoryObj) return false;
+      
+      let isMatch = false;
+
+      // Match by category ID
+      const catId = lab.category?._id || lab.category;
+      if (catId?.toString() === selectedCategoryObj._id?.toString()) {
+        isMatch = true;
+      }
+      
+      // Fallback 1: Match by category name
+      const catName = lab.category?.name;
+      if (!isMatch && catName && catName.toLowerCase() === selectedCategoryObj.name.toLowerCase()) {
+        isMatch = true;
+      }
+      
+      // Fallback 2: Match by assignedNurse department
+      const nurseDept = lab.assignedNurse?.department;
+      if (!isMatch && nurseDept && nurseDept.toLowerCase() === selectedCategoryObj.name.toLowerCase()) {
+        isMatch = true;
+      }
+      
+      // Fallback 3: Match by lab name containing the category name
+      const labName = lab.name || '';
+      if (!isMatch && labName.toLowerCase().includes(selectedCategoryObj.name.toLowerCase())) {
+        isMatch = true;
+      }
+      
+      if (isMatch) {
+        seenNurses.add(nurseId);
+        return true;
+      }
+      
+      return false;
+    })
+    .filter(lab =>
+      (lab.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (lab.description || '').toLowerCase().includes(searchQuery.toLowerCase())
     )
-    .map((nurse, index) => ({
-      id: nurse._id,
+    .map(lab => ({
+      id: lab._id,
       category: selectedCategory,
-      name: `Lab - ${nurse.name.split(' ')[0] || 'Unit'}`,
-      description: nurse.department || 'Lab Test',
-      floor: 'Main Floor',
+      name: lab.name,
+      description: lab.description || lab.category?.name || 'Lab Test',
+      floor: lab.floor || 'Main Floor',
       duration: '1-2 Hours',
       price: 'LKR 1500',
-      status: 'Available',
-      nurse: nurse.name,
+      status: lab.status || 'Available',
+      nurse: lab.assignedNurse?.name || 'Assigned Nurse',
       rating: 4.8,
-      queue: Math.floor(Math.random() * 5),
+      queue: 0,
       wait: '15 mins',
-      currentToken: 12,
-      yourToken: 15,
-      openTime: '08:00 AM',
-      closeTime: '06:00 PM',
-      image: nurse.profileImage || 'https://img.freepik.com/free-photo/lab-technician-holding-blood-tube_23-2148166567.jpg'
+      currentToken: 0,
+      yourToken: 0,
+      openTime: lab.openTime || '08:00 AM',
+      closeTime: lab.closeTime || '06:00 PM',
+      image: 'https://img.freepik.com/free-photo/lab-technician-holding-blood-tube_23-2148166567.jpg'
     }));
 
-  const currentTimeSlots = timeSlotsData[selectedDate] || timeSlotsData['default'];
+  useEffect(() => {
+    const fetchAllAvailableSlots = async () => {
+      if (filteredLabs.length === 0) return;
+      const counts: {[key: string]: number} = {};
+      await Promise.all(filteredLabs.map(async (lab) => {
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/labs/${lab.id}/availability`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const data = await res.json();
+          if (res.ok && data.success) {
+            const slotsList = data.data?.slots || [];
+            const count = slotsList.filter((s: any) => s.status === 'Available' || s.status === 'Busy').length;
+            counts[lab.id] = count;
+          } else {
+            counts[lab.id] = 0;
+          }
+        } catch (err) {
+          console.error(err);
+          counts[lab.id] = 0;
+        }
+      }));
+      setAvailableSlotsCount(prev => ({ ...prev, ...counts }));
+    };
+
+    if (token && filteredLabs.length > 0) {
+      fetchAllAvailableSlots();
+    }
+  }, [selectedDate, token, dbLabs, dbCategories, selectedCategory, searchQuery]);
+
+  const displaySlots = dbSlots.length > 0
+    ? dbSlots.map(s => {
+        const timeRange = s.endTime ? `${s.startTime} - ${s.endTime}` : s.startTime;
+        return {
+          time: timeRange,
+          status: s.status || 'Available',
+          rawSlot: s,
+          isExpired: s.isExpired
+        };
+      })
+    : (timeSlotsData[selectedDate] || timeSlotsData['default']);
 
   const openAvailability = (lab: any) => {
     setSelectedLabForAvailability(lab);
@@ -262,6 +399,9 @@ const LabAvailabilityScreen = () => {
       panY.setValue(0);
     });
   };
+
+  const selectedSlotObj = displaySlots.find((s: any) => s.time === selectedTimeSlot);
+  const isBookingEnabled = !!selectedTimeSlot && selectedSlotObj?.status !== 'Closed';
 
   return (
     <SafeAreaView style={styles.container}>
@@ -367,8 +507,8 @@ const LabAvailabilityScreen = () => {
                     <Text style={styles.detailText}>{lab.floor}</Text>
                   </View>
                   <View style={styles.detailItem}>
-                    <Activity size={16} color={COLORS.primary} />
-                    <Text style={styles.detailText}>Queue: {lab.queue}</Text>
+                    <Calendar size={16} color={COLORS.primary} />
+                    <Text style={styles.detailText}>Slots: {availableSlotsCount[lab.id] !== undefined ? availableSlotsCount[lab.id] : 0}</Text>
                   </View>
                 </View>
 
@@ -468,16 +608,25 @@ const LabAvailabilityScreen = () => {
             <ScrollView showsVerticalScrollIndicator={false}>
               {/* Calendar in Modal */}
               <View style={styles.modalSection}>
-                <Text style={styles.sectionLabel}>Select Date</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <Text style={styles.sectionLabel}>Select Date</Text>
+                  <TouchableOpacity 
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F1F5F9', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 }}
+                    onPress={() => setShowCalendarModal(true)}
+                  >
+                    <Calendar size={14} color={COLORS.primary} />
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: COLORS.primary }}>Full Calendar</Text>
+                  </TouchableOpacity>
+                </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.modalDateList}>
                   {dates.map((d) => (
                     <TouchableOpacity 
                       key={d.id} 
-                      style={[styles.dateCard, selectedDate === d.date && styles.dateCardActive, SHADOWS.small]}
-                      onPress={() => setSelectedDate(d.date)}
+                      style={[styles.dateCard, selectedDate === d.fullDate && styles.dateCardActive, SHADOWS.small]}
+                      onPress={() => setSelectedDate(d.fullDate)}
                     >
-                      <Text style={[styles.dateDay, selectedDate === d.date && styles.dateDayActive]}>{d.day}</Text>
-                      <Text style={[styles.dateNumber, selectedDate === d.date && styles.dateNumberActive]}>{d.date}</Text>
+                      <Text style={[styles.dateDay, selectedDate === d.fullDate && styles.dateDayActive]}>{d.day}</Text>
+                      <Text style={[styles.dateNumber, selectedDate === d.fullDate && styles.dateNumberActive]}>{d.date}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
@@ -485,31 +634,48 @@ const LabAvailabilityScreen = () => {
 
               {/* Time Slots in Modal */}
               <View style={styles.modalSection}>
-                <Text style={styles.sectionLabel}>Available Slots for {selectedDate} May</Text>
-                <View style={styles.timeGrid}>
-                  {currentTimeSlots.map((slot: any, i: number) => (
-                    <TouchableOpacity 
-                      key={i} 
-                      style={[
-                        styles.timeSlot, 
-                        slot.status === 'Available' ? styles.timeSlotAvailable : 
-                        slot.status === 'Busy' ? styles.timeSlotBusy : styles.timeSlotClosed,
-                        selectedTimeSlot === slot.time && styles.timeSlotSelected
-                      ]}
-                      onPress={() => setSelectedTimeSlot(slot.time)}
-                      disabled={slot.status === 'Closed'}
-                    >
-                      <Text style={[
-                        styles.timeText,
-                        slot.status === 'Available' ? styles.timeTextAvailable : 
-                        slot.status === 'Busy' ? styles.statusFew : styles.statusFull,
-                        selectedTimeSlot === slot.time && styles.timeTextSelected
-                      ]}>
-                        {slot.time}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                <Text style={styles.sectionLabel}>Available Slots for {moment(selectedDate).format('DD MMMM YYYY')}</Text>
+                {slotsLoading ? (
+                  <View style={{ paddingVertical: 30, alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+                    <ActivityIndicator size="large" color={COLORS.primary} />
+                    <Text style={{ color: COLORS.textSecondary, fontSize: 13, marginTop: 8 }}>Loading available slots...</Text>
+                  </View>
+                ) : displaySlots.length === 0 ? (
+                  <View style={{ paddingVertical: 30, alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+                    <AlertCircle size={36} color={COLORS.textSecondary} style={{ marginBottom: 10 }} />
+                    <Text style={{ color: COLORS.textHeader, fontSize: 15, fontWeight: '700' }}>No slots available</Text>
+                    <Text style={{ color: COLORS.textSecondary, fontSize: 13, marginTop: 4, textAlign: 'center', paddingHorizontal: 20 }}>
+                      The medical staff has not scheduled any slots for this date.
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.timeGrid}>
+                    {displaySlots.map((slot: any, i: number) => (
+                      <TouchableOpacity 
+                        key={i} 
+                        style={[
+                          styles.timeSlot, 
+                          slot.status === 'Available' ? styles.timeSlotAvailable : 
+                          slot.status === 'Busy' ? styles.timeSlotBusy : 
+                          (slot.status === 'Closed' || slot.isExpired) ? styles.timeSlotExpired : styles.timeSlotClosed,
+                          selectedTimeSlot === slot.time && styles.timeSlotSelected
+                        ]}
+                        onPress={() => setSelectedTimeSlot(slot.time)}
+                        disabled={slot.status === 'Closed' || slot.isExpired}
+                      >
+                        <Text style={[
+                          styles.timeText,
+                          slot.status === 'Available' ? styles.timeTextAvailable : 
+                          slot.status === 'Busy' ? styles.statusFew : 
+                          (slot.status === 'Closed' || slot.isExpired) ? styles.timeTextExpired : styles.statusFull,
+                          selectedTimeSlot === slot.time && styles.timeTextSelected
+                        ]}>
+                          {slot.time}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
                 {/* Time Legend */}
                 <View style={styles.legendContainer}>
                   <View style={styles.legendItem}>
@@ -546,13 +712,19 @@ const LabAvailabilityScreen = () => {
               </View>
 
               <TouchableOpacity 
-                style={styles.confirmBookingBtn}
+                style={[
+                  styles.confirmBookingBtn,
+                  !isBookingEnabled && { opacity: 0.4, shadowOpacity: 0, elevation: 0 }
+                ]}
+                disabled={!isBookingEnabled}
                 onPress={() => {
+                  const rawSlotObj = selectedSlotObj?.rawSlot;
                   setIsModalVisible(false);
                   navigation.navigate('LabBookingFlow', { 
                     lab: selectedLabForAvailability,
                     initialDate: selectedDate,
-                    initialTime: selectedTimeSlot
+                    initialTime: selectedTimeSlot,
+                    scheduleSlotId: rawSlotObj ? rawSlotObj._id || rawSlotObj.slotId : undefined
                   });
                 }}
               >
@@ -561,6 +733,87 @@ const LabAvailabilityScreen = () => {
               </TouchableOpacity>
             </ScrollView>
           </Animated.View>
+        </View>
+      </Modal>
+
+      {/* Full Calendar Modal for Patient */}
+      <Modal visible={showCalendarModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.calendarModalContent, greyShadow]}>
+            <View style={styles.calendarModalHeader}>
+              <Text style={styles.calendarModalTitle}>Select Date</Text>
+              <TouchableOpacity onPress={() => setShowCalendarModal(false)}>
+                <X size={20} color={COLORS.textHeader} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.calendarControls}>
+              <TouchableOpacity onPress={() => {
+                const prev = moment(currentMonthYear, 'MMMM YYYY').subtract(1, 'month').format('MMMM YYYY');
+                setCurrentMonthYear(prev);
+              }}>
+                <ChevronLeft size={20} color={COLORS.primary} />
+              </TouchableOpacity>
+              <Text style={styles.currentMonthText}>{currentMonthYear}</Text>
+              <TouchableOpacity onPress={() => {
+                const next = moment(currentMonthYear, 'MMMM YYYY').add(1, 'month').format('MMMM YYYY');
+                setCurrentMonthYear(next);
+              }}>
+                <View style={{ transform: [{ rotate: '180deg' }] }}>
+                  <ChevronLeft size={20} color={COLORS.primary} />
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.weekDaysRow}>
+              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, idx) => (
+                <Text key={idx} style={styles.weekDayText}>{day}</Text>
+              ))}
+            </View>
+
+            <View style={styles.daysGrid}>
+              {Array.from({ length: moment(currentMonthYear, 'MMMM YYYY').startOf('month').day() }).map((_, i) => (
+                <View key={`empty-${i}`} style={styles.dayCell} />
+              ))}
+              {Array.from({ length: moment(currentMonthYear, 'MMMM YYYY').daysInMonth() }).map((_, i) => {
+                const day = i + 1;
+                const dateMoment = moment(currentMonthYear, 'MMMM YYYY').date(day);
+                const isPast = dateMoment.isBefore(moment(), 'day');
+                const dateStr = dateMoment.format('YYYY-MM-DD');
+                const isSelected = selectedDate === dateStr;
+
+                return (
+                  <TouchableOpacity 
+                    key={day} 
+                    style={[
+                      styles.dayCell, 
+                      isSelected && styles.dayCellActive,
+                      isPast && { opacity: 0.3 }
+                    ]}
+                    onPress={() => {
+                      setSelectedDate(dateStr);
+                    }}
+                    disabled={isPast}
+                  >
+                    <Text style={[
+                      styles.dayCellText, 
+                      isSelected && styles.whiteText,
+                      isPast && { color: '#94A3B8' }
+                    ]}>
+                      {day}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <TouchableOpacity 
+              style={styles.calendarCloseBtnFull}
+              onPress={() => setShowCalendarModal(false)}
+            >
+              <Text style={styles.calendarCloseBtnText}>Confirm Selection</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
 
@@ -999,7 +1252,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   timeSlot: {
-    width: '31%',
+    width: '48%',
     paddingVertical: 14,
     borderRadius: 16,
     alignItems: 'center',
@@ -1018,6 +1271,11 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
     opacity: 0.6,
   },
+  timeSlotExpired: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#EF4444',
+    opacity: 0.4,
+  },
   timeSlotSelected: {
     backgroundColor: COLORS.primary,
     borderColor: COLORS.primary,
@@ -1029,6 +1287,7 @@ const styles = StyleSheet.create({
   timeTextAvailable: { color: '#166534' },
   timeTextBusy: { color: '#9A3412' },
   timeTextClosed: { color: '#6B7280' },
+  timeTextExpired: { color: '#EF4444' },
   timeTextSelected: { color: '#FFF' },
   statusFew: { color: '#9A3412' },
   statusFull: { color: '#6B7280' },
@@ -1105,6 +1364,86 @@ const styles = StyleSheet.create({
   confirmBookingBtnText: {
     color: '#FFF',
     fontSize: 16,
+    fontWeight: '800',
+  },
+  calendarModalContent: {
+    backgroundColor: '#FFF',
+    width: width * 0.9,
+    borderRadius: 24,
+    padding: 20,
+    alignSelf: 'center',
+    marginTop: 'auto',
+    marginBottom: 'auto',
+  },
+  calendarModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  calendarModalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: COLORS.textHeader,
+  },
+  calendarControls: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginVertical: 15,
+  },
+  currentMonthText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.textHeader,
+  },
+  weekDaysRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  weekDayText: {
+    width: (width * 0.9 - 40) / 7,
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+  },
+  daysGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 15,
+  },
+  dayCell: {
+    width: (width * 0.9 - 40) / 7,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    marginVertical: 2,
+  },
+  dayCellActive: {
+    backgroundColor: COLORS.primary,
+  },
+  dayCellText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.textHeader,
+  },
+  whiteText: {
+    color: '#FFF',
+  },
+  calendarCloseBtnFull: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  calendarCloseBtnText: {
+    color: '#FFF',
+    fontSize: 15,
     fontWeight: '800',
   }
 });

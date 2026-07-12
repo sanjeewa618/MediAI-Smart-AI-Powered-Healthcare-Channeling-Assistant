@@ -25,7 +25,7 @@ const SpecialtyDoctorsScreen = () => {
   useEffect(() => {
     const fetchDoctors = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/doctors?specialty=${specialty}`, {
+        const response = await fetch(`${API_BASE_URL}/api/doctor?specialty=${specialty}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await response.json();

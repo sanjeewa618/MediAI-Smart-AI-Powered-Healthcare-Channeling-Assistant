@@ -12,41 +12,16 @@ import {
   Phone, MessageCircle, Download, Activity, DollarSign,
   AlertCircle, User, X, FileText, ChevronLeft,
 } from 'lucide-react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import NurseBottomNavBar from '../../components/NurseBottomNavBar';
 import { COLORS, SHADOWS } from '../../theme/theme';
+import { useAuth } from '../../context/AuthContext';
+import moment from 'moment';
+import { useCallback } from 'react';
 
-const STATS = [
-  { label: 'Today Apps', value: '45', icon: CalendarIcon, color: COLORS.primary },
-  { label: 'Pending', value: '12', icon: Clock, color: COLORS.warning },
-  { label: 'Completed', value: '28', icon: CheckCircle, color: COLORS.success },
-  { label: 'Revenue', value: 'Rs. 45K', icon: DollarSign, color: COLORS.success },
-  { label: 'Urgent', value: '5', icon: AlertCircle, color: COLORS.error },
-];
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
 
-const FILTER_TABS = [
-  'All', 'Blood Tests', 'Urine Tests', 'Diabetes', 'Heart', 
-  'Liver', 'Kidney', 'Thyroid', 'Hormone', 'Pregnancy', 'Full Body'
-];
 
-const APPOINTMENTS = [
-  {
-    id: '1', patientName: 'John Perera', age: 45, gender: 'Male',
-    photo: 'https://img.icons8.com/bubbles/100/000000/user.png',
-    testType: 'Complete Blood Count (CBC)', date: 'Oct 24, 2023',
-    time: '10:30 AM', queueNumber: 'A-12', paymentStatus: 'Paid',
-    priority: 'Urgent', assignedTech: 'Nimal Silva', status: 'Pending',
-    doctorName: 'Dr. Sunil Fernando', symptoms: 'Fever, Body ache',
-  },
-  {
-    id: '2', patientName: 'Sarah Silva', age: 28, gender: 'Female',
-    photo: 'https://img.icons8.com/bubbles/100/000000/user-female.png',
-    testType: 'MRI Scan', date: 'Oct 24, 2023', time: '11:00 AM',
-    queueNumber: 'A-13', paymentStatus: 'Pending', priority: 'Normal',
-    assignedTech: 'Kamal Perera', status: 'Pending',
-    doctorName: 'Dr. Anita Raj', symptoms: 'Knee pain',
-  },
-];
 
 const HISTORY_STATS = { totalTests: 1250, revenue: 'Rs. 1.2M', avgWaitTime: '15 mins' };
 
@@ -64,12 +39,145 @@ const PAST_HISTORY = [
 
 const LabAppointmentsScreen: React.FC = () => {
   const navigation = useNavigation();
+  const { token } = useAuth();
+  
   const [isOnline, setIsOnline] = useState(true);
   const [activeTab, setActiveTab] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
-  const [showAlert, setShowAlert] = useState(true);
-  const [selectedAppt, setSelectedAppt] = useState<typeof APPOINTMENTS[number] | null>(null);
+  const [showAlert, setShowAlert] = useState(false);
+  const [selectedAppt, setSelectedAppt] = useState<any | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  
+  const [currentDateTime, setCurrentDateTime] = useState('');
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+      const slTime = new Date(utc + (5.5 * 3600000));
+      
+      const dateStr = slTime.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      const timeStr = slTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      
+      setCurrentDateTime(`${dateStr} • ${timeStr}`);
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 10000);
+    return () => clearInterval(interval);
+  }, []);
+  
+  const [department, setDepartment] = useState('');
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [stats, setStats] = useState({ todayTotal: 0, pending: 0, completed: 0, urgent: 0 });
+  const [loading, setLoading] = useState(false);
+
+  const fetchProfile = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (response.ok && data) {
+        setDepartment(data.department || '');
+      }
+    } catch (err) {
+      console.error('Failed to fetch profile in LabAppointmentsScreen:', err);
+    }
+  };
+
+  const fetchAppointments = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/labs/bookings`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        const list = data.data || [];
+        setAppointments(list);
+
+        // Compute stats dynamically
+        const todayStr = moment().format('YYYY-MM-DD');
+        const todayApps = list.filter((b: any) => moment(b.appointmentDate).format('YYYY-MM-DD') === todayStr).length;
+        const pendingApps = list.filter((b: any) => b.status === 'Pending').length;
+        const completedApps = list.filter((b: any) => b.status === 'Completed').length;
+        const urgentApps = list.filter((b: any) => b.paymentStatus === 'Paid' && b.status === 'Pending').length;
+
+        setStats({
+          todayTotal: todayApps,
+          pending: pendingApps,
+          completed: completedApps,
+          urgent: urgentApps,
+        });
+
+        // Show alert if there is a new pending booking
+        const hasPending = list.some((b: any) => b.status === 'Pending');
+        setShowAlert(hasPending);
+      }
+    } catch (err) {
+      console.error('Failed to fetch bookings:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (token) {
+      fetchProfile();
+      fetchAppointments();
+    }
+  }, [token]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (token) {
+        fetchAppointments();
+      }
+    }, [token])
+  );
+
+  const handleAccept = async (bookingId: string) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/labs/bookings/${bookingId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: 'Confirmed' })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert('Appointment Accepted successfully!');
+        fetchAppointments();
+      } else {
+        alert(data.message || 'Failed to accept appointment');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error accepting appointment');
+    }
+  };
+
+  const handleRemind = async (bookingId: string) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/labs/bookings/${bookingId}/remind`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert('Reminder sent to patient successfully!');
+      } else {
+        alert(data.message || 'Failed to send reminder');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error sending reminder');
+    }
+  };
 
   const panY = useRef(new Animated.Value(0)).current;
 
@@ -110,6 +218,24 @@ const LabAppointmentsScreen: React.FC = () => {
     }
   }, [modalVisible]);
 
+  const dynamicStats = [
+    { label: 'Today Apps', value: String(stats.todayTotal), icon: CalendarIcon, color: COLORS.primary },
+    { label: 'Pending', value: String(stats.pending), icon: Clock, color: COLORS.warning },
+    { label: 'Completed', value: String(stats.completed), icon: CheckCircle, color: COLORS.success },
+    { label: 'Urgent', value: String(stats.urgent), icon: AlertCircle, color: COLORS.error },
+  ];
+
+  const dynamicFilterTabs = ['All', department || 'Lab Category'];
+
+  const filteredAppointments = appointments.filter((item) => {
+    const q = searchQuery.toLowerCase();
+    return (
+      (item.patient?.fullName || '').toLowerCase().includes(q) ||
+      (item.bookingRef || '').toLowerCase().includes(q) ||
+      (item.lab?.name || '').toLowerCase().includes(q)
+    );
+  });
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -121,7 +247,7 @@ const LabAppointmentsScreen: React.FC = () => {
             </TouchableOpacity>
             <View>
               <Text style={styles.labName}>Test Appointments</Text>
-              <Text style={styles.dateTime}>Oct 24, 2023 • 10:15 AM</Text>
+              <Text style={styles.dateTime}>{currentDateTime}</Text>
             </View>
           </View>
           <View style={styles.headerRight}>
@@ -148,7 +274,7 @@ const LabAppointmentsScreen: React.FC = () => {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Stats */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsScroll}>
-          {STATS.map((stat, idx) => (
+          {dynamicStats.map((stat, idx) => (
             <View key={idx} style={styles.statCard}>
               <View style={[styles.statIconWrapper, { backgroundColor: stat.color + '1A' }]}>
                 <stat.icon size={20} color={stat.color} />
@@ -160,7 +286,7 @@ const LabAppointmentsScreen: React.FC = () => {
         </ScrollView>
 
         {/* Real-Time Alert */}
-        {showAlert && (
+        {showAlert && appointments.length > 0 && (
           <View style={styles.alertContainer}>
             <View style={styles.alertHeader}>
               <View style={styles.alertBadge}>
@@ -173,11 +299,11 @@ const LabAppointmentsScreen: React.FC = () => {
             </View>
             <View style={styles.alertContent}>
               <View>
-                <Text style={styles.alertName}>John Perera</Text>
-                <Text style={styles.alertDetails}>Blood Test • 10:30 AM</Text>
+                <Text style={styles.alertName}>{appointments.find(b => b.status === 'Pending')?.patient?.fullName}</Text>
+                <Text style={styles.alertDetails}>{appointments.find(b => b.status === 'Pending')?.lab?.name || 'Lab Test'} • {appointments.find(b => b.status === 'Pending')?.scheduleSlot?.startTime}</Text>
               </View>
               <View style={styles.statusPillPaid}>
-                <Text style={styles.statusPillTextPaid}>Paid ✅</Text>
+                <Text style={styles.statusPillTextPaid}>{appointments.find(b => b.status === 'Pending')?.paymentStatus} ✅</Text>
               </View>
             </View>
           </View>
@@ -186,7 +312,7 @@ const LabAppointmentsScreen: React.FC = () => {
         {/* Filters */}
         <View style={styles.filtersContainer}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {FILTER_TABS.map((tab) => {
+            {dynamicFilterTabs.map((tab) => {
               const isActive = activeTab === tab;
               return (
                 <TouchableOpacity key={tab}
@@ -202,58 +328,86 @@ const LabAppointmentsScreen: React.FC = () => {
 
         {/* Appointment Cards */}
         <View style={styles.listContainer}>
-          {APPOINTMENTS.map((item) => (
-            <View key={item.id} style={styles.appCard}>
-              <View style={styles.appCardHeader}>
-                <View style={styles.appCardHeaderLeft}>
-                  <Image source={{ uri: item.photo }} style={styles.patientPhoto} />
-                  <View>
-                    <Text style={styles.patientName}>{item.patientName}</Text>
-                    <Text style={styles.patientInfo}>{item.age} yrs • {item.gender}</Text>
+          {filteredAppointments.length === 0 ? (
+            <View style={{ padding: 40, alignItems: 'center' }}>
+              <Text style={{ color: COLORS.textSecondary, fontWeight: '600' }}>No appointments found</Text>
+            </View>
+          ) : (
+            filteredAppointments.map((item) => {
+              const patientPhoto = 'https://img.icons8.com/bubbles/100/000000/user.png';
+              const priority = item.paymentStatus === 'Paid' ? 'Urgent' : 'Normal';
+              return (
+                <View key={item._id} style={styles.appCard}>
+                  <View style={styles.appCardHeader}>
+                    <View style={styles.appCardHeaderLeft}>
+                      <Image source={{ uri: patientPhoto }} style={styles.patientPhoto} />
+                      <View>
+                        <Text style={styles.patientName}>{item.patient?.fullName}</Text>
+                        <Text style={styles.patientInfo}>{item.patient?.gender} • {item.patient?.mobile}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.queueBadge}>
+                      <Text style={styles.queueText}>T-{item.queueToken || 1}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.appCardDetails}>
+                    <View style={styles.detailRow}>
+                      <Activity size={14} color={COLORS.textSecondary} />
+                      <Text style={styles.detailText}>{item.lab?.name || 'Lab Test'}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Clock size={14} color={COLORS.textSecondary} />
+                      <Text style={styles.detailText}>
+                        {moment(item.appointmentDate).format('MMM DD, YYYY')} • {item.scheduleSlot?.startTime && item.scheduleSlot?.endTime ? `${item.scheduleSlot.startTime} - ${item.scheduleSlot.endTime}` : item.scheduleSlot?.startTime || 'N/A'}
+                      </Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <User size={14} color={COLORS.textSecondary} />
+                      <Text style={styles.detailText}>Room: {item.scheduleSlot?.room || 'N/A'}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.appCardBadges}>
+                    <Text style={[styles.badge, {
+                      backgroundColor: item.paymentStatus === 'Paid' ? COLORS.success + '1A' : COLORS.warning + '1A',
+                      color: item.paymentStatus === 'Paid' ? COLORS.success : COLORS.warning,
+                    }]}>{item.paymentStatus}</Text>
+                    <Text style={[styles.badge, {
+                      backgroundColor: priority === 'Urgent' ? COLORS.error + '1A' : COLORS.primaryLight,
+                      color: priority === 'Urgent' ? COLORS.error : COLORS.primary,
+                    }]}>{priority}</Text>
+                    <Text style={[styles.badge, {
+                      backgroundColor: item.status === 'Confirmed' ? COLORS.success + '1A' : COLORS.primaryLight,
+                      color: item.status === 'Confirmed' ? COLORS.success : COLORS.primary,
+                    }]}>{item.status}</Text>
+                  </View>
+                  <View style={styles.appCardActions}>
+                    <TouchableOpacity style={styles.btnSecondary}
+                      onPress={() => { setSelectedAppt(item); setModalVisible(true); }}>
+                      <Text style={styles.btnSecondaryText}>View</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.btnRemind} 
+                      onPress={() => handleRemind(item._id)}
+                    >
+                      <Text style={styles.btnRemindText}>Remind</Text>
+                    </TouchableOpacity>
+                    {item.status === 'Pending' ? (
+                      <TouchableOpacity 
+                        style={styles.btnPrimary} 
+                        onPress={() => handleAccept(item._id)}
+                      >
+                        <Text style={styles.btnPrimaryText}>Accept</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <View style={[styles.btnPrimary, { backgroundColor: COLORS.success, opacity: 0.8 }]}>
+                        <Text style={styles.btnPrimaryText}>Accepted</Text>
+                      </View>
+                    )}
                   </View>
                 </View>
-                <View style={styles.queueBadge}>
-                  <Text style={styles.queueText}>{item.queueNumber}</Text>
-                </View>
-              </View>
-              <View style={styles.appCardDetails}>
-                <View style={styles.detailRow}>
-                  <Activity size={14} color={COLORS.textSecondary} />
-                  <Text style={styles.detailText}>{item.testType}</Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Clock size={14} color={COLORS.textSecondary} />
-                  <Text style={styles.detailText}>{item.date} • {item.time}</Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <User size={14} color={COLORS.textSecondary} />
-                  <Text style={styles.detailText}>Tech: {item.assignedTech}</Text>
-                </View>
-              </View>
-              <View style={styles.appCardBadges}>
-                <Text style={[styles.badge, {
-                  backgroundColor: item.paymentStatus === 'Paid' ? COLORS.success + '1A' : COLORS.warning + '1A',
-                  color: item.paymentStatus === 'Paid' ? COLORS.success : COLORS.warning,
-                }]}>{item.paymentStatus}</Text>
-                <Text style={[styles.badge, {
-                  backgroundColor: item.priority === 'Urgent' ? COLORS.error + '1A' : COLORS.primaryLight,
-                  color: item.priority === 'Urgent' ? COLORS.error : COLORS.primary,
-                }]}>{item.priority}</Text>
-              </View>
-              <View style={styles.appCardActions}>
-                <TouchableOpacity style={styles.btnSecondary}
-                  onPress={() => { setSelectedAppt(item); setModalVisible(true); }}>
-                  <Text style={styles.btnSecondaryText}>View</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.btnRemind} onPress={() => alert('Reminder sent to ' + item.patientName)}>
-                  <Text style={styles.btnRemindText}>Remind</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.btnPrimary}>
-                  <Text style={styles.btnPrimaryText}>Accept</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))}
+              );
+            })
+          )}
         </View>
 
         {/* Appointments History Section */}
@@ -319,10 +473,10 @@ const LabAppointmentsScreen: React.FC = () => {
                 </View>
                 <ScrollView showsVerticalScrollIndicator={false}>
                   <View style={styles.modalProfileRow}>
-                    <Image source={{ uri: selectedAppt.photo }} style={styles.modalPhoto} />
+                    <Image source={{ uri: 'https://img.icons8.com/bubbles/100/000000/user.png' }} style={styles.modalPhoto} />
                     <View>
-                      <Text style={styles.modalName}>{selectedAppt.patientName}</Text>
-                      <Text style={styles.modalSub}>{selectedAppt.age} yrs • {selectedAppt.gender}</Text>
+                      <Text style={styles.modalName}>{selectedAppt.patient?.fullName}</Text>
+                      <Text style={styles.modalSub}>{selectedAppt.patient?.gender} • {selectedAppt.patient?.mobile}</Text>
                     </View>
                   </View>
                   <View style={styles.modalActionsRow}>
@@ -332,19 +486,34 @@ const LabAppointmentsScreen: React.FC = () => {
                   </View>
                   <View style={styles.infoSection}>
                     <Text style={styles.infoTitle}>Test Details</Text>
-                    <Text style={styles.infoText}><Text style={{ fontWeight: '600' }}>Requested Test:</Text> {selectedAppt.testType}</Text>
-                    <Text style={styles.infoText}><Text style={{ fontWeight: '600' }}>Doctor:</Text> {selectedAppt.doctorName}</Text>
-                    <Text style={styles.infoText}><Text style={{ fontWeight: '600' }}>Notes/Symptoms:</Text> {selectedAppt.symptoms}</Text>
-                    <Text style={styles.infoText}><Text style={{ fontWeight: '600' }}>Payment:</Text> {selectedAppt.paymentStatus}</Text>
+                    <Text style={styles.infoText}><Text style={{ fontWeight: '600' }}>Requested Test:</Text> {selectedAppt.lab?.name || 'Lab Test'}</Text>
+                    <Text style={styles.infoText}><Text style={{ fontWeight: '600' }}>Booking Ref:</Text> {selectedAppt.bookingRef}</Text>
+                    <Text style={styles.infoText}><Text style={{ fontWeight: '600' }}>Schedule Slot:</Text> {selectedAppt.scheduleSlot?.startTime} - {selectedAppt.scheduleSlot?.endTime}</Text>
+                    <Text style={styles.infoText}><Text style={{ fontWeight: '600' }}>Payment:</Text> {selectedAppt.paymentStatus} ({selectedAppt.paymentMethod})</Text>
+                    <Text style={styles.infoText}><Text style={{ fontWeight: '600' }}>Status:</Text> {selectedAppt.status}</Text>
                   </View>
                   <View style={styles.modalBtnColumn}>
-                    <TouchableOpacity style={styles.actionBtn}>
-                      <CheckCircle size={18} color="#FFF" />
-                      <Text style={styles.actionBtnText}>Mark as Sample Collected</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[styles.actionBtn, { backgroundColor: COLORS.success, marginTop: 10 }]}>
-                      <FileText size={18} color="#FFF" />
-                      <Text style={styles.actionBtnText}>Mark as Completed</Text>
+                    {selectedAppt.status === 'Pending' && (
+                      <TouchableOpacity 
+                        style={styles.actionBtn}
+                        onPress={async () => {
+                          await handleAccept(selectedAppt._id);
+                          closeModal();
+                        }}
+                      >
+                        <CheckCircle size={18} color="#FFF" />
+                        <Text style={styles.actionBtnText}>Accept Appointment</Text>
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity 
+                      style={[styles.actionBtn, { backgroundColor: COLORS.success, marginTop: 10 }]}
+                      onPress={async () => {
+                        await handleRemind(selectedAppt._id);
+                        closeModal();
+                      }}
+                    >
+                      <Bell size={18} color="#FFF" />
+                      <Text style={styles.actionBtnText}>Send Reminder Notification</Text>
                     </TouchableOpacity>
                   </View>
                 </ScrollView>

@@ -140,3 +140,38 @@ export const getLabDepartments = async (req, res) => {
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
+
+// @desc    Update nurse profile
+// @route   PUT /api/nurse/profile
+// @access  Private (Nurse only)
+export const updateNurseProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+
+    if (user) {
+      user.name = req.body.name || user.name;
+      user.phone = req.body.phone || user.phone;
+      if (req.body.email) {
+        user.email = req.body.email.toLowerCase();
+      }
+
+      // Nurse specific fields
+      user.staffId = req.body.staffId || user.staffId;
+      user.department = req.body.department || user.department;
+      user.hospital = req.body.hospital || user.hospital;
+      user.experienceYears = req.body.experienceYears || user.experienceYears;
+      user.bio = req.body.bio || user.bio;
+
+      const updatedUser = await user.save();
+
+      res.json({
+        success: true,
+        data: updatedUser
+      });
+    } else {
+      res.status(404).json({ message: 'User not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};

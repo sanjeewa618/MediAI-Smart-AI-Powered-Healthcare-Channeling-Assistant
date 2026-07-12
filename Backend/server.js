@@ -51,6 +51,15 @@ app.get('/', (req, res) => {
   res.send('MediAI API is running...');
 });
 
+// Global JSON error handler - prevents Express from returning HTML error pages
+app.use((err, req, res, next) => {
+  console.error('[Global Error]', err);
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || 'Internal Server Error',
+  });
+});
+
 // Port configuration
 const PORT = process.env.PORT || 5000;
 

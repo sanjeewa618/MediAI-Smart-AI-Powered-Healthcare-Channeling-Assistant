@@ -1,28 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, ScrollView,
-  TouchableOpacity, Platform, Image, Switch
+  TouchableOpacity, Platform, Image, Switch, Modal, TextInput, Alert
 } from 'react-native';
 import {
   ChevronLeft, Bell, Edit2, Camera, Mail, Phone,
   MapPin, Calendar, Award, Clock, Shield, ChevronRight,
-  Star, Activity, FileText, LogOut, Settings, User
+  Star, Activity, FileText, LogOut, Settings, User, X
 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import NurseBottomNavBar from '../../components/NurseBottomNavBar';
+import { useAuth } from '../../context/AuthContext';
 
-const PROFILE_DATA = {
-  name: 'Sarah Mendis',
-  role: 'Senior Lab Nurse',
-  department: 'Hematology & Pathology',
-  employeeId: 'NUR-2021-0047',
-  email: 'sarah.mendis@cityhospital.lk',
-  phone: '+94 77 123 4567',
-  address: 'City Hospital, Colombo 07',
-  joined: 'March 15, 2021',
-  shift: '08:00 AM – 04:00 PM',
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
+
+const STATIC_PROFILE_DATA = {
   photo: 'https://img.icons8.com/bubbles/200/000000/user-female.png',
   rating: 4.8,
   totalTests: 1284,
@@ -47,8 +41,79 @@ const MENU_ITEMS = [
 
 const LabProfileScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const { token, role } = useAuth();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [onDuty, setOnDuty] = useState(true);
+
+  const [profileInfo, setProfileInfo] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    department: 'Hematology & Pathology',
+    hospital: 'City Hospital, Colombo 07',
+    staffId: 'NUR-2021-0047',
+    experienceYears: '5',
+    joined: 'March 15, 2021',
+    shift: '08:00 AM – 04:00 PM',
+  });
+
+  const [editModalVisible, setEditModalVisible] = useState(false);
+
+  const fetchProfile = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      if (response.ok && data) {
+        setProfileInfo({
+          name: data.name || '',
+          email: data.email || '',
+          phone: data.phone || '',
+          department: data.department || 'Hematology & Pathology',
+          hospital: data.hospital || 'City Hospital, Colombo 07',
+          staffId: data.staffId || 'NUR-2021-0047',
+          experienceYears: data.experienceYears ? String(data.experienceYears) : '5',
+          joined: data.createdAt ? new Date(data.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'March 15, 2021',
+          shift: '08:00 AM – 04:00 PM'
+        });
+      }
+    } catch (err) {
+      console.error('Failed to fetch nurse profile:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (token) {
+      fetchProfile();
+    }
+  }, [token]);
+
+  const saveProfile = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/nurse/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(profileInfo)
+      });
+      const data = await response.json();
+      if (response.ok) {
+        Alert.alert('Success', 'Profile updated successfully!');
+        setEditModalVisible(false);
+        fetchProfile();
+      } else {
+        Alert.alert('Error', data.message || 'Failed to update profile');
+      }
+    } catch (err) {
+      console.error('Save Profile Error:', err);
+      Alert.alert('Error', 'Network error while updating profile.');
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -69,16 +134,16 @@ const LabProfileScreen: React.FC = () => {
           {/* Avatar Section */}
           <View style={styles.avatarSection}>
             <View style={styles.avatarWrapper}>
-              <Image source={{ uri: PROFILE_DATA.photo }} style={styles.avatar} />
+              <Image source={{ uri: STATIC_PROFILE_DATA.photo }} style={styles.avatar} />
               <TouchableOpacity style={styles.cameraBtn}>
                 <Camera size={16} color="#FFF" />
               </TouchableOpacity>
               {onDuty && <View style={styles.onDutyDot} />}
             </View>
-            <Text style={styles.profileName}>{PROFILE_DATA.name}</Text>
-            <Text style={styles.profileRole}>{PROFILE_DATA.role}</Text>
+            <Text style={styles.profileName}>{profileInfo.name || 'Nurse'}</Text>
+            <Text style={styles.profileRole}>{role === 'nurse' ? 'Senior Lab Nurse' : 'Lab Technician'}</Text>
             <View style={styles.deptBadge}>
-              <Text style={styles.deptBadgeText}>{PROFILE_DATA.department}</Text>
+              <Text style={styles.deptBadgeText}>{profileInfo.department}</Text>
             </View>
 
             {/* On Duty Toggle */}
@@ -112,19 +177,20 @@ const LabProfileScreen: React.FC = () => {
         <View style={[styles.infoCard, { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2 }]}>
           <View style={styles.infoCardHeader}>
             <Text style={styles.infoCardTitle}>Personal Information</Text>
-            <TouchableOpacity style={styles.editBtn}>
+            <TouchableOpacity style={styles.editBtn} onPress={() => setEditModalVisible(true)}>
               <Edit2 size={14} color={COLORS.primary} />
               <Text style={styles.editBtnText}>Edit</Text>
             </TouchableOpacity>
           </View>
 
           {[
-            { icon: Mail, label: 'Email', value: PROFILE_DATA.email, color: COLORS.primary },
-            { icon: Phone, label: 'Phone', value: PROFILE_DATA.phone, color: '#10B981' },
-            { icon: MapPin, label: 'Location', value: PROFILE_DATA.address, color: '#6366F1' },
-            { icon: Calendar, label: 'Joined', value: PROFILE_DATA.joined, color: '#F59E0B' },
-            { icon: Clock, label: 'Shift', value: PROFILE_DATA.shift, color: '#EF4444' },
-            { icon: User, label: 'Employee ID', value: PROFILE_DATA.employeeId, color: '#0EA5E9' },
+            { icon: Mail, label: 'Email', value: profileInfo.email, color: COLORS.primary },
+            { icon: Phone, label: 'Phone', value: profileInfo.phone, color: '#10B981' },
+            { icon: MapPin, label: 'Location', value: profileInfo.hospital, color: '#6366F1' },
+            { icon: Calendar, label: 'Joined', value: profileInfo.joined, color: '#F59E0B' },
+            { icon: Clock, label: 'Shift', value: profileInfo.shift, color: '#EF4444' },
+            { icon: User, label: 'Employee ID', value: profileInfo.staffId, color: '#0EA5E9' },
+            { icon: Award, label: 'Experience Years', value: `${profileInfo.experienceYears} Years`, color: '#F59E0B' },
           ].map((item, idx) => (
             <View key={idx} style={styles.infoRow}>
               <View style={[styles.infoIconBox, { backgroundColor: item.color + '15' }]}>
@@ -142,7 +208,7 @@ const LabProfileScreen: React.FC = () => {
         <View style={[styles.certCard, { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2 }]}>
           <Text style={styles.certTitle}>Certifications</Text>
           <View style={styles.certList}>
-            {PROFILE_DATA.certifications.map((cert, idx) => (
+            {STATIC_PROFILE_DATA.certifications.map((cert, idx) => (
               <View key={idx} style={styles.certBadge}>
                 <Award size={12} color={COLORS.primary} />
                 <Text style={styles.certText}>{cert}</Text>
@@ -204,6 +270,84 @@ const LabProfileScreen: React.FC = () => {
       </ScrollView>
 
       <NurseBottomNavBar />
+
+      {/* Edit Details Modal */}
+      <Modal visible={editModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContentSmall}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edit Profile Info</Text>
+              <TouchableOpacity onPress={() => setEditModalVisible(false)} style={styles.modalCloseBtn}>
+                <X size={20} color="#1F2937" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView contentContainerStyle={styles.modalBody} showsVerticalScrollIndicator={false}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Full Name</Text>
+                <TextInput
+                  style={styles.input}
+                  value={profileInfo.name}
+                  onChangeText={(t) => setProfileInfo({ ...profileInfo, name: t })}
+                />
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Phone Number</Text>
+                <TextInput
+                  style={styles.input}
+                  value={profileInfo.phone}
+                  onChangeText={(t) => setProfileInfo({ ...profileInfo, phone: t })}
+                  keyboardType="phone-pad"
+                />
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Email Address</Text>
+                <TextInput
+                  style={styles.input}
+                  value={profileInfo.email}
+                  onChangeText={(t) => setProfileInfo({ ...profileInfo, email: t })}
+                  keyboardType="email-address"
+                />
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Department</Text>
+                <TextInput
+                  style={styles.input}
+                  value={profileInfo.department}
+                  onChangeText={(t) => setProfileInfo({ ...profileInfo, department: t })}
+                />
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Location (Hospital/Clinic)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={profileInfo.hospital}
+                  onChangeText={(t) => setProfileInfo({ ...profileInfo, hospital: t })}
+                />
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Employee ID (Staff ID)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={profileInfo.staffId}
+                  onChangeText={(t) => setProfileInfo({ ...profileInfo, staffId: t })}
+                />
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Experience Years</Text>
+                <TextInput
+                  style={styles.input}
+                  value={profileInfo.experienceYears}
+                  onChangeText={(t) => setProfileInfo({ ...profileInfo, experienceYears: t })}
+                  keyboardType="numeric"
+                />
+              </View>
+              <TouchableOpacity style={styles.saveBtn} onPress={saveProfile}>
+                <Text style={styles.saveBtnText}>Save Changes</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -265,6 +409,73 @@ const styles = StyleSheet.create({
   logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginHorizontal: 20, marginTop: 16, paddingVertical: 16, borderRadius: 20, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FEE2E2' },
   logoutText: { fontSize: 16, fontWeight: '800', color: '#EF4444' },
   version: { textAlign: 'center', fontSize: 12, color: COLORS.textSecondary, marginTop: 16 },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalContentSmall: {
+    backgroundColor: '#FFF',
+    borderRadius: 24,
+    padding: 20,
+    maxHeight: '90%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1F2937',
+  },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalBody: {
+    gap: 16,
+    paddingBottom: 20,
+  },
+  inputGroup: {
+    gap: 6,
+    marginBottom: 12,
+  },
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#4B5563',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#1F2937',
+  },
+  saveBtn: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  saveBtnText: {
+    color: '#FFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
 });
 
 export default LabProfileScreen;
