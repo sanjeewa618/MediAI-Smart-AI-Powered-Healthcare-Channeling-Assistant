@@ -30,16 +30,24 @@ const buildQueueSnapshots = async (appointments) => {
       status: { $ne: 'cancelled' }
     });
 
-    // Find the lowest queue number that is still in 'pending' or 'confirmed'.
-    // That is the queue number currently being served (or about to be served).
-    const currentlyServing = await Appointment.findOne({
+    // Find the patient currently 'in', or fallback to the lowest queue number pending/confirmed.
+    let currentlyServing = await Appointment.findOne({
       doctor: appt.doctor._id ?? appt.doctor,
       timeSlot: appt.timeSlot,
       date: { $gte: startOfDay, $lte: endOfDay },
-      status: { $in: ['pending', 'confirmed'] }
-    })
-      .sort({ queueNumber: 1 })
-      .select('queueNumber');
+      status: 'in'
+    }).select('queueNumber');
+
+    if (!currentlyServing) {
+      currentlyServing = await Appointment.findOne({
+        doctor: appt.doctor._id ?? appt.doctor,
+        timeSlot: appt.timeSlot,
+        date: { $gte: startOfDay, $lte: endOfDay },
+        status: { $in: ['ready', 'nextIn', 'started', 'pending', 'confirmed'] }
+      })
+        .sort({ queueNumber: 1 })
+        .select('queueNumber');
+    }
 
     // How many patients are ahead of THIS patient (lower queue numbers,
     // excluding cancelled). If currentlyServing is 5 and the patient is 7,
@@ -84,14 +92,23 @@ const buildLabQueueSnapshots = async (bookings) => {
     });
 
     // Find the lowest queue token that is still in 'Pending' or 'Confirmed' or 'Checked-In'
-    const currentlyServing = await LabBooking.findOne({
+    let currentlyServing = await LabBooking.findOne({
       lab: labId,
       scheduleSlot: slotId,
       appointmentDate: { $gte: startOfDay, $lte: endOfDay },
-      status: { $in: ['Pending', 'Confirmed', 'Checked-In'] }
-    })
-      .sort({ queueToken: 1 })
-      .select('queueToken');
+      status: 'In-Progress'
+    }).select('queueToken');
+
+    if (!currentlyServing) {
+      currentlyServing = await LabBooking.findOne({
+        lab: labId,
+        scheduleSlot: slotId,
+        appointmentDate: { $gte: startOfDay, $lte: endOfDay },
+        status: { $in: ['Checked-In', 'Pending', 'Confirmed'] }
+      })
+        .sort({ queueToken: 1 })
+        .select('queueToken');
+    }
 
     const ahead = Math.max(0, (booking.queueToken || 1) - (currentlyServing?.queueToken || 1));
     const estimatedWaitMinutes = ahead * 10;
