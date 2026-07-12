@@ -551,3 +551,35 @@ export const generateAppointmentPdf = async (req, res) => {
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
+
+// @desc    Request admin to set skipped appointment to nextIn
+// @route   PUT /api/patient/request-next-in/:appointmentId
+// @access  Private (Patient only)
+export const requestAdminNextIn = async (req, res) => {
+  try {
+    const appointment = await Appointment.findOne({
+      _id: req.params.appointmentId,
+      patient: req.user._id
+    });
+
+    if (!appointment) {
+      return res.status(404).json({ success: false, message: 'Appointment not found' });
+    }
+
+    if (appointment.status !== 'skipped') {
+      return res.status(400).json({ success: false, message: 'Only skipped appointments can be requested' });
+    }
+
+    appointment.status = 'nextIn';
+    await appointment.save();
+
+    res.json({
+      success: true,
+      message: 'Request sent to admin successfully',
+      data: appointment
+    });
+  } catch (error) {
+    console.error('Error requesting nextIn:', error);
+    res.status(500).json({ success: false, message: 'Server error while requesting next in' });
+  }
+};
