@@ -8,7 +8,8 @@ import {
   updateDoctorSchedule,
   deleteDoctorSchedule,
   getSpecialties,
-  getDoctorAvailabilityForPatient
+  getDoctorAvailabilityForPatient,
+  getPatientDetailsForDoctor
 } from '../controllers/doctorController.js';
 import { protect } from '../middlewares/authMiddleware.js';
 import { doctorOnly } from '../middlewares/roleMiddleware.js';
@@ -26,6 +27,7 @@ router.use(protect);
 // Doctor Dashboard Data & Profile update (Only accessible by doctors)
 router.get('/dashboard', doctorOnly, getDoctorDashboard);
 router.put('/profile', doctorOnly, updateDoctorProfile);
+router.get('/patient/:id', doctorOnly, getPatientDetailsForDoctor);
 
 // Schedule Management
 router.get('/schedule', doctorOnly, getDoctorSchedule);

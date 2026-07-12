@@ -92,6 +92,17 @@ export const getMyAppointments = async (req, res) => {
       filter = { doctor: req.user._id };
     }
 
+    // Optional date filter
+    if (req.query.date) {
+      const queryDate = new Date(req.query.date);
+      const startOfDay = new Date(queryDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(queryDate);
+      endOfDay.setHours(23, 59, 59, 999);
+      
+      filter.date = { $gte: startOfDay, $lte: endOfDay };
+    }
+
     // If an Admin hits this route, they see everything because filter remains {}
 
     const appointments = await Appointment.find(filter)

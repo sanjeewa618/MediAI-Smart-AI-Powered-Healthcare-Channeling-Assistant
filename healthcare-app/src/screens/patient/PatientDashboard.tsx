@@ -276,16 +276,16 @@ const QueueLabAppointmentCard = ({
   const isConfirmed = status.toLowerCase() === 'confirmed';
   const isPending = status.toLowerCase() === 'pending';
 
-  const pillBgColor = isConfirmed 
-    ? 'rgba(16, 185, 129, 0.25)' 
-    : isPending 
-      ? 'rgba(245, 158, 11, 0.35)' 
+  const pillBgColor = isConfirmed
+    ? 'rgba(16, 185, 129, 0.25)'
+    : isPending
+      ? 'rgba(245, 158, 11, 0.35)'
       : 'rgba(255, 255, 255, 0.25)';
 
-  const dotColor = isConfirmed 
-    ? '#10B981' 
-    : isPending 
-      ? '#F59E0B' 
+  const dotColor = isConfirmed
+    ? '#10B981'
+    : isPending
+      ? '#F59E0B'
       : '#FFFFFF';
 
   return (
@@ -415,7 +415,7 @@ const PatientDashboard = () => {
   const [patientFullName, setPatientFullName] = useState('Patient Name');
   const [patientEmail, setPatientEmail] = useState('patient@example.com');
   const [activeAppointmentTab, setActiveAppointmentTab] = useState<'Doctor' | 'Lab'>('Doctor');
-  
+
   const [upcomingDoctorAppointments, setUpcomingDoctorAppointments] = useState<any[]>([]);
   const [upcomingLabAppointments, setUpcomingLabAppointments] = useState<any[]>([]);
   const [liveQueue, setLiveQueue] = useState<any[]>([]);
@@ -423,7 +423,7 @@ const PatientDashboard = () => {
 
   // Lab Availability
   const [labCategories, setLabCategories] = useState<any[]>([]);
-  const [labSlotCounts, setLabSlotCounts] = useState<{[catId: string]: number}>({});
+  const [labSlotCounts, setLabSlotCounts] = useState<{ [catId: string]: number }>({});
   const [labSlotsLoading, setLabSlotsLoading] = useState(false);
 
   useFocusEffect(
@@ -490,7 +490,7 @@ const PatientDashboard = () => {
           const labs = labsData.data || [];
           setLabCategories(cats);
           // For each category, sum available slots across all labs in that category
-          const counts: {[catId: string]: number} = {};
+          const counts: { [catId: string]: number } = {};
           await Promise.all(cats.map(async (cat: any) => {
             const catLabs = labs.filter((l: any) => {
               const catId = l.category?._id || l.category;
@@ -507,7 +507,7 @@ const PatientDashboard = () => {
                   const slots: any[] = d.data || [];
                   total += slots.filter((s: any) => (s.booked || 0) < s.maxPatients).length;
                 }
-              } catch (_) {}
+              } catch (_) { }
             }));
             counts[cat._id] = total;
           }));
@@ -992,13 +992,13 @@ const PatientDashboard = () => {
 
           {/* Custom Segmented Control */}
           <View style={styles.appointmentTabsContainer}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.appointmentTab, activeAppointmentTab === 'Doctor' && styles.activeAppointmentTab]}
               onPress={() => setActiveAppointmentTab('Doctor')}
             >
               <Text style={[styles.appointmentTabText, activeAppointmentTab === 'Doctor' && styles.activeAppointmentTabText]}>Doctor</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.appointmentTab, activeAppointmentTab === 'Lab' && styles.activeAppointmentTab]}
               onPress={() => setActiveAppointmentTab('Lab')}
             >
@@ -1082,7 +1082,7 @@ const PatientDashboard = () => {
               <Text style={styles.quickActionText}>Find Doctor</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.quickActionItem} onPress={() => navigation.navigate('AvailabilitySelection')}>
+            <TouchableOpacity style={styles.quickActionItem} onPress={() => navigation.navigate('LabAvailability')}>
               <View style={[styles.quickActionIconWrap, { backgroundColor: '#ECFDF5' }]}>
                 <FlaskConical size={24} color="#10B981" />
               </View>
@@ -1130,7 +1130,7 @@ const PatientDashboard = () => {
                 {labCategories.map((cat: any) => {
                   const slotCount = labSlotCounts[cat._id] ?? null;
                   const hasSlots = slotCount !== null && slotCount > 0;
-                  const catIcons: {[key: string]: string} = {
+                  const catIcons: { [key: string]: string } = {
                     'Blood Test': '🩸', 'Urine Test': '🧪', 'Diabetes': '🍬',
                     'Heart': '❤️', 'Liver': '🧬', 'Pregnancy': '🤰',
                     'X-Ray': '🦴', 'MRI': '🧲', 'CT Scan': '📡', 'Ultrasound': '🔊'
@@ -1237,7 +1237,7 @@ const PatientDashboard = () => {
               />
               <Text style={styles.menuUserName}>{patientFullName}</Text>
               <Text style={styles.menuUserEmail}>{patientEmail}</Text>
-              
+
               <View style={styles.membershipBadge}>
                 <Sparkles size={12} color="#FFD700" fill="#FFD700" />
                 <Text style={styles.membershipText}>Premium Member</Text>

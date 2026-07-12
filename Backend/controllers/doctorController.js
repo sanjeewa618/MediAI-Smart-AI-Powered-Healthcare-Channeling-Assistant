@@ -3,6 +3,7 @@ import User from '../model/User.js';
 import Appointment from '../model/Appointment.js';
 import DoctorAvailability from '../model/DoctorAvailability.js';
 import Specialty from '../model/Specialty.js';
+import MedicalRecord from '../model/MedicalRecord.js';
 
 // @desc    Get doctor dashboard data (Stats & Upcoming appointments)
 // @route   GET /api/doctor/dashboard
@@ -15,7 +16,7 @@ export const getDoctorDashboard = async (req, res) => {
     const todayEnd = new Date();
     todayEnd.setHours(23, 59, 59, 999);
 
-    // 1. Fetch upcoming appointments for the doctor
+    // 1. Fetch upcoming appointments for the doctor (Future)
     const upcomingAppointments = await Appointment.find({
       doctor: req.user._id,
       date: { $gte: new Date() },
@@ -26,24 +27,40 @@ export const getDoctorDashboard = async (req, res) => {
       .limit(10);
 
     // 2. Calculate Today's Appointments Count
-    const todayAppointmentsCount = await Appointment.countDocuments({
+    const todayAppointments = await Appointment.find({
       doctor: req.user._id,
       date: { $gte: todayStart, $lte: todayEnd },
-      status: { $in: ['pending', 'confirmed'] }
-    });
+      status: { $ne: 'cancelled' }
+    }).populate('patient', 'name email phone').sort({ queueNumber: 1 });
 
-    // 3. Calculate Unique Patients Count
-    const uniquePatients = await Appointment.distinct('patient', { doctor: req.user._id });
-    const totalPatients = uniquePatients.length;
+    const todayAppointmentsCount = todayAppointments.length;
+    const completedTodayCount = todayAppointments.filter(app => app.status === 'completed').length;
+    const pendingTodayCount = todayAppointments.filter(app => ['pending', 'started', 'ready', 'skipped'].includes(app.status)).length;
+
+    // 4. Fetch today's slots
+    const today = new Date();
+    const todayDayName = today.toLocaleDateString('en-US', { weekday: 'short' });
+    const todayDateStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+
+    const availabilities = await DoctorAvailability.find({ doctor: req.user._id });
+    const todaySlots = availabilities.filter(s => 
+      s.repeat === 'daily' || 
+      (s.repeat === 'weekly' && s.day === todayDayName) || 
+      s.day === todayDayName || 
+      s.day === todayDateStr
+    ).sort((a, b) => a.startTime.localeCompare(b.startTime));
 
     res.json({
       success: true,
       data: {
         stats: {
-          totalPatients,
-          todayAppointments: todayAppointmentsCount
+          totalPatients: completedTodayCount,
+          todayAppointments: todayAppointmentsCount,
+          pendingApprovals: pendingTodayCount
         },
-        upcomingAppointments
+        upcomingAppointments,
+        todayAppointments,
+        todaySlots
       }
     });
   } catch (error) {
@@ -282,8 +299,13 @@ export const getDoctorAvailabilityForPatient = async (req, res) => {
       const dateStr = `${y}-${m}-${d}`;
       const dayOfWeekStr = dayNames[date.getDay()];
 
-      // Find slots applicable to this day
-      const applicableSlots = slots.filter(s => s.day === dayOfWeekStr || s.repeat === 'daily');
+      // Find slots applicable to this day (daily repeats, weekly repeats matching weekday, legacy weekday matches, or specific date overrides)
+      const applicableSlots = slots.filter(s => 
+        s.repeat === 'daily' || 
+        (s.repeat === 'weekly' && s.day === dayOfWeekStr) || 
+        s.day === dayOfWeekStr || 
+        s.day === dateStr
+      );
 
       const daySlots = applicableSlots.map(s => {
         const timeSlotStr = `${s.startTime} - ${s.endTime}`;
@@ -320,6 +342,28 @@ export const getDoctorAvailabilityForPatient = async (req, res) => {
     }
 
     res.json({ success: true, data: availabilityCalendar });
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+// @desc    Get patient profile and reports for doctor
+// @route   GET /api/doctor/patient/:id
+// @access  Private (Doctor only)
+export const getPatientDetailsForDoctor = async (req, res) => {
+  try {
+    const patient = await User.findById(req.params.id);
+    if (!patient || patient.role !== 'patient') {
+      return res.status(404).json({ message: 'Patient not found' });
+    }
+    const reports = await MedicalRecord.find({ patient: req.params.id }).sort({ recordDate: -1 });
+    res.json({
+      success: true,
+      data: {
+        patient,
+        reports
+      }
+    });
   } catch (error) {
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
