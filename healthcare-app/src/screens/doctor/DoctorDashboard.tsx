@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, Platform, Modal, Animated, PanResponder, Dimensions, BackHandler } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
-import { Bell, Calendar, LogOut, X, Clock, FileEdit, Plus, Play, Users, CheckSquare, Activity } from 'lucide-react-native';
+import { Bell, Calendar, LogOut, X, Clock, FileEdit, Plus, Play, Users, CheckSquare, Activity, Search, MessageCircle } from 'lucide-react-native';
 
 const { height } = Dimensions.get('window');
 import DoctorBottomNavBar from '../../components/DoctorBottomNavBar';
@@ -220,7 +220,32 @@ const DoctorDashboard = () => {
             </LinearGradient>
           </ScrollView>
 
-          <Text style={[styles.sectionTitle, { marginTop: 8 }]}>Today's Schedule</Text>
+          {/* Quick Actions */}
+          <Text style={[styles.sectionTitle, { marginTop: 16 }]}>Quick Actions</Text>
+          <View style={styles.quickActionsRow}>
+            <TouchableOpacity style={styles.quickActionBtn}>
+              <View style={[styles.quickActionIconBox, { backgroundColor: '#DBEAFE' }]}>
+                <Search size={24} color="#2563EB" />
+              </View>
+              <Text style={styles.quickActionText}>Search</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.quickActionBtn}>
+              <View style={[styles.quickActionIconBox, { backgroundColor: '#FCE7F3' }]}>
+                <FileEdit size={24} color="#DB2777" />
+              </View>
+              <Text style={styles.quickActionText}>Prescribe</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.quickActionBtn}>
+              <View style={[styles.quickActionIconBox, { backgroundColor: '#E0E7FF' }]}>
+                <MessageCircle size={24} color="#4F46E5" />
+              </View>
+              <Text style={styles.quickActionText}>Messages</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={[styles.sectionTitle, { marginTop: 16 }]}>Today's Schedule</Text>
           {todaySlots.length === 0 ? (
             <View style={styles.emptyBox}>
               <Clock size={40} color="#D1D5DB" />
@@ -399,6 +424,30 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.85)',
   },
   sectionTitle: { fontSize: 18, fontWeight: '700', color: '#1F2937', marginBottom: 16, marginTop: 10, paddingHorizontal: 20 },
+  quickActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingHorizontal: 10,
+    marginBottom: 8,
+  },
+  quickActionBtn: {
+    alignItems: 'center',
+    width: 80,
+  },
+  quickActionIconBox: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  quickActionText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#4B5563',
+    textAlign: 'center',
+  },
   slotCard: {
     backgroundColor: '#FFF',
     borderRadius: 16,
