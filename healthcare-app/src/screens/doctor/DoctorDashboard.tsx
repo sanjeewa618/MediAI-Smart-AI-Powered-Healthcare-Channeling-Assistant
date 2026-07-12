@@ -19,6 +19,19 @@ const greyShadow = {
   elevation: 3,
 };
 
+const parseTime = (timeStr: string) => {
+  if (!timeStr) return 0;
+  const match = timeStr.match(/(\d+):(\d+)\s(AM|PM)/);
+  if (!match) return 0;
+  let [, h, m, mod] = match;
+  let hours = parseInt(h, 10);
+  if (hours === 12) hours = 0;
+  if (mod === 'PM') hours += 12;
+  const d = new Date();
+  d.setHours(hours, parseInt(m, 10), 0, 0);
+  return d.getTime();
+};
+
 const DoctorDashboard = () => {
   const navigation = useNavigation<any>();
   const isLoggingOut = useRef(false);
@@ -30,6 +43,12 @@ const DoctorDashboard = () => {
   const [todaySlots, setTodaySlots] = useState<any[]>([]);
   const [todayAppointments, setTodayAppointments] = useState<any[]>([]);
   const [stats, setStats] = useState({ totalPatients: 0, todayAppointments: 0, pendingApprovals: 0 });
+  const [currentTime, setCurrentTime] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(Date.now()), 60000); // update every minute
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
@@ -207,34 +226,56 @@ const DoctorDashboard = () => {
               <Clock size={40} color="#D1D5DB" />
               <Text style={styles.emptyTitle}>No slots today</Text>
             </View>
-          ) : (
-            todaySlots.map((slot, idx) => {
+          ) : (() => {
+            const nextSlotIndex = todaySlots.findIndex(slot => parseTime(slot.endTime) > currentTime);
+            
+            return todaySlots.map((slot, idx) => {
               const timeSlotStr = `${slot.startTime} - ${slot.endTime}`;
               const patientsForSlot = todayAppointments.filter(app => app.timeSlot === timeSlotStr);
+              const isNext = idx === nextSlotIndex;
+
+              let timeRemainingText = '';
+              if (isNext) {
+                const timeRemainingMs = parseTime(slot.startTime) - currentTime;
+                if (timeRemainingMs > 0) {
+                  const mins = Math.floor(timeRemainingMs / 60000);
+                  if (mins > 60) {
+                    timeRemainingText = `Starts in ${Math.floor(mins / 60)}h ${mins % 60}m`;
+                  } else {
+                    timeRemainingText = `Starts in ${mins} min`;
+                  }
+                } else {
+                  timeRemainingText = `Active Now`;
+                }
+              }
+
               return (
                 <TouchableOpacity 
                   key={slot._id || idx} 
-                  style={styles.slotCard}
+                  style={[styles.slotCard, isNext && styles.nextSlotCard]}
                   onPress={() => navigation.navigate('DoctorSession', { slot, appointments: patientsForSlot })}
                   activeOpacity={0.8}
                 >
                   <View style={styles.slotLeft}>
-                    <View style={styles.slotIconBox}>
-                      <Clock size={20} color={COLORS.primary} />
+                    <View style={[styles.slotIconBox, isNext && { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                      <Clock size={20} color={isNext ? "#FFF" : COLORS.primary} />
                     </View>
                     <View>
-                      <Text style={styles.slotTime}>{timeSlotStr}</Text>
-                      <Text style={styles.slotMeta}>{patientsForSlot.length} Patient{patientsForSlot.length !== 1 ? 's' : ''}</Text>
+                      {isNext && <Text style={styles.upNextBadge}>UP NEXT</Text>}
+                      <Text style={[styles.slotTime, isNext && { color: '#FFF', fontSize: 16 }]}>{timeSlotStr}</Text>
+                      <Text style={[styles.slotMeta, isNext && { color: 'rgba(255,255,255,0.85)' }]}>
+                        {patientsForSlot.length} Patient{patientsForSlot.length !== 1 ? 's' : ''} {isNext ? `• ${timeRemainingText}` : ''}
+                      </Text>
                     </View>
                   </View>
-                  <View style={styles.startBtn}>
-                    <Play size={14} color="#FFF" fill="#FFF" />
-                    <Text style={styles.startBtnText}>Start</Text>
+                  <View style={[styles.startBtn, isNext && { backgroundColor: '#FFF' }]}>
+                    <Play size={14} color={isNext ? "#10B981" : "#FFF"} fill={isNext ? "#10B981" : "#FFF"} />
+                    <Text style={[styles.startBtnText, isNext && { color: "#10B981" }]}>Start</Text>
                   </View>
                 </TouchableOpacity>
               );
-            })
-          )}
+            });
+          })()}
           <View style={{ height: 60 }} />
         </ScrollView>
         <DoctorBottomNavBar />
@@ -372,6 +413,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
+  },
+  nextSlotCard: {
+    backgroundColor: '#10B981', // A bright emerald color
+    borderWidth: 0,
+    transform: [{ scale: 1.02 }],
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+  },
+  upNextBadge: {
+    color: '#D1FAE5',
+    fontWeight: '800',
+    fontSize: 10,
+    letterSpacing: 1,
+    marginBottom: 4,
   },
   slotLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   slotIconBox: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#F5F3FF', alignItems: 'center', justifyContent: 'center' },
