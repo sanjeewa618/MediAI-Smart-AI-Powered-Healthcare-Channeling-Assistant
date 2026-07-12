@@ -288,8 +288,7 @@ export const getDoctorAvailabilityForPatient = async (req, res) => {
     // 3. Fetch all active appointments for this doctor in this month
     const appointments = await Appointment.find({
       doctor: doctorId,
-      date: { $gte: startDate, $lte: endDate },
-      status: { $in: ['pending', 'confirmed'] }
+      date: { $gte: startDate, $lte: endDate }
     });
 
     // Group appointments by date string (YYYY-MM-DD) and timeSlot so we
@@ -304,9 +303,19 @@ export const getDoctorAvailabilityForPatient = async (req, res) => {
       
       const key = `${dateStr}_${app.timeSlot}`;
       if (!appointmentCounts[key]) {
-        appointmentCounts[key] = 0;
+        appointmentCounts[key] = { active: 0, highestQueue: 0 };
       }
-      appointmentCounts[key]++;
+      
+      // Active slots consumed (cancellations free up a slot)
+      if (app.status !== 'cancelled') {
+        appointmentCounts[key].active++;
+      }
+      
+      // Highest queue number assigned (to ensure monotonic strictly increasing queue numbers)
+      const q = Number(app.queueNumber) || 0;
+      if (q > appointmentCounts[key].highestQueue) {
+        appointmentCounts[key].highestQueue = q;
+      }
     });
 
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -334,14 +343,13 @@ export const getDoctorAvailabilityForPatient = async (req, res) => {
       const daySlots = applicableSlots.map(s => {
         const timeSlotStr = `${s.startTime} - ${s.endTime}`;
         const key = `${dateStr}_${timeSlotStr}`;
-        const bookedCount = appointmentCounts[key] || 0;
+        const slotData = appointmentCounts[key] || { active: 0, highestQueue: 0 };
+        const bookedCount = slotData.active;
         const maxPatients = s.maxPatients || 1;
-        // The next queue number for this slot = bookedCount + 1, but
-        // never more than maxPatients. When the slot is full, show
-        // maxPatients so the UI displays a sensible value.
-        const nextQueueNumber = bookedCount >= maxPatients
-          ? maxPatients
-          : bookedCount + 1;
+        
+        // The queue number strictly increments based on the highest queue number generated so far.
+        // It never re-uses numbers even if there are cancellations.
+        const nextQueueNumber = slotData.highestQueue + 1;
 
         return {
           id: s._id,

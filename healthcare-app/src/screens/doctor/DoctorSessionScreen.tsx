@@ -111,32 +111,33 @@ const DoctorSessionScreen = () => {
     }
 
     try {
+      // Step 1: Start the DailySession in backend FIRST
+      // The backend will bulk-set all pending/confirmed appointments to 'started'
+      await fetch(`${API_BASE_URL}/api/doctor/session/start`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          date: new Date().toISOString(),
+          timeSlot: `${slot.startTime} - ${slot.endTime}`
+        })
+      }).then(res => res.json());
+
+      // Step 2: Now do fine-grained promotion:
+      // First unserved patient → 'ready', all others stay 'started'
       const updatedPatients = [...patients];
       let firstAssigned = false;
       const promises = updatedPatients.map(p => {
-        if (p.status === 'pending' || p.status === 'confirmed') {
+        if (p.status === 'pending' || p.status === 'confirmed' || p.status === 'started') {
           if (!firstAssigned) {
             p.status = 'ready';
             firstAssigned = true;
-          } else {
-            p.status = 'started';
+            return updatePatientStatus(p._id, 'ready');
           }
-          return updatePatientStatus(p._id, p.status);
+          // already 'started' by backend, no need to re-call API
+          return Promise.resolve();
         }
         return Promise.resolve();
       });
-
-      // Start DailySession in backend
-      promises.push(
-        fetch(`${API_BASE_URL}/api/doctor/session/start`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({
-            date: new Date().toISOString(),
-            timeSlot: `${slot.startTime} - ${slot.endTime}`
-          })
-        }).then(res => res.json())
-      );
 
       await Promise.all(promises);
       setPatients(updatedPatients);

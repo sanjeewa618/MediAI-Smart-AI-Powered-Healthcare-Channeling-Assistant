@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, Dimensions, Animated, PanResponder, Pressable, StatusBar, Modal, BackHandler, Easing } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, Dimensions, Animated, PanResponder, Pressable, StatusBar, Modal, BackHandler, Easing, Alert } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
-import { Search, Calendar, User, FileText, Activity, MoreHorizontal, Home, Heart, Shield, MessageCircle, FileEdit, FlaskConical, ChevronRight, Baby, Droplets, Sparkles, Plus, Bell, LogOut, Pill, Truck, Settings, X, LifeBuoy, Stethoscope, Dna, Brain, Bone, Eye, Smile, Wallet, Clock, AlertCircle, Hourglass, Users } from 'lucide-react-native';
+import { Search, Calendar, User, FileText, Activity, MoreHorizontal, Home, Heart, Shield, MessageCircle, FileEdit, FlaskConical, ChevronRight, Baby, Droplets, Sparkles, Plus, Bell, LogOut, Pill, Truck, Settings, X, LifeBuoy, Stethoscope, Dna, Brain, Bone, Eye, Smile, Wallet, Clock, AlertCircle, Hourglass, Users, RefreshCw, CheckCircle, XCircle } from 'lucide-react-native';
 import BottomNavBar from '../../components/BottomNavBar';
 import { useAuth } from '../../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -92,12 +92,14 @@ const QueueAppointmentCard = ({
   appointment,
   queueInfo,
   onPress,
-  lastRefresh
+  lastRefresh,
+  onRequestAdmin
 }: {
   appointment: any;
   queueInfo?: any;
   onPress: () => void;
   lastRefresh?: Date | null;
+  onRequestAdmin?: (id: string) => void;
 }) => {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
@@ -130,17 +132,39 @@ const QueueAppointmentCard = ({
   const estimatedWait = queueInfo?.estimatedWaitMinutes ?? 0;
   const isYourTurn = patientsAhead === 0;
 
-  const waitHours = Math.floor(estimatedWait / 60);
-  const waitMinutes = estimatedWait % 60;
-  const waitLabel = estimatedWait === 0
-    ? "It's your turn!"
-    : waitHours > 0
-      ? `~${waitHours}h ${waitMinutes}m wait`
-      : `~${waitMinutes}m wait`;
+  let waitLabel = "It's your turn!";
+  if (estimatedWait > 0) {
+    const waitHours = Math.floor(estimatedWait / 60);
+    const waitMinutes = estimatedWait % 60;
+    waitLabel = waitHours > 0 ? `~${waitHours}h ${waitMinutes}m wait` : `~${waitMinutes}m wait`;
+  }
+
+  let statusText = waitLabel;
+  let statusColor = isYourTurn ? '#10B981' : patientsAhead <= 2 ? '#F59E0B' : COLORS.primary;
+  let statusBg = isYourTurn ? '#D1FAE5' : patientsAhead <= 2 ? '#FEF3C7' : '#F3F0FF';
+  let showRequestBtn = false;
+
+  const rawStatus = appointment?.status?.toLowerCase();
+  if (rawStatus === 'started') {
+    statusText = "The queue got started";
+    statusBg = '#FEF9C3';
+    statusColor = '#CA8A04';
+  } else if (rawStatus === 'ready') {
+    statusText = "Next your chance";
+    statusBg = '#D1FAE5';
+    statusColor = '#059669';
+  } else if (rawStatus === 'in') {
+    statusText = "Please come in";
+    statusBg = '#DBEAFE';
+    statusColor = '#2563EB';
+  } else if (rawStatus === 'skipped') {
+    statusText = "You are skipped";
+    statusBg = '#FEE2E2';
+    statusColor = '#DC2626';
+    showRequestBtn = true;
+  }
 
   const isLab = !!appointment?.testName;
-  const statusColor = isYourTurn ? '#10B981' : patientsAhead <= 2 ? '#F59E0B' : COLORS.primary;
-  const statusBg = isYourTurn ? '#D1FAE5' : patientsAhead <= 2 ? '#FEF3C7' : '#F3F0FF';
   const dateLabel = appointment?.date ? moment(appointment.date).format('ddd, DD MMM YYYY') : '';
   const timeLabel = appointment?.timeSlot || '';
   const displayName = isLab ? appointment.testName : (appointment?.doctor?.name || 'Doctor');
@@ -229,8 +253,15 @@ const QueueAppointmentCard = ({
         {/* Estimated Wait Banner */}
         <View style={[styles.waitBanner, { backgroundColor: statusBg }]}>
           <Hourglass size={14} color={statusColor} />
-          <Text style={[styles.waitBannerText, { color: statusColor }]}>{waitLabel}</Text>
-          {lastRefresh && (
+          <Text style={[styles.waitBannerText, { color: statusColor }]}>{statusText}</Text>
+          {showRequestBtn && onRequestAdmin ? (
+            <TouchableOpacity 
+              style={{ backgroundColor: '#DC2626', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}
+              onPress={() => onRequestAdmin(appointment._id)}
+            >
+              <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>Request Next In</Text>
+            </TouchableOpacity>
+          ) : lastRefresh && (
             <Text style={styles.refreshLabel}>
               · Updated {moment(lastRefresh).format('HH:mm:ss')}
             </Text>
@@ -439,6 +470,28 @@ const PatientDashboard = () => {
   const [upcomingLabAppointments, setUpcomingLabAppointments] = useState<any[]>([]);
   const [liveQueue, setLiveQueue] = useState<any[]>([]);
   const [lastQueueRefresh, setLastQueueRefresh] = useState<Date | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [todayCompletedCount, setTodayCompletedCount] = useState(0);
+  const [todayCancelledCount, setTodayCancelledCount] = useState(0);
+
+  const handleRequestAdmin = async (appointmentId: string) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/patient/request-next-in/${appointmentId}`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setRefreshTrigger(prev => prev + 1);
+        Alert.alert('Success', 'Request sent to admin successfully');
+      } else {
+        Alert.alert('Error', data.message || 'Failed to send request');
+      }
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Error', 'Server error');
+    }
+  };
 
   // Lab Availability
   const [labCategories, setLabCategories] = useState<any[]>([]);
@@ -460,9 +513,7 @@ const PatientDashboard = () => {
             const filterNextTwoDays = (appts: any[]) => {
               if (!appts) return [];
               return appts.filter(appt => {
-                const dateInRange = moment(appt.date).isBetween(startOfToday, endOfTwoDays, null, '[]');
-                if (!dateInRange) return false;
-                return !isApptExpiredFrontend(appt.date, appt.timeSlot);
+                return moment(appt.date).isBetween(startOfToday, endOfTwoDays, null, '[]');
               });
             };
             const filterUnique = (appts: any[]) => {
@@ -477,6 +528,8 @@ const PatientDashboard = () => {
             setUpcomingDoctorAppointments(filterUnique(filterNextTwoDays(json.data.doctorAppointments)));
             setUpcomingLabAppointments(filterUnique(filterNextTwoDays(json.data.labAppointments)));
             setLiveQueue(json.data.liveQueue || []);
+            setTodayCompletedCount(json.data.todayCompletedCount || 0);
+            setTodayCancelledCount(json.data.todayCancelledCount || 0);
             setLastQueueRefresh(new Date());
           }
         } catch (e) {
@@ -488,7 +541,7 @@ const PatientDashboard = () => {
         const interval = setInterval(fetchQueue, 30000);
         return () => clearInterval(interval);
       }
-    }, [token])
+    }, [token, refreshTrigger])
   );
 
   useFocusEffect(
@@ -540,7 +593,7 @@ const PatientDashboard = () => {
         }
       };
       if (token) fetchLabAvailability();
-    }, [token])
+    }, [token, refreshTrigger])
   );
 
   useFocusEffect(
@@ -566,7 +619,7 @@ const PatientDashboard = () => {
       if (token) {
         fetchProfile();
       }
-    }, [token])
+    }, [token, refreshTrigger])
   );
 
 
@@ -847,9 +900,9 @@ const PatientDashboard = () => {
               <View style={styles.headerActions}>
                 <TouchableOpacity
                   style={styles.headerActionButton}
-                  onPress={() => setAppointmentModalVisible(true)}
+                  onPress={() => setRefreshTrigger(prev => prev + 1)}
                 >
-                  <Calendar size={20} color="#FFFFFF" />
+                  <RefreshCw size={20} color="#FFFFFF" />
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.headerActionButton, { marginLeft: 10 }]}>
                   <Bell size={20} color="#FFFFFF" />
@@ -889,6 +942,31 @@ const PatientDashboard = () => {
               <X size={18} color={COLORS.textSecondary} />
             </TouchableOpacity>
           )}
+
+          {/* Summary Cards */}
+          <StaggeredView delay={250}>
+            <View style={styles.summaryCardsRow}>
+              <View style={[styles.summaryCard, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0', borderWidth: 1 }]}>
+                <View style={[styles.summaryCardIconWrap, { backgroundColor: '#DCFCE7' }]}>
+                  <CheckCircle size={20} color="#16A34A" />
+                </View>
+                <View style={styles.summaryCardTextWrap}>
+                  <Text style={styles.summaryCardValue}>{todayCompletedCount}</Text>
+                  <Text style={styles.summaryCardLabel}>Completed</Text>
+                </View>
+              </View>
+
+              <View style={[styles.summaryCard, { backgroundColor: '#FEF2F2', borderColor: '#FECACA', borderWidth: 1 }]}>
+                <View style={[styles.summaryCardIconWrap, { backgroundColor: '#FEE2E2' }]}>
+                  <XCircle size={20} color="#DC2626" />
+                </View>
+                <View style={styles.summaryCardTextWrap}>
+                  <Text style={styles.summaryCardValue}>{todayCancelledCount}</Text>
+                  <Text style={styles.summaryCardLabel}>Cancelled</Text>
+                </View>
+              </View>
+            </View>
+          </StaggeredView>
 
           {/* AI Health Assistant Card */}
           <StaggeredView delay={300}>
@@ -1040,6 +1118,7 @@ const PatientDashboard = () => {
                       queueInfo={liveQueue.find((q) => q.appointmentId === appt._id)}
                       onPress={() => navigation.navigate('PatientAppointments')}
                       lastRefresh={lastQueueRefresh}
+                      onRequestAdmin={handleRequestAdmin}
                     />
                   </View>
                 ))}
@@ -1059,6 +1138,7 @@ const PatientDashboard = () => {
                       queueInfo={liveQueue.find((q) => q.appointmentId === appt._id)}
                       onPress={() => navigation.navigate('PatientAppointments')}
                       lastRefresh={lastQueueRefresh}
+                      onRequestAdmin={handleRequestAdmin}
                     />
                   </View>
                 ))}
@@ -2405,6 +2485,48 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#6B7280',
     fontWeight: '600',
+  },
+  summaryCardsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    marginTop: 10,
+    marginBottom: 10,
+  },
+  summaryCard: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 16,
+    marginHorizontal: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  summaryCardIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  summaryCardTextWrap: {
+    flex: 1,
+  },
+  summaryCardValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: COLORS.textHeader,
+  },
+  summaryCardLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+    marginTop: 2,
   }
 });
 
