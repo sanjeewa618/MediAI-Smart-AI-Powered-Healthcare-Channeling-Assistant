@@ -59,6 +59,7 @@ const AdminDashboardScreen = () => {
     totalUsers: 0,
     totalPatients: 0,
     totalDoctors: 0,
+    approvedDoctors: 0,
     totalNurses: 0,
     totalAppointments: 0,
     pendingVerifications: 0,
@@ -92,6 +93,7 @@ const AdminDashboardScreen = () => {
           totalUsers: statsData.data.users ?? 0,
           totalPatients: statsData.data.patients ?? 0,
           totalDoctors: statsData.data.doctors ?? 0,
+          approvedDoctors: statsData.data.approvedDoctors ?? 0,
           totalNurses: statsData.data.nurses ?? 0,
           totalAppointments: statsData.data.appointments ?? 0,
         }));
@@ -466,6 +468,9 @@ const AdminDashboardScreen = () => {
               </View>
               <Text style={styles.statVal}>{stats.totalDoctors}</Text>
               <Text style={styles.statLabel}>Doctors</Text>
+              <Text style={{ fontSize: 10, color: '#10B981', marginTop: 2, fontWeight: '700' }}>
+                {stats.approvedDoctors} Approved
+              </Text>
             </View>
 
             <View style={[styles.statCard, SHADOWS.light]}>
