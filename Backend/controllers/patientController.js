@@ -364,3 +364,31 @@ export const uploadPatientReport = async (req, res) => {
     res.status(500).json({ message: 'Server Error uploading report', error: error.message });
   }
 };
+
+// @desc    Upload patient avatar/profile picture
+// @route   POST /api/patient/profile/upload-avatar
+// @access  Private (Patient only)
+export const uploadPatientAvatar = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'Please upload an image file' });
+    }
+    const user = await User.findById(req.user._id);
+
+    if (user) {
+      const avatarUrl = `/uploads/${req.file.filename}`;
+      user.photo = avatarUrl;
+      const updatedUser = await user.save();
+      res.json({
+        success: true,
+        message: 'Avatar uploaded successfully',
+        photo: avatarUrl,
+        data: updatedUser
+      });
+    } else {
+      res.status(404).json({ message: 'User not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};

@@ -2,6 +2,8 @@ import User from '../model/User.js';
 import Appointment from '../model/Appointment.js';
 import AIAnalysisLog from '../model/AIAnalysisLog.js';
 import LabBooking from '../model/LabBooking.js';
+import Lab from '../model/Lab.js';
+import LabCategory from '../model/LabCategory.js';
 import PDFDocument from 'pdfkit';
 import ExcelJS from 'exceljs';
 
@@ -668,6 +670,27 @@ export const approveRequest = async (req, res) => {
     }
     user.status = 'approved';
     const updatedUser = await user.save();
+
+    // If the approved user is a nurse, check and auto-create their Lab record!
+    if (user.role === 'nurse') {
+      let lab = await Lab.findOne({ assignedNurse: user._id });
+      if (!lab) {
+        let categoryId = null;
+        if (user.department) {
+          const cat = await LabCategory.findOne({ name: new RegExp(`^${user.department}$`, 'i') });
+          categoryId = cat?._id || null;
+        }
+        lab = new Lab({
+          name: `${user.department || 'General'} Lab`,
+          floor: 'Main Floor',
+          status: 'Available',
+          assignedNurse: user._id,
+          ...(categoryId ? { category: categoryId } : {}),
+        });
+        await lab.save();
+      }
+    }
+
     res.json({ success: true, data: updatedUser });
   } catch (error) {
     res.status(500).json({ message: 'Server Error', error: error.message });
@@ -746,6 +769,21 @@ export const addUser = async (req, res) => {
       department,
       status: 'active'
     });
+
+    if (user.role === 'nurse') {
+      let categoryId = null;
+      if (user.department) {
+        const cat = await LabCategory.findOne({ name: new RegExp(`^${user.department}$`, 'i') });
+        categoryId = cat?._id || null;
+      }
+      await Lab.create({
+        name: `${user.department || 'General'} Lab`,
+        floor: 'Main Floor',
+        status: 'Available',
+        assignedNurse: user._id,
+        ...(categoryId ? { category: categoryId } : {}),
+      });
+    }
 
     res.status(201).json({
       success: true,

@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "checkJs": false,
+    "forceConsistentCasingInFileNames": false
+  },
+  "exclude": [
+    "node_modules"
+  ]
+}

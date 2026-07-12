@@ -4,6 +4,8 @@ import bcrypt from 'bcryptjs';
 import User from '../model/User.js';
 import OTP from '../model/OTP.js';
 import sendEmail from '../config/emailService.js';
+import Lab from '../model/Lab.js';
+import LabCategory from '../model/LabCategory.js';
 
 // Generate JWT Token
 const generateToken = (id) => {
@@ -113,6 +115,22 @@ export const registerUser = async (req, res) => {
     });
 
     if (user) {
+      // If the registered user is a nurse, create their Lab record immediately!
+      if (user.role === 'nurse') {
+        let categoryId = null;
+        if (user.department) {
+          const cat = await LabCategory.findOne({ name: new RegExp(`^${user.department}$`, 'i') });
+          categoryId = cat?._id || null;
+        }
+        await Lab.create({
+          name: `${user.department || 'General'} Lab`,
+          floor: 'Main Floor',
+          status: 'Available',
+          assignedNurse: user._id,
+          ...(categoryId ? { category: categoryId } : {}),
+        });
+      }
+
       res.status(201).json({
         _id: user.id,
         name: user.name,

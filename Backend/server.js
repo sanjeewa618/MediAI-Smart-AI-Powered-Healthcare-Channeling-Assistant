@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
 import connectDB from './config/db.js';
+import fs from 'fs';
 import authRoutes from './routers/authRoutes.js';
 import patientRoutes from './routers/patientRoutes.js';
 import doctorRoutes from './routers/doctorRoutes.js';
@@ -16,11 +17,41 @@ import prescriptionRoutes from './routers/prescriptionRoutes.js';
 import labRoutes from './routers/labRoutes.js';
 import medicalRecordRoutes from './routers/medicalRecordRoutes.js';
 import notificationRoutes from './routers/notificationRoutes.js';
+import Lab from './model/Lab.js';
+import User from './model/User.js';
+
 // 1. Load environment variables FIRST
 dotenv.config();
 
 // 2. Connect to Database AFTER env is loaded
 connectDB();
+
+// Clean up old/mock labs that don't have a valid approved nurse
+const cleanUpLabs = async () => {
+  try {
+    // Delete any Lab record that does not have an assignedNurse or where assignedNurse is null
+    await Lab.deleteMany({ 
+      $or: [
+        { assignedNurse: { $exists: false } },
+        { assignedNurse: null }
+      ] 
+    });
+
+    // Delete any Lab record where assignedNurse does not exist in User collection or is not a nurse
+    const labs = await Lab.find().populate('assignedNurse');
+    for (const lab of labs) {
+      if (!lab.assignedNurse || lab.assignedNurse.role !== 'nurse') {
+        await Lab.deleteOne({ _id: lab._id });
+      }
+    }
+    console.log('[CleanUp] Laboratory database successfully cleaned of mock data.');
+  } catch (err) {
+    console.error('[CleanUp] Error cleaning up labs:', err);
+  }
+};
+
+// Run cleanup shortly after connection establishes
+setTimeout(cleanUpLabs, 3000);
 
 const app = express();
 
@@ -30,7 +61,13 @@ app.use(express.json());
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+app.use('/uploads', express.static(uploadsDir));
 
 // 3. Mount Route Paths
 app.use('/api/auth', authRoutes);

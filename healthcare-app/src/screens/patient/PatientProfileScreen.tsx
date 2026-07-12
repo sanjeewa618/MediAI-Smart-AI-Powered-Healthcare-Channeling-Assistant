@@ -97,6 +97,7 @@ const PatientProfileScreen = () => {
       expiryDate: '15 Dec 2025',
       documentUrl: ''
     },
+    photo: '',
     createdAt: '',
     stats: {
       totalAppointments: 0,
@@ -202,6 +203,7 @@ const PatientProfileScreen = () => {
             chronicConditions: Array.isArray(data.chronicConditions) ? data.chronicConditions : prev.chronicConditions,
             emergencyContacts: Array.isArray(data.emergencyContacts) && data.emergencyContacts.length > 0 ? data.emergencyContacts : prev.emergencyContacts,
             insurance: data.insurance || prev.insurance,
+            photo: data.photo || prev.photo || '',
             createdAt: data.createdAt || prev.createdAt,
             stats: statsData?.success ? statsData.data : prev.stats,
           }));
@@ -263,6 +265,60 @@ const PatientProfileScreen = () => {
           }
         } else {
           Alert.alert('Error', 'Failed to upload insurance card');
+        }
+      }
+    } catch (error) {
+      console.error('Image picking/upload error:', error);
+      Alert.alert('Error', 'An error occurred while uploading');
+    }
+  };
+
+  const handlePickProfileImage = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert('Permission required', 'Permission to access gallery is required!');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const formData = new FormData();
+        const filename = asset.uri.split('/').pop() || 'profile.jpg';
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : `image/jpeg`;
+
+        formData.append('avatar', {
+          uri: asset.uri,
+          name: filename,
+          type: type,
+        } as any);
+
+        const response = await fetch(`${API_BASE_URL}/api/patient/profile/upload-avatar`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json',
+          },
+          body: formData,
+        });
+
+        const uploadData = await response.json();
+        if (response.ok && uploadData.success && uploadData.photo) {
+          setProfileData(p => ({
+            ...p,
+            photo: uploadData.photo
+          }));
+          Alert.alert('Success', 'Profile picture updated successfully!');
+        } else {
+          Alert.alert('Error', uploadData.message || 'Failed to upload profile picture');
         }
       }
     } catch (error) {
@@ -395,10 +451,15 @@ const PatientProfileScreen = () => {
           {/* Profile Header Card */}
           <View style={[styles.profileCard, SHADOWS.medium]}>
             <View style={styles.profileHeader}>
-              <Image
-                source={require('../../../assets/robot-avatar.png')}
-                style={styles.profilePhoto}
-              />
+              <TouchableOpacity onPress={handlePickProfileImage} style={styles.photoContainer}>
+                <Image
+                  source={profileData.photo ? { uri: `${API_BASE_URL}${profileData.photo}` } : require('../../../assets/robot-avatar.png')}
+                  style={styles.profilePhoto}
+                />
+                <View style={styles.cameraIconBadge}>
+                  <Camera size={14} color="#FFF" />
+                </View>
+              </TouchableOpacity>
               <View style={styles.profileInfo}>
                 <View style={styles.nameRow}>
                   <Text style={styles.patientName}>{profileData.name}</Text>
@@ -1089,7 +1150,21 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   profileHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  photoContainer: { position: 'relative' },
   profilePhoto: { width: 80, height: 80, borderRadius: 40, marginRight: 16 },
+  cameraIconBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 16,
+    backgroundColor: COLORS.primary,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFF',
+  },
   profileInfo: { flex: 1 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   patientName: { fontSize: 20, fontWeight: '800', color: COLORS.textHeader },

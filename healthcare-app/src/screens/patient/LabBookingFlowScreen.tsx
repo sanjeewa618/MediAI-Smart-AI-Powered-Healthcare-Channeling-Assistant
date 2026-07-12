@@ -115,7 +115,15 @@ const LabBookingFlowScreen = () => {
             <div style="text-align: center; margin-bottom: 30px;">
               <h1 style="color: #3b82f6; margin-bottom: 5px;">MediAI Smart Channeling</h1>
               <p style="color: #6B7280; margin-top: 0; font-size: 14px;">Lab Appointment E-Receipt</p>
-              <div style="display: inline-block; padding: 6px 12px; background-color: #ECFDF5; color: #047857; font-weight: bold; border-radius: 20px; font-size: 14px; margin-top: 10px;">
+              
+              <!-- Payment Status Badge -->
+              <div style="margin-top: 10px; margin-bottom: 10px;">
+                <span style="display: inline-block; padding: 6px 16px; background-color: ${paymentMethod === 'Cash' ? '#FEF3C7' : '#D1FAE5'}; color: ${paymentMethod === 'Cash' ? '#B45309' : '#065F46'}; font-weight: bold; border-radius: 20px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">
+                  ${paymentMethod === 'Cash' ? 'Paid at Hospital' : 'Paid'}
+                </span>
+              </div>
+
+              <div style="display: inline-block; padding: 6px 12px; background-color: #ECFDF5; color: #047857; font-weight: bold; border-radius: 20px; font-size: 14px; margin-top: 5px;">
                 Booking ID: #${bookingRefId}
               </div>
             </div>
@@ -710,6 +718,26 @@ const LabBookingFlowScreen = () => {
         <Text style={styles.successSub}>Your lab test has been scheduled successfully.</Text>
         
         <View style={[styles.ticketCard, SHADOWS.medium]}>
+          <View style={{
+            alignSelf: 'center',
+            backgroundColor: paymentMethod === 'Cash' ? '#FEF3C7' : '#D1FAE5',
+            paddingHorizontal: 16,
+            paddingVertical: 6,
+            borderRadius: 20,
+            marginBottom: 15,
+            borderWidth: 1,
+            borderColor: paymentMethod === 'Cash' ? '#FDE68A' : '#A7F3D0'
+          }}>
+            <Text style={{
+              color: paymentMethod === 'Cash' ? '#B45309' : '#065F46',
+              fontWeight: '800',
+              fontSize: 12,
+              textTransform: 'uppercase'
+            }}>
+              {paymentMethod === 'Cash' ? 'Paid at Hospital' : 'Paid'}
+            </Text>
+          </View>
+
           <View style={styles.ticketHeader}>
             <Text style={styles.ticketLabel}>Booking ID</Text>
             <Text style={styles.ticketID}>#{bookingRefId}</Text>

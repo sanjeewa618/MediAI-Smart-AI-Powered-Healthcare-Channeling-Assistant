@@ -209,6 +209,7 @@ const LabAvailabilityScreen = () => {
   const [dbSlots, setDbSlots] = useState<any[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [availableSlotsCount, setAvailableSlotsCount] = useState<{[key: string]: number}>({});
+  const [currentTokens, setCurrentTokens] = useState<{[key: string]: number}>({});
 
   useFocusEffect(
     useCallback(() => {
@@ -345,9 +346,10 @@ const LabAvailabilityScreen = () => {
     const fetchAllAvailableSlots = async () => {
       if (filteredLabs.length === 0) return;
       const counts: {[key: string]: number} = {};
+      const tokensMap: {[key: string]: number} = {};
       await Promise.all(filteredLabs.map(async (lab) => {
         try {
-          const res = await fetch(`${API_BASE_URL}/api/labs/${lab.id}/availability`, {
+          const res = await fetch(`${API_BASE_URL}/api/labs/${lab.id}/availability?date=${selectedDate}`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
           const data = await res.json();
@@ -355,15 +357,19 @@ const LabAvailabilityScreen = () => {
             const slotsList = data.data?.slots || [];
             const count = slotsList.filter((s: any) => s.status === 'Available' || s.status === 'Busy').length;
             counts[lab.id] = count;
+            tokensMap[lab.id] = data.data?.currentToken || 1;
           } else {
             counts[lab.id] = 0;
+            tokensMap[lab.id] = 1;
           }
         } catch (err) {
           console.error(err);
           counts[lab.id] = 0;
+          tokensMap[lab.id] = 1;
         }
       }));
       setAvailableSlotsCount(prev => ({ ...prev, ...counts }));
+      setCurrentTokens(prev => ({ ...prev, ...tokensMap }));
     };
 
     if (token && filteredLabs.length > 0) {
@@ -516,7 +522,7 @@ const LabAvailabilityScreen = () => {
                 <View style={styles.queueBox}>
                   <View style={styles.queueItem}>
                     <Text style={styles.queueLabel}>Current Token</Text>
-                    <Text style={styles.queueValue}>{lab.currentToken}</Text>
+                    <Text style={styles.queueValue}>{currentTokens[lab.id] !== undefined ? currentTokens[lab.id] : 1}</Text>
                   </View>
                   <View style={styles.queueDivider} />
                   <View style={styles.queueItem}>
