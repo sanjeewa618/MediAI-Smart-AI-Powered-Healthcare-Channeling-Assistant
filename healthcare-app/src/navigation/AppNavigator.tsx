@@ -20,6 +20,7 @@ import DoctorSchedulingScreen from '../screens/doctor/DoctorSchedulingScreen';
 import DoctorHistoryScreen from '../screens/doctor/DoctorHistoryScreen';
 import DoctorReportsScreen from '../screens/doctor/DoctorReportsScreen';
 import DoctorProfileScreen from '../screens/doctor/DoctorProfileScreen';
+import DoctorSessionScreen from '../screens/doctor/DoctorSessionScreen';
 import LabDashboard from '../screens/lab/LabDashboard';
 import LabAppointmentsScreen from '../screens/lab/LabAppointmentsScreen';
 import LabSchedulingScreen from '../screens/lab/LabSchedulingScreen';
@@ -81,6 +82,7 @@ const AppNavigator = () => {
       <Stack.Screen name="DoctorHistory" component={DoctorHistoryScreen} />
       <Stack.Screen name="DoctorReports" component={DoctorReportsScreen} />
       <Stack.Screen name="DoctorProfile" component={DoctorProfileScreen} />
+      <Stack.Screen name="DoctorSession" component={DoctorSessionScreen} />
       <Stack.Screen name="LabDashboard" component={LabDashboard} />
       <Stack.Screen name="LabAppointments" component={LabAppointmentsScreen} />
       <Stack.Screen name="LabScheduling" component={LabSchedulingScreen} />

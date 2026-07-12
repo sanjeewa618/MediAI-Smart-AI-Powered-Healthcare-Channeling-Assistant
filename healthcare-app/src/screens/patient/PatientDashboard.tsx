@@ -60,6 +60,29 @@ const StaggeredView = ({ children, delay = 0, style }: { children: React.ReactNo
 };
 
 // =============================================================
+//  Utility for Dynamic Gradients
+// =============================================================
+const getGradientForDate = (dateVal: string | Date) => {
+  const dateStr = moment(dateVal).format('YYYY-MM-DD');
+  let hash = 0;
+  for (let i = 0; i < dateStr.length; i++) {
+    hash = dateStr.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  hash = Math.abs(hash);
+  
+  const gradients = [
+    ['#1E3A8A', '#3B82F6'], // Deep Blue
+    ['#0F766E', '#14B8A6'], // Premium Teal
+    ['#0369A1', '#0EA5E9'], // Sky Blue
+    ['#065F46', '#10B981'], // Emerald Green
+    ['#083344', '#06B6D4'], // Bright Cyan
+    ['#1D4ED8', '#60A5FA'], // Classic Blue
+    ['#047857', '#34D399'], // Sea Green
+  ] as const;
+  return gradients[hash % gradients.length] as readonly [string, string];
+};
+
+// =============================================================
 //  QueueAppointmentCard
 //  Beautifully redesigned card that prominently shows the
 //  patient's live queue number along with live status indicators
@@ -127,7 +150,7 @@ const QueueAppointmentCard = ({
   return (
     <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={styles.queueCardOuter}>
       <LinearGradient
-        colors={isYourTurn ? ['#065F46', '#10B981'] : ['#5F0FFF', '#8B3DFF']}
+        colors={getGradientForDate(appointment?.date)}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.queueCardGradient}
@@ -253,16 +276,16 @@ const QueueLabAppointmentCard = ({
   const isConfirmed = status.toLowerCase() === 'confirmed';
   const isPending = status.toLowerCase() === 'pending';
 
-  const pillBgColor = isConfirmed 
-    ? 'rgba(16, 185, 129, 0.25)' 
-    : isPending 
-      ? 'rgba(245, 158, 11, 0.35)' 
+  const pillBgColor = isConfirmed
+    ? 'rgba(16, 185, 129, 0.25)'
+    : isPending
+      ? 'rgba(245, 158, 11, 0.35)'
       : 'rgba(255, 255, 255, 0.25)';
 
-  const dotColor = isConfirmed 
-    ? '#10B981' 
-    : isPending 
-      ? '#F59E0B' 
+  const dotColor = isConfirmed
+    ? '#10B981'
+    : isPending
+      ? '#F59E0B'
       : '#FFFFFF';
 
   return (
@@ -393,7 +416,7 @@ const PatientDashboard = () => {
   const [patientEmail, setPatientEmail] = useState('patient@example.com');
   const [patientPhoto, setPatientPhoto] = useState('');
   const [activeAppointmentTab, setActiveAppointmentTab] = useState<'Doctor' | 'Lab'>('Doctor');
-  
+
   const [upcomingDoctorAppointments, setUpcomingDoctorAppointments] = useState<any[]>([]);
   const [upcomingLabAppointments, setUpcomingLabAppointments] = useState<any[]>([]);
   const [liveQueue, setLiveQueue] = useState<any[]>([]);
@@ -401,7 +424,7 @@ const PatientDashboard = () => {
 
   // Lab Availability
   const [labCategories, setLabCategories] = useState<any[]>([]);
-  const [labSlotCounts, setLabSlotCounts] = useState<{[catId: string]: number}>({});
+  const [labSlotCounts, setLabSlotCounts] = useState<{ [catId: string]: number }>({});
   const [labSlotsLoading, setLabSlotsLoading] = useState(false);
 
   useFocusEffect(
@@ -468,7 +491,7 @@ const PatientDashboard = () => {
           const labs = labsData.data || [];
           setLabCategories(cats);
           // For each category, sum available slots across all labs in that category
-          const counts: {[catId: string]: number} = {};
+          const counts: { [catId: string]: number } = {};
           await Promise.all(cats.map(async (cat: any) => {
             const catLabs = labs.filter((l: any) => {
               const catId = l.category?._id || l.category;
@@ -485,7 +508,7 @@ const PatientDashboard = () => {
                   const slots: any[] = d.data || [];
                   total += slots.filter((s: any) => (s.booked || 0) < s.maxPatients).length;
                 }
-              } catch (_) {}
+              } catch (_) { }
             }));
             counts[cat._id] = total;
           }));
@@ -973,13 +996,13 @@ const PatientDashboard = () => {
 
           {/* Custom Segmented Control */}
           <View style={styles.appointmentTabsContainer}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.appointmentTab, activeAppointmentTab === 'Doctor' && styles.activeAppointmentTab]}
               onPress={() => setActiveAppointmentTab('Doctor')}
             >
               <Text style={[styles.appointmentTabText, activeAppointmentTab === 'Doctor' && styles.activeAppointmentTabText]}>Doctor</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.appointmentTab, activeAppointmentTab === 'Lab' && styles.activeAppointmentTab]}
               onPress={() => setActiveAppointmentTab('Lab')}
             >
@@ -1010,12 +1033,40 @@ const PatientDashboard = () => {
             upcomingLabAppointments.length > 0 ? (
               <View style={styles.appointmentSubSection}>
                 {upcomingLabAppointments.map((appt, idx) => (
-                  <View key={idx} style={{ marginBottom: 15 }}>
-                    <QueueLabAppointmentCard
-                      appointment={appt}
-                      onPress={() => navigation.navigate('Reports')}
-                    />
-                  </View>
+                  <TouchableOpacity
+                    key={idx}
+                    style={[styles.mainAppointmentCard, SHADOWS.small, { marginBottom: 15, padding: 0, overflow: 'hidden', borderWidth: 0 }]}
+                    onPress={() => navigation.navigate('Reports')}
+                    activeOpacity={0.9}
+                  >
+                    <LinearGradient
+                      colors={getGradientForDate(appt.date)}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={{ padding: 16, flexDirection: 'row', alignItems: 'center' }}
+                    >
+                      <View style={[styles.mainAppIconWrap, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                        <FlaskConical size={28} color="#FFF" />
+                      </View>
+                      <View style={styles.mainAppInfo}>
+                        <Text style={[styles.mainAppTitle, { color: '#FFF' }]}>
+                          {appt.testName || 'Lab Test'}
+                        </Text>
+                        <Text style={[styles.mainAppSub, { color: 'rgba(255,255,255,0.8)' }]}>
+                          Lab Visit  •  {moment(appt.date).format('DD MMM')}  •  {appt.timeSlot || 'TBD'}
+                        </Text>
+                        <View style={[styles.countdownPill, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                          <Activity size={11} color="#FFF" />
+                          <Text style={[styles.countdownText, { color: '#FFF' }]}>
+                            {appt.queueNumber
+                              ? `Queue #${appt.queueNumber}`
+                              : 'Upcoming'}
+                          </Text>
+                        </View>
+                      </View>
+                      <ChevronRight size={20} color="rgba(255,255,255,0.6)" />
+                    </LinearGradient>
+                  </TouchableOpacity>
                 ))}
               </View>
             ) : (
@@ -1035,7 +1086,7 @@ const PatientDashboard = () => {
               <Text style={styles.quickActionText}>Find Doctor</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.quickActionItem} onPress={() => navigation.navigate('AvailabilitySelection')}>
+            <TouchableOpacity style={styles.quickActionItem} onPress={() => navigation.navigate('LabAvailability')}>
               <View style={[styles.quickActionIconWrap, { backgroundColor: '#ECFDF5' }]}>
                 <FlaskConical size={24} color="#10B981" />
               </View>
@@ -1083,7 +1134,7 @@ const PatientDashboard = () => {
                 {labCategories.map((cat: any) => {
                   const slotCount = labSlotCounts[cat._id] ?? null;
                   const hasSlots = slotCount !== null && slotCount > 0;
-                  const catIcons: {[key: string]: string} = {
+                  const catIcons: { [key: string]: string } = {
                     'Blood Test': '🩸', 'Urine Test': '🧪', 'Diabetes': '🍬',
                     'Heart': '❤️', 'Liver': '🧬', 'Pregnancy': '🤰',
                     'X-Ray': '🦴', 'MRI': '🧲', 'CT Scan': '📡', 'Ultrasound': '🔊'
@@ -1190,7 +1241,7 @@ const PatientDashboard = () => {
               />
               <Text style={styles.menuUserName}>{patientFullName}</Text>
               <Text style={styles.menuUserEmail}>{patientEmail}</Text>
-              
+
               <View style={styles.membershipBadge}>
                 <Sparkles size={12} color="#FFD700" fill="#FFD700" />
                 <Text style={styles.membershipText}>Premium Member</Text>

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, 
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/types';
-import { ArrowLeft, ArrowRight, Home, Calendar, Heart, FileText, User, ChevronLeft, Stethoscope, FlaskConical, CheckCircle2, Clock, XCircle, Plus } from 'lucide-react-native';
+import { ArrowLeft, ArrowRight, Home, Calendar, Heart, FileText, User, ChevronLeft, Stethoscope, FlaskConical, CheckCircle2, Clock, XCircle, Plus, Activity } from 'lucide-react-native';
 import BottomNavBar from '../../components/BottomNavBar';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -44,7 +44,7 @@ const mockLabAppointments = [
 const PatientAppointmentsScreen = () => {
   const navigation = useNavigation<AppointmentsNavProp>();
   const { token } = useAuth();
-  
+
   const [activeCategory, setActiveCategory] = useState<'Doctor' | 'Lab'>('Doctor');
   const [activeTab, setActiveTab] = useState('Upcoming');
   const [doctorAppointments, setDoctorAppointments] = useState<any[]>([]);
@@ -61,13 +61,13 @@ const PatientAppointmentsScreen = () => {
             }
           });
           const data = await response.json();
-          
+
           if (response.ok && data.success) {
             const formatted = data.data.map((app: any) => {
               let mappedStatus = 'Upcoming';
               if (app.status === 'completed') mappedStatus = 'Completed';
               if (app.status === 'cancelled') mappedStatus = 'Cancelled';
-              
+
               return {
                 id: app._id,
                 name: app.doctor?.name || 'Unknown Doctor',
@@ -76,7 +76,8 @@ const PatientAppointmentsScreen = () => {
                 date: moment(app.date).format('DD MMM YYYY'),
                 time: app.timeSlot || 'TBD',
                 status: mappedStatus,
-                avatar: null
+                avatar: null,
+                queueNumber: app.queueNumber
               };
             });
             setDoctorAppointments(formatted);
@@ -145,80 +146,133 @@ const PatientAppointmentsScreen = () => {
       default: return null;
     }
   };
+  const getGradientForDate = (dateString: string) => {
+    // We hash the normalized date string to ensure all cards on the exact same date get the same color
+    const dateStr = moment(dateString, 'DD MMM YYYY').format('YYYY-MM-DD');
+    let hash = 0;
+    for (let i = 0; i < dateStr.length; i++) {
+      hash = dateStr.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    hash = Math.abs(hash);
 
-  const renderDoctorItem = (item: any) => (
-    <TouchableOpacity key={item.id} style={[styles.appointmentCard, SHADOWS.small]}>
-      <View style={styles.cardHeader}>
-        <View style={styles.avatarWrap}>
-          {item.avatar ? (
-            <Image source={item.avatar} style={styles.avatar} />
-          ) : (
-            <View style={{width: 50, height: 50, borderRadius: 25, backgroundColor: '#F3F0FF', alignItems: 'center', justifyContent: 'center'}}>
-              <Text style={{fontSize: 20, color: COLORS.primary, fontWeight: 'bold'}}>{item.name.charAt(0)}</Text>
+    const gradients = [
+      ['#1E3A8A', '#3B82F6'], // Deep Blue
+      ['#0F766E', '#14B8A6'], // Premium Teal
+      ['#0369A1', '#0EA5E9'], // Sky Blue
+      ['#065F46', '#10B981'], // Emerald Green
+      ['#083344', '#06B6D4'], // Bright Cyan
+      ['#1D4ED8', '#60A5FA'], // Classic Blue
+      ['#047857', '#34D399'], // Sea Green
+    ] as const;
+    return gradients[hash % gradients.length] as readonly [string, string];
+  };
+
+  const renderDoctorItem = (item: any) => {
+    const bgGradient = getGradientForDate(item.date);
+    return (
+      <TouchableOpacity key={item.id} activeOpacity={0.9}>
+        <LinearGradient
+          colors={bgGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.appointmentCard, SHADOWS.small, { borderWidth: 0, padding: 0, overflow: 'hidden' }]}
+        >
+          <View style={{ padding: 16 }}>
+            <View style={styles.cardHeader}>
+              <View style={[styles.avatarWrap, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                {item.avatar ? (
+                  <Image source={item.avatar} style={styles.avatar} />
+                ) : (
+                  <View style={{ width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ fontSize: 20, color: '#FFF', fontWeight: 'bold' }}>{item.name.charAt(0)}</Text>
+                  </View>
+                )}
+              </View>
+              <View style={styles.cardMainInfo}>
+                <Text style={[styles.docName, { color: '#FFF' }]}>{item.name}</Text>
+                <Text style={[styles.specialtyText, { color: 'rgba(255,255,255,0.8)' }]}>{item.specialty}</Text>
+              </View>
+              <View style={[styles.statusBadge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                {activeTab === 'Upcoming' ? (
+                  <>
+                    <Activity size={14} color="#FFF" />
+                    <Text style={[styles.statusBadgeText, { color: '#FFF' }]}>
+                      {item.queueNumber ? `Queue #${item.queueNumber}` : 'Upcoming'}
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    {getStatusIcon(item.status)}
+                    <Text style={[styles.statusBadgeText, { color: '#FFF' }]}>{item.status}</Text>
+                  </>
+                )}
+              </View>
             </View>
-          )}
-        </View>
-        <View style={styles.cardMainInfo}>
-          <Text style={styles.docName}>{item.name}</Text>
-          <Text style={styles.specialtyText}>{item.specialty}</Text>
-        </View>
-        <View style={[styles.statusBadge, { backgroundColor: activeTab === 'Upcoming' ? '#F3F0FF' : activeTab === 'Completed' ? '#ECFDF5' : '#FEF2F2' }]}>
-          {getStatusIcon(item.status)}
-          <Text style={[styles.statusBadgeText, { color: activeTab === 'Upcoming' ? COLORS.primary : activeTab === 'Completed' ? '#10B981' : '#EF4444' }]}>
-            {item.status}
-          </Text>
-        </View>
-      </View>
-      <View style={styles.cardDivider} />
-      <View style={styles.cardFooter}>
-        <View style={styles.footerDetail}>
-          <Calendar size={14} color="#6B7280" />
-          <Text style={styles.footerDetailText}>{item.date} • {item.time}</Text>
-        </View>
-        <View style={styles.footerDetail}>
-          <Home size={14} color="#6B7280" />
-          <Text style={styles.footerDetailText}>{item.hospital}</Text>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
+            <View style={[styles.cardDivider, { backgroundColor: 'rgba(255,255,255,0.2)' }]} />
+            <View style={styles.cardFooter}>
+              <View style={styles.footerDetail}>
+                <Calendar size={14} color="rgba(255,255,255,0.8)" />
+                <Text style={[styles.footerDetailText, { color: '#FFF' }]}>{item.date} • {item.time}</Text>
+              </View>
+              <View style={styles.footerDetail}>
+                <Home size={14} color="rgba(255,255,255,0.8)" />
+                <Text style={[styles.footerDetailText, { color: '#FFF' }]}>{item.hospital}</Text>
+              </View>
+            </View>
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
+    );
+  };
 
-  const renderLabItem = (item: any) => (
-    <TouchableOpacity key={item.id} style={[styles.appointmentCard, SHADOWS.small]}>
-      <View style={styles.cardHeader}>
-        <View style={[styles.labIconWrap, { backgroundColor: '#F3F0FF' }]}>
-          <FlaskConical size={24} color={COLORS.primary} />
-        </View>
-        <View style={styles.cardMainInfo}>
-          <Text style={styles.docName}>{item.name}</Text>
-          <Text style={styles.specialtyText}>{item.lab}</Text>
-        </View>
-        <View style={[styles.statusBadge, { backgroundColor: activeTab === 'Upcoming' ? '#F3F0FF' : activeTab === 'Completed' ? '#ECFDF5' : '#FEF2F2' }]}>
-          {getStatusIcon(item.status)}
-          <Text style={[styles.statusBadgeText, { color: activeTab === 'Upcoming' ? COLORS.primary : activeTab === 'Completed' ? '#10B981' : '#EF4444' }]}>
-            {item.exactStatus || item.status}
-          </Text>
-        </View>
-      </View>
-      <View style={styles.cardDivider} />
-      <View style={styles.cardFooter}>
-        <View style={styles.footerDetail}>
-          <Calendar size={14} color="#6B7280" />
-          <Text style={styles.footerDetailText}>{item.date} • {item.time}</Text>
-        </View>
-        <View style={styles.footerDetail}>
-          <Home size={14} color="#6B7280" />
-          <Text style={styles.footerDetailText}>{item.location}</Text>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
+  const renderLabItem = (item: any) => {
+    const bgGradient = getGradientForDate(item.date);
+    return (
+      <TouchableOpacity key={item.id} activeOpacity={0.9}>
+        <LinearGradient
+          colors={bgGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.appointmentCard, SHADOWS.small, { borderWidth: 0, padding: 0, overflow: 'hidden' }]}
+        >
+          <View style={{ padding: 16 }}>
+            <View style={styles.cardHeader}>
+              <View style={[styles.labIconWrap, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                <FlaskConical size={24} color="#FFF" />
+              </View>
+              <View style={styles.cardMainInfo}>
+                <Text style={[styles.docName, { color: '#FFF' }]}>{item.name}</Text>
+                <Text style={[styles.specialtyText, { color: 'rgba(255,255,255,0.8)' }]}>{item.lab}</Text>
+              </View>
+              <View style={[styles.statusBadge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                {getStatusIcon(item.status)}
+                <Text style={[styles.statusBadgeText, { color: '#FFF' }]}>
+                  {item.status}
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.cardDivider, { backgroundColor: 'rgba(255,255,255,0.2)' }]} />
+            <View style={styles.cardFooter}>
+              <View style={styles.footerDetail}>
+                <Calendar size={14} color="rgba(255,255,255,0.8)" />
+                <Text style={[styles.footerDetailText, { color: '#FFF' }]}>{item.date} • {item.time}</Text>
+              </View>
+              <View style={styles.footerDetail}>
+                <Home size={14} color="rgba(255,255,255,0.8)" />
+                <Text style={[styles.footerDetailText, { color: '#FFF' }]}>{item.location}</Text>
+              </View>
+            </View>
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
         <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-        
+
         {/* Header Section */}
         <LinearGradient colors={COLORS.screenHeaderGradient} style={styles.headerGradient}>
           <View style={styles.headerContent}>
@@ -235,7 +289,7 @@ const PatientAppointmentsScreen = () => {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           {/* Category Selection Cards */}
           <View style={styles.categoryCardsRow}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.categoryCard, activeCategory === 'Doctor' && styles.activeCategoryCard, SHADOWS.medium]}
               onPress={() => setActiveCategory('Doctor')}
             >
@@ -246,7 +300,7 @@ const PatientAppointmentsScreen = () => {
               <Text style={[styles.categoryCardSub, activeCategory === 'Doctor' && { color: 'rgba(255,255,255,0.8)' }]}>Booking</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.categoryCard, activeCategory === 'Lab' && styles.activeCategoryCard, SHADOWS.medium]}
               onPress={() => setActiveCategory('Lab')}
             >
@@ -262,8 +316,8 @@ const PatientAppointmentsScreen = () => {
           <View style={styles.tabsWrapper}>
             <View style={styles.tabsBackground}>
               {tabs.map((tab) => (
-                <TouchableOpacity 
-                  key={tab} 
+                <TouchableOpacity
+                  key={tab}
                   style={[styles.tabItem, activeTab === tab && styles.activeTabItem]}
                   onPress={() => setActiveTab(tab)}
                 >
@@ -278,14 +332,14 @@ const PatientAppointmentsScreen = () => {
           {/* Appointments List */}
           <View style={styles.appointmentsList}>
             {getFilteredAppointments().length > 0 ? (
-              getFilteredAppointments().map(item => 
+              getFilteredAppointments().map(item =>
                 activeCategory === 'Doctor' ? renderDoctorItem(item) : renderLabItem(item)
               )
             ) : (
               <View style={styles.emptyState}>
-                <Image 
-                  source={require('../../../assets/robot-avatar.png')} 
-                  style={styles.emptyImage} 
+                <Image
+                  source={require('../../../assets/robot-avatar.png')}
+                  style={styles.emptyImage}
                 />
                 <Text style={styles.emptyText}>No {activeTab.toLowerCase()} appointments found</Text>
               </View>
@@ -295,15 +349,15 @@ const PatientAppointmentsScreen = () => {
 
         {/* Floating Book Button */}
         <View style={styles.floatingButtonContainer}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.mainBookBtn, SHADOWS.medium]}
             onPress={() => {
               navigation.navigate('AvailabilitySelection');
             }}
           >
-            <LinearGradient 
-              colors={['#8B3DFF', '#5F0FFF']} 
-              start={{ x: 0, y: 0 }} 
+            <LinearGradient
+              colors={['#8B3DFF', '#5F0FFF']}
+              start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.btnGradient}
             >
@@ -527,11 +581,12 @@ const styles = StyleSheet.create({
     bottom: Platform.OS === 'ios' ? 120 : 120,
     left: 24,
     right: 24,
+
   },
   mainBookBtn: {
     borderRadius: 20,
     overflow: 'hidden',
-    
+
   },
   btnGradient: {
     flexDirection: 'row',

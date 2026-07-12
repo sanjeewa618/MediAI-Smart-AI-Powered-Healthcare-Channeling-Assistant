@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Modal, TextInput, Platform, Switch } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Plus, Clock, Trash2, Edit3, X, CheckCircle, AlertCircle, ChevronRight, Calendar } from 'lucide-react-native';
+import { Plus, Clock, Trash2, Edit3, X, CheckCircle, AlertCircle, ChevronRight, ChevronLeft, Calendar } from 'lucide-react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import DoctorBottomNavBar from '../../components/DoctorBottomNavBar';
 import NurseBottomNavBar from '../../components/NurseBottomNavBar';
@@ -11,31 +11,33 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
 
-const generateCurrentMonth = () => {
+const generateMonthDays = (targetDate: Date) => {
   const days = [];
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const today = new Date();
-  const year = today.getFullYear();
-  const month = today.getMonth();
+  const year = targetDate.getFullYear();
+  const month = targetDate.getMonth();
   
-  // Get number of days in the current month
+  // Get number of days in the target month
   const numDays = new Date(year, month + 1, 0).getDate();
 
   for (let i = 1; i <= numDays; i++) {
-    const date = new Date(year, month, i);
+    const d = new Date(year, month, i);
+    // Determine if date is strictly in the past (before today's midnight)
+    const isPast = d < new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    
+    const mStr = String(month + 1).padStart(2, '0');
+    const dStr = String(i).padStart(2, '0');
+
     days.push({
-      dayName: dayNames[date.getDay()],
-      dateStr: date.getDate().toString(),
-      isPast: i < today.getDate()
+      dayName: dayNames[d.getDay()],
+      dateStr: i.toString(),
+      fullDateStr: `${year}-${mStr}-${dStr}`,
+      isPast
     });
   }
   return days;
 };
-
-const WEEK_DAYS = generateCurrentMonth();
-const DAYS = WEEK_DAYS.map(d => d.dayName);
-const DATES = WEEK_DAYS.map(d => d.dateStr);
-const CURRENT_MONTH = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
 
 type SlotType = 'available' | 'booked' | 'break' | 'blocked';
 
@@ -64,7 +66,16 @@ const DoctorSchedulingScreen = () => {
   const navigation = useNavigation<any>();
   const { token } = useAuth();
   const scrollRef = useRef<ScrollView>(null);
-  const [selectedDay, setSelectedDay] = useState(WEEK_DAYS.find(wd => !wd.isPast)?.dayName || 'Mon');
+  
+  const [currentMonthDate, setCurrentMonthDate] = useState(new Date());
+  const monthDays = generateMonthDays(currentMonthDate);
+  const currentMonthStr = currentMonthDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+  const [selectedDay, setSelectedDay] = useState(() => {
+    const activeDay = monthDays.find(wd => !wd.isPast);
+    return activeDay ? activeDay.fullDateStr : monthDays[0].fullDateStr;
+  });
+
   const [slots, setSlots] = useState<Slot[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
@@ -73,6 +84,8 @@ const DoctorSchedulingScreen = () => {
   
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
+  const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
   const [startDateTime, setStartDateTime] = useState(new Date());
   const [endDateTime, setEndDateTime] = useState(new Date());
 
@@ -117,17 +130,26 @@ const DoctorSchedulingScreen = () => {
 
   useEffect(() => {
     if (token) fetchSlots();
-    
-    // Auto-scroll to today
-    const todayIndex = WEEK_DAYS.findIndex(wd => !wd.isPast);
-    if (todayIndex > 0) {
-      setTimeout(() => {
-        scrollRef.current?.scrollTo({ x: todayIndex * 70, animated: true });
-      }, 100);
-    }
   }, [token]);
 
-  const daySlots = slots.filter(s => s.repeat === 'daily' || s.day === selectedDay);
+  useEffect(() => {
+    const activeIndex = monthDays.findIndex(wd => wd.fullDateStr === selectedDay);
+    if (activeIndex > 0) {
+      setTimeout(() => {
+        scrollRef.current?.scrollTo({ x: activeIndex * 70, animated: true });
+      }, 100);
+    }
+  }, [currentMonthDate]);
+
+  const selectedDayObj = monthDays.find(wd => wd.fullDateStr === selectedDay);
+  const currentDayName = selectedDayObj ? selectedDayObj.dayName : 'Mon';
+  
+  const daySlots = slots.filter(s => 
+    s.repeat === 'daily' || 
+    (s.repeat === 'weekly' && s.day === currentDayName) || 
+    s.day === currentDayName || 
+    s.day === selectedDay
+  );
 
   const openAddModal = () => {
     setSelectedSlot(null);
@@ -152,24 +174,53 @@ const DoctorSchedulingScreen = () => {
     setShowModal(true);
   };
 
+  const parseTime = (timeStr: string) => {
+    if (!timeStr) return 0;
+    const [time, modifier] = timeStr.split(' ');
+    let [hours, minutes] = time.split(':').map(Number);
+    if (modifier === 'PM' && hours < 12) hours += 12;
+    if (modifier === 'AM' && hours === 12) hours = 0;
+    return hours * 60 + minutes;
+  };
+
   const checkConflict = (start: string, end: string, excludeId?: string) => {
-    const existing = slots.filter(s => s.day === selectedDay && s.id !== excludeId);
-    return existing.some(s => s.startTime === start || s.endTime === end || s.startTime === end);
+    const startMin = parseTime(start);
+    const endMin = parseTime(end);
+
+    if (endMin <= startMin) {
+      return 'End time must be strictly after start time';
+    }
+
+    const existing = daySlots.filter(s => s.id !== excludeId);
+    const overlap = existing.some(s => {
+      const eStart = parseTime(s.startTime);
+      const eEnd = parseTime(s.endTime);
+      // Overlap condition: one interval starts before the other ends, AND ends after the other starts
+      return startMin < eEnd && endMin > eStart;
+    });
+
+    if (overlap) {
+      return 'This time overlaps with an existing slot';
+    }
+    
+    return null;
   };
 
   const saveSlot = async () => {
     if (!form.startTime || !form.endTime) { setConflict('Please fill start and end time'); return; }
-    if (checkConflict(form.startTime, form.endTime, selectedSlot?.id)) {
-      setConflict('⚠ This slot already has an appointment or overlaps with another slot.');
+    
+    const conflictMsg = checkConflict(form.startTime, form.endTime, selectedSlot?.id);
+    if (conflictMsg) {
+      setConflict('⚠ ' + conflictMsg);
       return;
     }
     
     const payload = {
-      day: selectedDay,
+      day: form.repeat === 'weekly' ? currentDayName : selectedDay,
       startTime: form.startTime,
       endTime: form.endTime,
       type: 'available',
-      consultType: 'Physical',
+      consultType: form.consultType,
       maxPatients: parseInt(form.maxPatients) || 1,
       notes: form.notes,
       repeat: form.repeat
@@ -230,14 +281,10 @@ const DoctorSchedulingScreen = () => {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <ChevronRight size={22} color="#FFF" style={{ transform: [{ rotate: '180deg' }] }} />
           </TouchableOpacity>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={styles.headerTitle}>Schedule Manager</Text>
             <Text style={styles.headerSub}>Manage your time slots</Text>
           </View>
-          <TouchableOpacity style={styles.addBtn} onPress={openAddModal}>
-            <Plus size={18} color={COLORS.primary} />
-            <Text style={styles.addBtnText}>Add Slot</Text>
-          </TouchableOpacity>
         </View>
       </LinearGradient>
 
@@ -253,17 +300,28 @@ const DoctorSchedulingScreen = () => {
 
       {/* Month Header */}
       <View style={styles.monthHeader}>
-        <Calendar size={18} color={COLORS.primary} />
-        <Text style={styles.monthText}>{CURRENT_MONTH}</Text>
+        <TouchableOpacity onPress={() => setCurrentMonthDate(new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth() - 1, 1))} style={styles.monthNavBtn}>
+          <ChevronLeft size={24} color={COLORS.primary} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.monthTitleContainer} onPress={() => {
+          setPickerYear(currentMonthDate.getFullYear());
+          setShowMonthPicker(true);
+        }}>
+          <Calendar size={18} color={COLORS.primary} />
+          <Text style={styles.monthText}>{currentMonthStr}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => setCurrentMonthDate(new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth() + 1, 1))} style={styles.monthNavBtn}>
+          <ChevronRight size={24} color={COLORS.primary} />
+        </TouchableOpacity>
       </View>
 
       {/* Day Selector */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dayScroll} contentContainerStyle={styles.dayScrollContent} ref={scrollRef}>
-        {WEEK_DAYS.map((wd, i) => {
-          const isActive = selectedDay === wd.dayName;
-          const hasSlots = slots.some(s => s.day === wd.dayName || s.repeat === 'daily');
+        {monthDays.map((wd, i) => {
+          const isActive = selectedDay === wd.fullDateStr;
+          const hasSlots = slots.some(s => s.day === wd.dayName || s.day === wd.fullDateStr || s.repeat === 'daily');
           return (
-            <TouchableOpacity key={i + '-' + wd.dayName} onPress={() => setSelectedDay(wd.dayName)} style={[styles.dayBtn, wd.isPast && styles.dayBtnPast, isActive && styles.dayBtnActive]}>
+            <TouchableOpacity key={i + '-' + wd.dayName} onPress={() => setSelectedDay(wd.fullDateStr)} style={[styles.dayBtn, wd.isPast && styles.dayBtnPast, isActive && styles.dayBtnActive]}>
               <Text style={[styles.dayName, isActive && styles.dayNameActive]}>{wd.dayName}</Text>
               <Text style={[styles.dayDate, isActive && styles.dayDateActive]}>{wd.dateStr}</Text>
               {hasSlots && <View style={[styles.dayDot, isActive && { backgroundColor: '#FFF' }]} />}
@@ -347,6 +405,7 @@ const DoctorSchedulingScreen = () => {
                   mode="time"
                   is24Hour={false}
                   display="default"
+                  minuteInterval={30}
                   onChange={onStartTimeChange}
                 />
               )}
@@ -363,6 +422,7 @@ const DoctorSchedulingScreen = () => {
                   mode="time"
                   is24Hour={false}
                   display="default"
+                  minuteInterval={30}
                   onChange={onEndTimeChange}
                 />
               )}
@@ -405,6 +465,63 @@ const DoctorSchedulingScreen = () => {
         </View>
       </Modal>
 
+      {/* Month/Year Picker Modal */}
+      <Modal visible={showMonthPicker} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalBox, { minHeight: 400 }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Month & Year</Text>
+              <TouchableOpacity onPress={() => setShowMonthPicker(false)}>
+                <X size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Year Selector */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, paddingHorizontal: 10 }}>
+              <TouchableOpacity onPress={() => setPickerYear(y => y - 1)} style={{ padding: 10, backgroundColor: '#F9FAFB', borderRadius: 12 }}>
+                <ChevronLeft size={24} color={COLORS.primary} />
+              </TouchableOpacity>
+              <Text style={{ fontSize: 22, fontWeight: '800', color: '#1F2937' }}>{pickerYear}</Text>
+              <TouchableOpacity onPress={() => setPickerYear(y => y + 1)} style={{ padding: 10, backgroundColor: '#F9FAFB', borderRadius: 12 }}>
+                <ChevronRight size={24} color={COLORS.primary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Month Grid */}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 10 }}>
+              {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((m, i) => {
+                const isActive = currentMonthDate.getMonth() === i && currentMonthDate.getFullYear() === pickerYear;
+                return (
+                  <TouchableOpacity 
+                    key={m} 
+                    style={[
+                      { width: '30%', paddingVertical: 14, alignItems: 'center', borderRadius: 12, backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB' },
+                      isActive && { backgroundColor: COLORS.primary, borderColor: COLORS.primary }
+                    ]} 
+                    onPress={() => {
+                      setCurrentMonthDate(new Date(pickerYear, i, 1));
+                      setShowMonthPicker(false);
+                    }}
+                  >
+                    <Text style={[
+                      { fontSize: 15, fontWeight: '600', color: '#4B5563' },
+                      isActive && { color: '#FFF', fontWeight: '700' }
+                    ]}>{m}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Floating Action Button */}
+      <TouchableOpacity style={styles.fab} onPress={openAddModal}>
+        <LinearGradient colors={['#8B3DFF', '#6A11CB']} style={styles.fabGradient}>
+          <Plus size={24} color="#FFF" />
+        </LinearGradient>
+      </TouchableOpacity>
+
       <DoctorBottomNavBar />
       <NurseBottomNavBar />
     </SafeAreaView>
@@ -420,11 +537,15 @@ const styles = StyleSheet.create({
   headerSub: { fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 4 },
   addBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFF', paddingHorizontal: 12, paddingVertical: 9, borderRadius: 14, maxWidth: 104 },
   addBtnText: { color: COLORS.primary, fontWeight: '700', fontSize: 12 },
+  fab: { position: 'absolute', bottom: 120, right: 20, width: 56, height: 56, borderRadius: 28, elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 5 },
+  fabGradient: { flex: 1, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
   legend: { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#FFF', borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendText: { fontSize: 11, color: '#4B5563', fontWeight: '600' },
-  monthHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 4, gap: 8 },
+  monthHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 4 },
+  monthTitleContainer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  monthNavBtn: { padding: 8, backgroundColor: '#FFF', borderRadius: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
   monthText: { fontSize: 16, fontWeight: '700', color: '#1F2937' },
   dayScroll: { maxHeight: 90 },
   dayScrollContent: { paddingHorizontal: 16, paddingVertical: 10, gap: 10 },
