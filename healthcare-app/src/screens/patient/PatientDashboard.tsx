@@ -60,6 +60,29 @@ const StaggeredView = ({ children, delay = 0, style }: { children: React.ReactNo
 };
 
 // =============================================================
+//  Utility for Dynamic Gradients
+// =============================================================
+const getGradientForDate = (dateVal: string | Date) => {
+  const dateStr = moment(dateVal).format('YYYY-MM-DD');
+  let hash = 0;
+  for (let i = 0; i < dateStr.length; i++) {
+    hash = dateStr.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  hash = Math.abs(hash);
+  
+  const gradients = [
+    ['#1E3A8A', '#3B82F6'], // Deep Blue
+    ['#0F766E', '#14B8A6'], // Premium Teal
+    ['#0369A1', '#0EA5E9'], // Sky Blue
+    ['#065F46', '#10B981'], // Emerald Green
+    ['#083344', '#06B6D4'], // Bright Cyan
+    ['#1D4ED8', '#60A5FA'], // Classic Blue
+    ['#047857', '#34D399'], // Sea Green
+  ] as const;
+  return gradients[hash % gradients.length] as readonly [string, string];
+};
+
+// =============================================================
 //  QueueAppointmentCard
 //  Beautifully redesigned card that prominently shows the
 //  patient's live queue number along with live status indicators
@@ -127,7 +150,7 @@ const QueueAppointmentCard = ({
   return (
     <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={styles.queueCardOuter}>
       <LinearGradient
-        colors={isYourTurn ? ['#065F46', '#10B981'] : ['#5F0FFF', '#8B3DFF']}
+        colors={getGradientForDate(appointment?.date)}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.queueCardGradient}
@@ -1006,12 +1029,40 @@ const PatientDashboard = () => {
             upcomingLabAppointments.length > 0 ? (
               <View style={styles.appointmentSubSection}>
                 {upcomingLabAppointments.map((appt, idx) => (
-                  <View key={idx} style={{ marginBottom: 15 }}>
-                    <QueueLabAppointmentCard
-                      appointment={appt}
-                      onPress={() => navigation.navigate('Reports')}
-                    />
-                  </View>
+                  <TouchableOpacity
+                    key={idx}
+                    style={[styles.mainAppointmentCard, SHADOWS.small, { marginBottom: 15, padding: 0, overflow: 'hidden', borderWidth: 0 }]}
+                    onPress={() => navigation.navigate('Reports')}
+                    activeOpacity={0.9}
+                  >
+                    <LinearGradient
+                      colors={getGradientForDate(appt.date)}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={{ padding: 16, flexDirection: 'row', alignItems: 'center' }}
+                    >
+                      <View style={[styles.mainAppIconWrap, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                        <FlaskConical size={28} color="#FFF" />
+                      </View>
+                      <View style={styles.mainAppInfo}>
+                        <Text style={[styles.mainAppTitle, { color: '#FFF' }]}>
+                          {appt.testName || 'Lab Test'}
+                        </Text>
+                        <Text style={[styles.mainAppSub, { color: 'rgba(255,255,255,0.8)' }]}>
+                          Lab Visit  •  {moment(appt.date).format('DD MMM')}  •  {appt.timeSlot || 'TBD'}
+                        </Text>
+                        <View style={[styles.countdownPill, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                          <Activity size={11} color="#FFF" />
+                          <Text style={[styles.countdownText, { color: '#FFF' }]}>
+                            {appt.queueNumber
+                              ? `Queue #${appt.queueNumber}`
+                              : 'Upcoming'}
+                          </Text>
+                        </View>
+                      </View>
+                      <ChevronRight size={20} color="rgba(255,255,255,0.6)" />
+                    </LinearGradient>
+                  </TouchableOpacity>
                 ))}
               </View>
             ) : (
