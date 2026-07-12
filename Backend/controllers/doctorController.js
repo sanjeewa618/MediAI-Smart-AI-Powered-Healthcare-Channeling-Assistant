@@ -6,6 +6,7 @@ import DoctorAvailability from '../model/DoctorAvailability.js';
 import DailySession from '../model/DailySession.js';
 import Specialty from '../model/Specialty.js';
 import MedicalRecord from '../model/MedicalRecord.js';
+import jwt from 'jsonwebtoken';
 
 // @desc    Get doctor dashboard data (Stats & Upcoming appointments)
 // @route   GET /api/doctor/dashboard
@@ -316,6 +317,17 @@ export const getDoctorAvailabilityForPatient = async (req, res) => {
     const doctorId = req.params.id;
     const { month, year } = req.query;
 
+    let patientId = null;
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      try {
+        const token = req.headers.authorization.split(' ')[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        patientId = decoded.id;
+      } catch (err) {
+        // gracefully ignore invalid token for public calendar access
+      }
+    }
+
     const targetDate = new Date();
     const targetMonth = month !== undefined ? parseInt(month) : targetDate.getMonth();
     const targetYear = year !== undefined ? parseInt(year) : targetDate.getFullYear();
@@ -361,12 +373,15 @@ export const getDoctorAvailabilityForPatient = async (req, res) => {
       
       const key = `${dateStr}_${app.timeSlot}`;
       if (!appointmentCounts[key]) {
-        appointmentCounts[key] = { active: 0, highestQueue: 0 };
+        appointmentCounts[key] = { active: 0, highestQueue: 0, hasBooked: false };
       }
       
       // Active slots consumed (cancellations free up a slot)
       if (app.status !== 'cancelled') {
         appointmentCounts[key].active++;
+        if (patientId && app.patient.toString() === patientId) {
+          appointmentCounts[key].hasBooked = true;
+        }
       }
       
       // Highest queue number assigned (to ensure monotonic strictly increasing queue numbers)
@@ -410,6 +425,7 @@ export const getDoctorAvailabilityForPatient = async (req, res) => {
         const nextQueueNumber = slotData.highestQueue + 1;
         
         const isEnded = sessionStatusMap[key] === 'ended';
+        const hasBooked = slotData.hasBooked || false;
 
         return {
           id: s._id,
@@ -420,6 +436,7 @@ export const getDoctorAvailabilityForPatient = async (req, res) => {
           bookedCount,
           isFull: bookedCount >= maxPatients || isEnded,
           isEnded,
+          hasBooked,
           type: s.type,
           consultType: s.consultType,
           notes: s.notes,

@@ -6,6 +6,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/types';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useAuth } from '../../context/AuthContext';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
 
@@ -21,6 +22,7 @@ interface Slot {
   bookedCount: number;
   isFull: boolean;
   isEnded?: boolean;
+  hasBooked?: boolean;
   type: string;
   consultType: string;
   notes?: string;
@@ -42,6 +44,7 @@ const DoctorAvailabilityCalendarScreen = () => {
   const navigation = useNavigation<NavProp>();
   const route = useRoute<RouteProps>();
   const { doctorId, doctorName, specialty } = route.params;
+  const { token } = useAuth();
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [calendarData, setCalendarData] = useState<DayData[]>([]);
@@ -58,11 +61,14 @@ const DoctorAvailabilityCalendarScreen = () => {
   const fetchAvailability = async () => {
     setLoading(true);
     try {
-      const month = currentDate.getMonth();
-      const year = currentDate.getFullYear();
-      const res = await fetch(`${API_BASE_URL}/api/doctor/${doctorId}/availability?month=${month}&year=${year}`);
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const headers: any = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const response = await fetch(`${API_BASE_URL}/api/doctor/${doctorId}/availability?month=${currentDate.getMonth()}&year=${currentDate.getFullYear()}`, {
+        headers
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
         setCalendarData(data.data);
         
         // Auto select first available day with slots, or today if in current month
@@ -224,8 +230,8 @@ const DoctorAvailabilityCalendarScreen = () => {
               </View>
 
               <TouchableOpacity
-                style={[styles.bookBtn, (slot.isFull || slot.isEnded) && styles.bookBtnDisabled]}
-                disabled={slot.isFull || slot.isEnded}
+                style={[styles.bookBtn, (slot.isFull || slot.isEnded || slot.hasBooked) && styles.bookBtnDisabled]}
+                disabled={slot.isFull || slot.isEnded || slot.hasBooked}
                 onPress={() => navigation.navigate('BookAppointment', {
                   doctorId,
                   doctorName,
@@ -241,7 +247,7 @@ const DoctorAvailabilityCalendarScreen = () => {
                 })}
               >
                 <Text style={styles.bookBtnText}>
-                  {slot.isEnded ? 'Ended' : slot.isFull ? 'Full' : 'Book'}
+                  {slot.hasBooked ? 'Booked' : slot.isEnded ? 'Ended' : slot.isFull ? 'Full' : 'Book'}
                 </Text>
               </TouchableOpacity>
             </View>
