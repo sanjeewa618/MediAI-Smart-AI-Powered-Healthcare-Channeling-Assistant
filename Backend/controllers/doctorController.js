@@ -244,8 +244,36 @@ export const deleteDoctorSchedule = async (req, res) => {
       return res.status(404).json({ message: 'Schedule slot not found' });
     }
 
+    const slotTimeSlot = `${slot.startTime} - ${slot.endTime}`;
     await slot.deleteOne();
-    res.json({ success: true, message: 'Schedule slot removed' });
+
+    // Intelligently cancel all future appointments that were booked for this deleted time slot
+    // making sure to only cancel appointments on the same day of the week as the deleted slot!
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const futureAppointments = await Appointment.find({
+      doctor: req.user._id,
+      timeSlot: slotTimeSlot,
+      date: { $gte: todayStart },
+      status: { $in: ['pending', 'confirmed'] }
+    });
+
+    const dayMap = { 'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6 };
+    const targetDay = dayMap[slot.day];
+
+    const toCancelIds = futureAppointments
+      .filter(appt => new Date(appt.date).getDay() === targetDay)
+      .map(appt => appt._id);
+
+    if (toCancelIds.length > 0) {
+      await Appointment.updateMany(
+        { _id: { $in: toCancelIds } },
+        { $set: { status: 'cancelled' } }
+      );
+    }
+
+    res.json({ success: true, message: 'Schedule slot removed and future appointments cancelled' });
   } catch (error) {
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
