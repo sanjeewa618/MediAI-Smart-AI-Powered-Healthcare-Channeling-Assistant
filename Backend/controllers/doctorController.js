@@ -282,8 +282,13 @@ export const getDoctorAvailabilityForPatient = async (req, res) => {
       const dateStr = `${y}-${m}-${d}`;
       const dayOfWeekStr = dayNames[date.getDay()];
 
-      // Find slots applicable to this day
-      const applicableSlots = slots.filter(s => s.day === dayOfWeekStr || s.repeat === 'daily');
+      // Find slots applicable to this day (daily repeats, weekly repeats matching weekday, legacy weekday matches, or specific date overrides)
+      const applicableSlots = slots.filter(s => 
+        s.repeat === 'daily' || 
+        (s.repeat === 'weekly' && s.day === dayOfWeekStr) || 
+        s.day === dayOfWeekStr || 
+        s.day === dateStr
+      );
 
       const daySlots = applicableSlots.map(s => {
         const timeSlotStr = `${s.startTime} - ${s.endTime}`;
