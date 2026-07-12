@@ -430,6 +430,7 @@ const PatientDashboard = () => {
   const [labCategories, setLabCategories] = useState<any[]>([]);
   const [labSlotCounts, setLabSlotCounts] = useState<{ [catId: string]: number }>({});
   const [labSlotsLoading, setLabSlotsLoading] = useState(false);
+  const [dashboardLabs, setDashboardLabs] = useState<any[]>([]);
 
   useFocusEffect(
     useCallback(() => {
@@ -494,6 +495,7 @@ const PatientDashboard = () => {
           const cats = catsData.data || [];
           const labs = labsData.data || [];
           setLabCategories(cats);
+          setDashboardLabs(labs);
           // For each category, sum available slots across all labs in that category
           const counts: { [catId: string]: number } = {};
           await Promise.all(cats.map(async (cat: any) => {
@@ -1118,6 +1120,14 @@ const PatientDashboard = () => {
                     'X-Ray': '🦴', 'MRI': '🧲', 'CT Scan': '📡', 'Ultrasound': '🔊'
                   };
                   const emoji = catIcons[cat.name] || '🔬';
+                  const catLabs = dashboardLabs.filter((l: any) => {
+                    const catId = l.category?._id || l.category;
+                    return catId?.toString() === cat._id?.toString();
+                  });
+                  const labWithPhoto = catLabs.find((l: any) => l.assignedNurse?.photo);
+                  const imageUrl = labWithPhoto?.assignedNurse?.photo 
+                    ? `${API_BASE_URL}${labWithPhoto.assignedNurse.photo}` 
+                    : null;
                   return (
                     <TouchableOpacity
                       key={cat._id}
@@ -1138,7 +1148,14 @@ const PatientDashboard = () => {
                       onPress={() => navigation.navigate('LabAvailability')}
                       activeOpacity={0.8}
                     >
-                      <Text style={{ fontSize: 28, marginBottom: 8 }}>{emoji}</Text>
+                      {imageUrl ? (
+                        <Image 
+                          source={{ uri: imageUrl }} 
+                          style={{ width: 44, height: 44, borderRadius: 22, marginBottom: 8 }} 
+                        />
+                      ) : (
+                        <Text style={{ fontSize: 28, marginBottom: 8 }}>{emoji}</Text>
+                      )}
                       <Text style={{ fontSize: 13, fontWeight: '700', color: '#1E293B', marginBottom: 6 }} numberOfLines={2}>
                         {cat.name}
                       </Text>
