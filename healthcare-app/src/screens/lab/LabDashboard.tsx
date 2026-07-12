@@ -60,7 +60,7 @@ const LabDashboard = () => {
         setStats(statsData.data);
       }
 
-      const bookingsRes = await fetch(`${API_BASE_URL}/api/labs/bookings`, {
+      const bookingsRes = await fetch(`${API_BASE_URL}/api/labs/bookings?limit=1000`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const bookingsData = await bookingsRes.json();
@@ -145,10 +145,10 @@ const LabDashboard = () => {
   };
 
   const taskStats = [
-    { label: 'Today\'s Tests', value: String(stats.todayTotal).padStart(2, '0'), icon: <FlaskConical size={20} color="#FFF" />, bg: COLORS.primary },
-    { label: 'Pending', value: String(stats.pending).padStart(2, '0'), icon: <Clock size={20} color="#FFF" />, bg: COLORS.warning },
-    { label: 'Processing', value: String(stats.processing).padStart(2, '0'), icon: <Activity size={20} color="#FFF" />, bg: '#60A5FA' },
-    { label: 'Completed', value: String(stats.completed).padStart(2, '0'), icon: <CheckCircle size={20} color="#FFF" />, bg: COLORS.success },
+    { label: 'Today\'s Tests', value: String(stats.todayTotal).padStart(2, '0'), icon: <FlaskConical size={20} color="#FFF" />, bg: COLORS.primary, desc: 'Schedules booked for today' },
+    { label: 'Pending', value: String(stats.pending).padStart(2, '0'), icon: <Clock size={20} color="#FFF" />, bg: COLORS.warning, desc: 'Booking is not confirmed yet' },
+    { label: 'Processing', value: String(stats.processing).padStart(2, '0'), icon: <Activity size={20} color="#FFF" />, bg: '#60A5FA', desc: 'Patient is arriving/test is in progress' },
+    { label: 'Completed', value: String(stats.completed).padStart(2, '0'), icon: <CheckCircle size={20} color="#FFF" />, bg: COLORS.success, desc: 'Appointment finished & report collected' },
   ];
 
   const laboratorySections = [
@@ -270,6 +270,9 @@ const LabDashboard = () => {
                 </View>
                 <Text style={styles.statValue}>{stat.value}</Text>
                 <Text style={styles.statLabel}>{stat.label}</Text>
+                {stat.desc ? (
+                  <Text style={styles.statDesc}>{stat.desc}</Text>
+                ) : null}
               </TouchableOpacity>
             ))}
           </View>
@@ -859,6 +862,12 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     fontWeight: '500',
     marginTop: 2,
+  },
+  statDesc: {
+    fontSize: 10,
+    color: '#94A3B8',
+    marginTop: 4,
+    lineHeight: 12,
   },
   sectionHeader: {
     flexDirection: 'row',

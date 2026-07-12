@@ -69,6 +69,54 @@ const BookAppointmentScreen = () => {
   const TOTAL_AMOUNT = CHANNELING_FEE + HOSPITAL_FEE;
 
   const nextStep = () => {
+    if (currentStep === 0) {
+      if (!patientInfo.name.trim()) {
+        Alert.alert('Validation Error', 'Please enter your Full Name.');
+        return;
+      }
+      if (!patientInfo.nic.trim()) {
+        Alert.alert('Validation Error', 'Please enter your NIC or Passport.');
+        return;
+      }
+      if (!patientInfo.dob.trim()) {
+        Alert.alert('Validation Error', 'Please enter your Date of Birth.');
+        return;
+      }
+      if (!patientInfo.mobile.trim()) {
+        Alert.alert('Validation Error', 'Please enter your Mobile Number.');
+        return;
+      }
+    } else if (currentStep === 1) {
+      if (!medicalInfo.symptoms.trim()) {
+        Alert.alert('Validation Error', 'Please describe your Symptoms or Reason for Visit.');
+        return;
+      }
+    } else if (currentStep === 2) {
+      if (paymentInfo.method === 'Card') {
+        if (!cardInfo.name.trim()) {
+          Alert.alert('Validation Error', 'Please enter the Cardholder Name.');
+          return;
+        }
+        if (!cardInfo.number.trim()) {
+          Alert.alert('Validation Error', 'Please enter the Card Number.');
+          return;
+        }
+        if (!cardInfo.expiry.trim()) {
+          Alert.alert('Validation Error', 'Please enter the Expiry Date (MM/YY).');
+          return;
+        }
+        if (!cardInfo.cvv.trim()) {
+          Alert.alert('Validation Error', 'Please enter the Card CVV.');
+          return;
+        }
+      } else if (paymentInfo.method === 'Insurance') {
+        if (!paymentInfo.insuranceProvider.trim()) {
+          Alert.alert('Validation Error', 'Please enter your Insurance Provider.');
+          return;
+        }
+      }
+    }
+
     if (currentStep < STEPS.length - 1) setCurrentStep(currentStep + 1);
   };
   const prevStep = () => {
@@ -77,6 +125,18 @@ const BookAppointmentScreen = () => {
   };
 
   const handleConfirmBooking = async () => {
+    if (paymentInfo.method === 'Card') {
+      if (!cardInfo.name.trim() || !cardInfo.number.trim() || !cardInfo.expiry.trim() || !cardInfo.cvv.trim()) {
+        Alert.alert('Validation Error', 'Please fill in all card details.');
+        return;
+      }
+    } else if (paymentInfo.method === 'Insurance') {
+      if (!paymentInfo.insuranceProvider.trim()) {
+        Alert.alert('Validation Error', 'Please enter your Insurance Provider.');
+        return;
+      }
+    }
+
     try {
       const response = await fetch(`${API_BASE_URL}/api/appointments`, {
         method: 'POST',
@@ -269,7 +329,7 @@ const BookAppointmentScreen = () => {
       <Text style={styles.inputLabel}>Mobile Number</Text>
       <TextInput style={styles.input} placeholder="+94 7X XXX XXXX" keyboardType="phone-pad" value={patientInfo.mobile} onChangeText={(t) => setPatientInfo({...patientInfo, mobile: t})} />
       
-      <Text style={styles.inputLabel}>Email Address</Text>
+      <Text style={styles.inputLabel}>Email Address (Optional)</Text>
       <TextInput style={styles.input} placeholder="email@example.com" keyboardType="email-address" value={patientInfo.email} onChangeText={(t) => setPatientInfo({...patientInfo, email: t})} />
     </View>
   );
@@ -359,7 +419,7 @@ const BookAppointmentScreen = () => {
           <View style={{ backgroundColor: '#EEF2FF', padding: 12, borderRadius: 8, marginBottom: 12 }}>
             <Text style={{ color: COLORS.primary, fontSize: 13, fontWeight: '500' }}>ℹ️ You can pay at the channeling center reception on the day of the appointment.</Text>
           </View>
-          <Text style={styles.inputLabel}>Any Special Notes for Reception</Text>
+          <Text style={styles.inputLabel}>Any Special Notes for Reception (Optional)</Text>
           <TextInput style={[styles.input, styles.textArea]} multiline numberOfLines={2} placeholder="Optional notes for hospital staff..." value={paymentInfo.notes} onChangeText={(t) => setPaymentInfo({...paymentInfo, notes: t})} />
         </View>
       )}
@@ -371,7 +431,7 @@ const BookAppointmentScreen = () => {
         </View>
       )}
 
-      <Text style={[styles.inputLabel, { marginTop: 16 }]}>Promo / Discount Code</Text>
+      <Text style={[styles.inputLabel, { marginTop: 16 }]}>Promo / Discount Code (Optional)</Text>
       <TextInput style={styles.input} placeholder="Enter code here" value={paymentInfo.promo} onChangeText={(t) => setPaymentInfo({...paymentInfo, promo: t})} />
     </View>
   );
@@ -430,7 +490,7 @@ const BookAppointmentScreen = () => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
-        <ScrollView style={styles.scrollContainer} contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+        <ScrollView style={styles.scrollContainer} contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator={false}>
           {currentStep === 0 && renderPatientInfo()}
           {currentStep === 1 && renderMedicalDetails()}
           {currentStep === 2 && renderReviewAndPay()}
@@ -534,10 +594,19 @@ const styles = StyleSheet.create({
   sumTotalLabel: { fontSize: 15, fontWeight: '800', color: '#111827' },
   sumTotalValue: { fontSize: 16, fontWeight: '800', color: COLORS.primary },
   bottomBar: {
-    position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#FFF',
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingTop: 16, paddingBottom: Platform.OS === 'ios' ? 30 : 16,
-    borderTopWidth: 1, borderTopColor: '#F3F4F6', ...SHADOWS.medium
+    backgroundColor: '#FFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    marginHorizontal: 16,
+    marginBottom: Platform.OS === 'ios' ? 30 : 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    
+    zIndex:20,  
   },
   bottomOverview: { flex: 1 },
   bottomDocText: { fontSize: 14, fontWeight: '700', color: '#111827' },
