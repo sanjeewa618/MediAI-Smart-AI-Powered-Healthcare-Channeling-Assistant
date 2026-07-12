@@ -131,20 +131,14 @@ const getLabs = async (req, res, next) => {
 
     const pageNum = Math.max(1, parseInt(page, 10));
     const pageSize = Math.min(100, Math.max(1, parseInt(limit, 10)));
-    const skip = (pageNum - 1) * pageSize;
 
-    const [labs, total] = await Promise.all([
-      Lab.find(filter)
-        .populate('category', 'name icon color')
-        .populate('assignedNurse', 'name photo shift department')
-        .skip(skip)
-        .limit(pageSize)
-        .sort({ createdAt: -1 }),
-      Lab.countDocuments(filter),
-    ]);
+    const allLabs = await Lab.find(filter)
+      .populate('category', 'name icon color')
+      .populate('assignedNurse', 'name photo shift department status')
+      .sort({ createdAt: -1 });
 
     // Self-correct category reference in MongoDB if missing
-    for (let lab of labs) {
+    for (let lab of allLabs) {
       if (!lab.category && lab.assignedNurse) {
         const dept = lab.assignedNurse.department || (lab.name && lab.name.split(' ')[0]);
         if (dept) {
@@ -157,14 +151,26 @@ const getLabs = async (req, res, next) => {
       }
     }
 
+    // Filter to display only labs associated with approved/active/verified/pending signed-up hospital nurses
+    const activeUserStatuses = ['pending', 'approved', 'active', 'verified'];
+    const labs = allLabs.filter(lab => {
+      if (!lab.assignedNurse) return false; // Filter out system/seed labs with no nurse
+      const nurseStatus = String(lab.assignedNurse.status || '').toLowerCase();
+      return activeUserStatuses.includes(nurseStatus);
+    });
+
+    const finalTotal = labs.length;
+    const skip = (pageNum - 1) * pageSize;
+    const paginatedLabs = labs.slice(skip, skip + pageSize);
+
     res.status(200).json({
       success: true,
-      data: labs,
+      data: paginatedLabs,
       meta: {
-        total,
+        total: finalTotal,
         page: pageNum,
         limit: pageSize,
-        totalPages: Math.ceil(total / pageSize),
+        totalPages: Math.ceil(finalTotal / pageSize),
       },
     });
   } catch (err) {
@@ -293,11 +299,12 @@ const getLabAvailability = async (req, res, next) => {
       })
     );
 
-    const currentToken = await LabBooking.countDocuments({
+    const count = await LabBooking.countDocuments({
       lab: id,
       appointmentDate: { $gte: dayStart, $lte: dayEnd },
-      status: 'Checked-In',
+      status: { $in: ['Pending', 'Confirmed', 'Checked-In'] },
     });
+    const currentToken = count + 1;
 
     res.status(200).json({
       success: true,

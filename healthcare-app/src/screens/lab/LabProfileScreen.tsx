@@ -162,7 +162,7 @@ const LabProfileScreen: React.FC = () => {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
@@ -186,7 +186,7 @@ const LabProfileScreen: React.FC = () => {
       const type = match ? `image/${match[1]}` : `image/jpeg`;
 
       formData.append('avatar', {
-        uri: Platform.OS === 'android' ? uri : uri.replace('file://', ''),
+        uri: uri,
         name: filename,
         type: type,
       } as any);

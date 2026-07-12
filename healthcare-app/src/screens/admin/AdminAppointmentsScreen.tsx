@@ -10,6 +10,8 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  ScrollView,
+  Modal
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -22,9 +24,16 @@ import {
   Check, 
   X, 
   Clock, 
-  CheckCircle
+  CheckCircle,
+  FileText,
+  User as UserIcon,
+  Download,
+  AlertTriangle
 } from 'lucide-react-native';
 import AdminBottomNavBar from '../../components/AdminBottomNavBar';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
+import moment from 'moment';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
 
@@ -66,29 +75,50 @@ const MOCK_APPOINTMENTS = [
 const AdminAppointmentsScreen = () => {
   const navigation = useNavigation<any>();
   const { token } = useAuth();
+  
+  // Dashboard states
+  const [selectedType, setSelectedType] = useState<'doctor' | 'lab'>('doctor');
   const [appointments, setAppointments] = useState<any[]>([]);
+  const [labBookings, setLabBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState<'all' | 'pending' | 'confirmed' | 'completed' | 'cancelled'>('all');
+  const [activeFilter, setActiveFilter] = useState<string>('all');
+  
+  // Modal states
+  const [modalVisible, setModalVisible] = useState(false);
+  const [receiptModalVisible, setReceiptModalVisible] = useState(false);
+  const [selectedAppt, setSelectedAppt] = useState<any | null>(null);
 
-  const fetchAppointments = async () => {
+  const fetchAllData = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/appointments`, {
+      // 1. Fetch Doctor appointments
+      const apptResponse = await fetch(`${API_BASE_URL}/api/appointments`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
-      const data = await response.json();
-      if (response.ok && data.success && data.data && data.data.length > 0) {
-        setAppointments(data.data);
+      const apptData = await apptResponse.json();
+      if (apptResponse.ok && apptData.success && apptData.data && apptData.data.length > 0) {
+        setAppointments(apptData.data);
       } else {
-        // Fallback to mock data if empty database
         setAppointments(MOCK_APPOINTMENTS);
       }
+
+      // 2. Fetch Lab test bookings (booked by patients)
+      const labResponse = await fetch(`${API_BASE_URL}/api/labs/bookings?limit=100`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const labData = await labResponse.json();
+      if (labResponse.ok && labData.success) {
+        setLabBookings(labData.data || []);
+      } else {
+        setLabBookings([]);
+      }
     } catch (error) {
-      console.error('Fetch appointments error:', error);
-      // Fail gracefully to mock data
+      console.error('Fetch all data error:', error);
       setAppointments(MOCK_APPOINTMENTS);
     } finally {
       setLoading(false);
@@ -96,8 +126,10 @@ const AdminAppointmentsScreen = () => {
   };
 
   useEffect(() => {
-    fetchAppointments();
-  }, []);
+    if (token) {
+      fetchAllData();
+    }
+  }, [token]);
 
   const handleUpdateStatus = async (id: string, newStatus: string) => {
     try {
@@ -112,51 +144,203 @@ const AdminAppointmentsScreen = () => {
       const data = await response.json();
       if (response.ok) {
         Alert.alert('Success', `Appointment marked as ${newStatus}.`);
-        fetchAppointments();
+        fetchAllData();
       } else {
-        // If API fails (e.g. mock items in frontend offline mode) update locally
         setAppointments(prev => prev.map(a => a._id === id ? { ...a, status: newStatus } : a));
         Alert.alert('Status Updated', `Appointment status updated locally to ${newStatus}.`);
       }
     } catch (error) {
       console.error('Update status error:', error);
-      // Fallback local update
       setAppointments(prev => prev.map(a => a._id === id ? { ...a, status: newStatus } : a));
       Alert.alert('Status Updated', `Appointment status updated locally to ${newStatus}.`);
     }
   };
 
-  // Stats derived dynamically
-  const stats = useMemo(() => {
-    return {
-      total: appointments.length,
-      pending: appointments.filter(a => a.status === 'pending').length,
-      confirmed: appointments.filter(a => a.status === 'confirmed' || a.status === 'scheduled').length,
-      completed: appointments.filter(a => a.status === 'completed').length,
-    };
-  }, [appointments]);
+  // PDF Receipt Generation for Lab Bookings
+  const handleDownloadLabReceipt = async (booking: any) => {
+    try {
+      const formattedDate = moment(booking.appointmentDate).format('DD MMMM YYYY');
+      const timeStr = booking.scheduleSlot?.startTime || 'N/A';
+      const statusText = booking.paymentMethod === 'Cash' ? 'Paid at Hospital' : 'Paid';
+      const statusBgColor = booking.paymentMethod === 'Cash' ? '#FEF3C7' : '#D1FAE5';
+      const statusTextColor = booking.paymentMethod === 'Cash' ? '#B45309' : '#065F46';
 
-  // Filters + Search Query matching doctor/patient names
-  const filteredAppointments = useMemo(() => {
-    return appointments.filter(appt => {
-      const matchFilter = activeFilter === 'all' || appt.status === activeFilter;
-      const docName = appt.doctor?.name || '';
-      const patName = appt.patient?.name || '';
-      const matchSearch = docName.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          patName.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchFilter && matchSearch;
-    });
-  }, [appointments, activeFilter, searchQuery]);
+      const htmlContent = `
+        <html>
+          <body style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 30px; color: #1F2937;">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <h1 style="color: #3b82f6; margin-bottom: 5px;">MediAI Smart Channeling</h1>
+              <p style="color: #6B7280; margin-top: 0; font-size: 14px;">Lab Appointment E-Receipt</p>
+              
+              <!-- Payment Status Badge -->
+              <div style="margin-top: 10px; margin-bottom: 10px;">
+                <span style="display: inline-block; padding: 6px 16px; background-color: ${statusBgColor}; color: ${statusTextColor}; font-weight: bold; border-radius: 20px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">
+                  ${statusText}
+                </span>
+              </div>
+
+              <div style="display: inline-block; padding: 6px 12px; background-color: #ECFDF5; color: #047857; font-weight: bold; border-radius: 20px; font-size: 14px; margin-top: 5px;">
+                Booking ID: #${booking.bookingRef}
+              </div>
+            </div>
+            
+            <hr style="border: 0; border-top: 1px solid #E5E7EB; margin-bottom: 30px;" />
+            
+            <h3 style="color: #3b82f6; border-bottom: 2px solid #EFF6FF; padding-bottom: 8px;">Patient Information</h3>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #6B7280; width: 35%;"><strong>Patient Name</strong></td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #1F2937;">${booking.patient?.fullName}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #6B7280;"><strong>NIC / Passport</strong></td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #1F2937;">${booking.patient?.nic}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #6B7280;"><strong>Mobile Number</strong></td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #1F2937;">${booking.patient?.mobile}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #6B7280;"><strong>Gender</strong></td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #1F2937;">${booking.patient?.gender}</td>
+              </tr>
+              ${booking.collectionMethod === 'Home' ? `
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #6B7280;"><strong>Collection Address</strong></td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #1F2937;">${booking.homeAddress || ''}</td>
+              </tr>
+              ` : ''}
+            </table>
+            
+            <h3 style="color: #3b82f6; border-bottom: 2px solid #EFF6FF; padding-bottom: 8px;">Lab & Appointment Details</h3>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #6B7280; width: 35%;"><strong>Lab Test</strong></td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #1F2937; font-weight: bold;">${booking.lab?.description || 'Lab Test'}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #6B7280;"><strong>Lab Center</strong></td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #1F2937;">${booking.lab?.name}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #6B7280;"><strong>Date & Time</strong></td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #1F2937;">${formattedDate} at ${timeStr}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #6B7280;"><strong>Collection Method</strong></td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #1F2937;">${booking.collectionMethod === 'Home' ? 'Home Collection' : 'Hospital Visit'}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #6B7280;"><strong>Assigned Nurse</strong></td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #1F2937;">Nurse ${booking.scheduleSlot?.nurse || 'Assigned Nurse'}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #6B7280;"><strong>Queue Token</strong></td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #F3F4F6; color: #3b82f6; font-weight: bold; font-size: 16px;">${booking.queueToken || 1}</td>
+              </tr>
+            </table>
+
+            <div style="background-color: #F9FAFB; padding: 20px; border-radius: 12px; border: 1px solid #E5E7EB; text-align: right; margin-top: 20px;">
+              <span style="color: #6B7280; font-size: 14px; margin-right: 15px;">Amount:</span>
+              <strong style="color: #3b82f6; font-size: 20px;">${booking.lab?.price || 'LKR 1500'}</strong>
+            </div>
+            
+            <div style="text-align: center; margin-top: 50px; color: #9CA3AF; font-size: 12px;">
+              <p>Thank you for using MediAI. Please produce this receipt/e-token at the lab center.</p>
+              <p style="margin-top: 5px;">MediAI Smart Healthcare Channeling Assistant &copy; 2026</p>
+            </div>
+          </body>
+        </html>
+      `;
+
+      const { uri } = await Print.printToFileAsync({ html: htmlContent });
+      
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri);
+      } else {
+        Alert.alert('Saved', 'Receipt saved to your documents.');
+      }
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Error', 'Failed to generate receipt PDF.');
+    }
+  };
+
+  // Stats derived dynamically based on selectedType
+  const stats = useMemo(() => {
+    if (selectedType === 'doctor') {
+      return {
+        total: appointments.length,
+        pending: appointments.filter(a => a.status === 'pending').length,
+        confirmed: appointments.filter(a => a.status === 'completed').length,
+        confirmedLabel: 'Completed'
+      };
+    } else {
+      return {
+        total: labBookings.length,
+        pending: labBookings.filter(b => b.status === 'Pending').length,
+        confirmed: labBookings.filter(b => b.status === 'Completed').length,
+        confirmedLabel: 'Completed'
+      };
+    }
+  }, [appointments, labBookings, selectedType]);
+
+  // Filters + Search Query matching names and codes
+  const filteredData = useMemo(() => {
+    if (selectedType === 'doctor') {
+      return appointments.filter(appt => {
+        const matchFilter = activeFilter.toLowerCase() === 'all' || appt.status.toLowerCase() === activeFilter.toLowerCase();
+        const docName = appt.doctor?.name || '';
+        const patName = appt.patient?.name || '';
+        const matchSearch = docName.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                            patName.toLowerCase().includes(searchQuery.toLowerCase());
+        return matchFilter && matchSearch;
+      });
+    } else {
+      return labBookings.filter(booking => {
+        const statusLower = booking.status ? booking.status.toLowerCase() : '';
+        let matchFilter = false;
+        
+        if (activeFilter.toLowerCase() === 'all') {
+          matchFilter = true;
+        } else if (activeFilter.toLowerCase() === 'confirmed') {
+          matchFilter = ['confirmed', 'checked-in', 'sample-collected', 'testing'].includes(statusLower);
+        } else {
+          matchFilter = statusLower === activeFilter.toLowerCase();
+        }
+        
+        const labName = booking.lab?.name || '';
+        const patName = booking.patient?.fullName || '';
+        const refId = booking.bookingRef || '';
+        const nurseName = booking.scheduleSlot?.nurse || '';
+        const matchSearch = labName.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                            patName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            refId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            nurseName.toLowerCase().includes(searchQuery.toLowerCase());
+        return matchFilter && matchSearch;
+      });
+    }
+  }, [appointments, labBookings, selectedType, activeFilter, searchQuery]);
 
   const getStatusColor = (status: string) => {
-    switch (status) {
+    if (!status) return { bg: '#F3F4F6', text: '#6B7280' };
+    const s = status.toLowerCase();
+    switch (s) {
       case 'pending': return { bg: '#FEF3C7', text: '#D97706' };
       case 'confirmed':
       case 'scheduled': return { bg: '#EFF6FF', text: '#3B82F6' };
+      case 'checked-in':
+      case 'sample-collected':
+      case 'testing': return { bg: '#F5F3FF', text: '#7C3AED' };
       case 'completed': return { bg: '#ECFDF5', text: '#10B981' };
       case 'cancelled': return { bg: '#FEF2F2', text: '#EF4444' };
       default: return { bg: '#F3F4F6', text: '#6B7280' };
     }
+  };
+
+  const closeModal = () => {
+    setModalVisible(false);
+    setSelectedAppt(null);
   };
 
   return (
@@ -170,16 +354,42 @@ const AdminAppointmentsScreen = () => {
             <ArrowLeft size={24} color="#FFF" />
           </TouchableOpacity>
           <View style={styles.headerTextWrap}>
-            <Text style={styles.headerTitle}>Hospital Appointments</Text>
+            <Text style={styles.headerTitle}>Hospital Bookings</Text>
             <Text style={styles.headerSubtitle}>Overall hospital booking logs</Text>
           </View>
         </View>
       </LinearGradient>
 
+      {/* Selector Tabs: Doctor vs Nurse */}
+      <View style={styles.typeSelectorContainer}>
+        <TouchableOpacity 
+          style={[styles.typeTab, selectedType === 'doctor' && styles.typeTabActive]}
+          onPress={() => {
+            setSelectedType('doctor');
+            setActiveFilter('all');
+          }}
+        >
+          <Text style={[styles.typeTabText, selectedType === 'doctor' && styles.typeTabTextActive]}>
+            Doctor
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.typeTab, selectedType === 'lab' && styles.typeTabActive]}
+          onPress={() => {
+            setSelectedType('lab');
+            setActiveFilter('all');
+          }}
+        >
+          <Text style={[styles.typeTabText, selectedType === 'lab' && styles.typeTabTextActive]}>
+            Nurse
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Overview Cards */}
       <View style={styles.statsContainer}>
         <View style={[styles.statCard, SHADOWS.light, { borderLeftColor: '#F59E0B' }]}>
-          <Text style={styles.statLabel}>Total Appts</Text>
+          <Text style={styles.statLabel}>Total Logs</Text>
           <View style={styles.statRow}>
             <Calendar size={20} color="#6B7280" />
             <Text style={styles.statVal}>{stats.total}</Text>
@@ -195,7 +405,7 @@ const AdminAppointmentsScreen = () => {
         </View>
 
         <View style={[styles.statCard, SHADOWS.light, { borderLeftColor: '#10B981' }]}>
-          <Text style={styles.statLabel}>Confirmed</Text>
+          <Text style={styles.statLabel}>{stats.confirmedLabel}</Text>
           <View style={styles.statRow}>
             <CheckCircle size={20} color="#10B981" />
             <Text style={[styles.statVal, { color: '#10B981' }]}>{stats.confirmed}</Text>
@@ -209,7 +419,11 @@ const AdminAppointmentsScreen = () => {
           <Search size={18} color="#9CA3AF" />
           <TextInput 
             style={styles.searchInput}
-            placeholder="Search patient, doctor..."
+            placeholder={
+              selectedType === 'doctor' 
+                ? 'Search patient, doctor...' 
+                : 'Search patient, nurse, ref ID...'
+            }
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
@@ -233,14 +447,14 @@ const AdminAppointmentsScreen = () => {
             <TouchableOpacity 
               style={[
                 styles.tabItem, 
-                activeFilter === item ? styles.tabItemActive : null
+                activeFilter.toLowerCase() === item.toLowerCase() ? styles.tabItemActive : null
               ]}
               onPress={() => setActiveFilter(item)}
             >
               <Text 
                 style={[
                   styles.tabText, 
-                  activeFilter === item ? styles.tabTextActive : null
+                  activeFilter.toLowerCase() === item.toLowerCase() ? styles.tabTextActive : null
                 ]}
               >
                 {item.charAt(0).toUpperCase() + item.slice(1)}
@@ -257,94 +471,321 @@ const AdminAppointmentsScreen = () => {
         </View>
       ) : (
         <FlatList 
-          data={filteredAppointments}
+          data={filteredData}
           keyExtractor={(item) => item._id}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Calendar size={48} color="#D1D5DB" />
-              <Text style={styles.emptyText}>No matching appointments found.</Text>
+              <Text style={styles.emptyText}>No matching bookings found.</Text>
             </View>
           }
           renderItem={({ item }) => {
             const colors = getStatusColor(item.status);
-            return (
-              <View style={[styles.appointmentCard, SHADOWS.small]}>
-                <View style={styles.cardHeader}>
-                  <View style={styles.patientInfo}>
-                    <View style={styles.avatarPlaceholder}>
-                      <Text style={styles.avatarLetter}>
-                        {item.patient?.name ? item.patient.name.charAt(0).toUpperCase() : 'P'}
+            
+            if (selectedType === 'doctor') {
+              return (
+                <View style={[styles.appointmentCard, SHADOWS.small]}>
+                  <View style={styles.cardHeader}>
+                    <View style={styles.patientInfo}>
+                      <View style={styles.avatarPlaceholder}>
+                        <Text style={styles.avatarLetter}>
+                          {item.patient?.name ? item.patient.name.charAt(0).toUpperCase() : 'P'}
+                        </Text>
+                      </View>
+                      <View>
+                        <Text style={styles.patientName}>{item.patient?.name || 'Unknown Patient'}</Text>
+                        <Text style={styles.patientContact}>{item.patient?.phone || 'No phone number'}</Text>
+                      </View>
+                    </View>
+                    <View style={[styles.statusBadge, { backgroundColor: colors.bg }]}>
+                      <Text style={[styles.statusText, { color: colors.text }]}>
+                        {item.status?.toUpperCase()}
                       </Text>
                     </View>
-                    <View>
-                      <Text style={styles.patientName}>{item.patient?.name || 'Unknown Patient'}</Text>
-                      <Text style={styles.patientContact}>{item.patient?.phone || 'No phone number'}</Text>
+                  </View>
+
+                  <View style={styles.divider} />
+
+                  <View style={styles.cardBody}>
+                    <Text style={styles.doctorLabel}>Doctor Details:</Text>
+                    <Text style={styles.doctorName}>{item.doctor?.name || 'Dr. Not Assigned'}</Text>
+                    <Text style={styles.doctorSpec}>{item.doctor?.specialization || 'General Practitioner'}</Text>
+
+                    <View style={styles.timeInfoRow}>
+                      <View style={styles.infoCol}>
+                        <Text style={styles.infoLabel}>Date</Text>
+                        <Text style={styles.infoVal}>{item.date}</Text>
+                      </View>
+                      <View style={styles.infoCol}>
+                        <Text style={styles.infoLabel}>Time</Text>
+                        <Text style={styles.infoVal}>{item.time}</Text>
+                      </View>
                     </View>
                   </View>
-                  <View style={[styles.statusBadge, { backgroundColor: colors.bg }]}>
-                    <Text style={[styles.statusText, { color: colors.text }]}>
-                      {item.status?.toUpperCase()}
+
+                  {/* Doctor Card Status Actions */}
+                  {item.status === 'pending' && (
+                    <View style={styles.cardActions}>
+                      <TouchableOpacity 
+                        style={[styles.actionBtn, styles.btnConfirm]}
+                        onPress={() => handleUpdateStatus(item._id, 'confirmed')}
+                      >
+                        <Check size={16} color="#FFF" />
+                        <Text style={styles.actionBtnText}>Confirm</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[styles.actionBtn, styles.btnCancel]}
+                        onPress={() => handleUpdateStatus(item._id, 'cancelled')}
+                      >
+                        <X size={16} color="#FFF" />
+                        <Text style={styles.actionBtnText}>Cancel</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {(item.status === 'confirmed' || item.status === 'scheduled') && (
+                    <View style={styles.cardActions}>
+                      <TouchableOpacity 
+                        style={[styles.actionBtn, styles.btnComplete]}
+                        onPress={() => handleUpdateStatus(item._id, 'completed')}
+                      >
+                        <CheckCircle size={16} color="#FFF" />
+                        <Text style={styles.actionBtnText}>Complete</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              );
+            } else {
+              // Lab booking render item under Nurse tab
+              return (
+                <View style={[styles.appointmentCard, SHADOWS.small]}>
+                  <View style={styles.cardHeader}>
+                    <View style={styles.patientInfo}>
+                      <View style={styles.avatarPlaceholder}>
+                        <Text style={styles.avatarLetter}>
+                          {item.patient?.fullName ? item.patient.fullName.charAt(0).toUpperCase() : 'P'}
+                        </Text>
+                      </View>
+                      <View>
+                        <Text style={styles.patientName}>{item.patient?.fullName || 'Unknown Patient'}</Text>
+                        <Text style={styles.patientContact}>NIC: {item.patient?.nic || 'N/A'}</Text>
+                      </View>
+                    </View>
+                    <View style={[styles.statusBadge, { backgroundColor: colors.bg }]}>
+                      <Text style={[styles.statusText, { color: colors.text }]}>
+                        {item.status?.toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.divider} />
+
+                  <View style={styles.cardBody}>
+                    <Text style={styles.doctorLabel}>Lab & Nurse Details:</Text>
+                    <Text style={styles.doctorName}>{item.lab?.name || 'Lab Center'}</Text>
+                    <Text style={styles.doctorSpec}>Nurse: {item.scheduleSlot?.nurse || 'Assigned Nurse'}</Text>
+                    <Text style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>
+                      Test: {item.lab?.description || 'Lab Test'}
                     </Text>
-                  </View>
-                </View>
 
-                <View style={styles.divider} />
-
-                <View style={styles.cardBody}>
-                  <Text style={styles.doctorLabel}>Doctor Details:</Text>
-                  <Text style={styles.doctorName}>{item.doctor?.name || 'Dr. Not Assigned'}</Text>
-                  <Text style={styles.doctorSpec}>{item.doctor?.specialization || 'General Practitioner'}</Text>
-
-                  <View style={styles.timeInfoRow}>
-                    <View style={styles.infoCol}>
-                      <Text style={styles.infoLabel}>Date</Text>
-                      <Text style={styles.infoVal}>{item.date}</Text>
-                    </View>
-                    <View style={styles.infoCol}>
-                      <Text style={styles.infoLabel}>Time</Text>
-                      <Text style={styles.infoVal}>{item.time}</Text>
+                    <View style={styles.timeInfoRow}>
+                      <View style={styles.infoCol}>
+                        <Text style={styles.infoLabel}>Date</Text>
+                        <Text style={styles.infoVal}>{moment(item.appointmentDate).format('YYYY-MM-DD')}</Text>
+                      </View>
+                      <View style={styles.infoCol}>
+                        <Text style={styles.infoLabel}>Time</Text>
+                        <Text style={styles.infoVal}>{item.scheduleSlot?.startTime || 'N/A'}</Text>
+                      </View>
+                      <View style={styles.infoCol}>
+                        <Text style={styles.infoLabel}>Token</Text>
+                        <Text style={[styles.infoVal, { color: COLORS.primary }]}>Token {item.queueToken || 1}</Text>
+                      </View>
                     </View>
                   </View>
+
+                  <View style={styles.cardActions}>
+                    <TouchableOpacity 
+                      style={[styles.actionBtn, { backgroundColor: COLORS.primaryLight }]}
+                      onPress={() => {
+                        setSelectedAppt(item);
+                        setReceiptModalVisible(true);
+                      }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: COLORS.primary }}>View Receipt</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                      style={[styles.actionBtn, { backgroundColor: '#EFF6FF' }]}
+                      onPress={() => handleDownloadLabReceipt(item)}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#2563EB' }}>Download PDF</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-
-                {/* Status operations buttons for admin */}
-                {item.status === 'pending' && (
-                  <View style={styles.cardActions}>
-                    <TouchableOpacity 
-                      style={[styles.actionBtn, styles.btnConfirm]}
-                      onPress={() => handleUpdateStatus(item._id, 'confirmed')}
-                    >
-                      <Check size={16} color="#FFF" />
-                      <Text style={styles.actionBtnText}>Confirm</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                      style={[styles.actionBtn, styles.btnCancel]}
-                      onPress={() => handleUpdateStatus(item._id, 'cancelled')}
-                    >
-                      <X size={16} color="#FFF" />
-                      <Text style={styles.actionBtnText}>Cancel</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-
-                {(item.status === 'confirmed' || item.status === 'scheduled') && (
-                  <View style={styles.cardActions}>
-                    <TouchableOpacity 
-                      style={[styles.actionBtn, styles.btnComplete]}
-                      onPress={() => handleUpdateStatus(item._id, 'completed')}
-                    >
-                      <CheckCircle size={16} color="#FFF" />
-                      <Text style={styles.actionBtnText}>Complete</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-            );
+              );
+            }
           }}
         />
       )}
+
+      {/* Doctor Summary / Detail Modal */}
+      <Modal 
+        visible={modalVisible} 
+        animationType="fade" 
+        transparent 
+        onRequestClose={closeModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Appointment Details</Text>
+              <TouchableOpacity onPress={closeModal} style={styles.closeBtn}>
+                <X size={20} color={COLORS.textHeader} />
+              </TouchableOpacity>
+            </View>
+
+            {selectedAppt != null && (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <View style={styles.modalProfileRow}>
+                  <View style={styles.modalPhotoPlaceholder}>
+                    <UserIcon size={32} color={COLORS.primary} />
+                  </View>
+                  <View>
+                    <Text style={styles.modalName}>{selectedAppt.patient?.name}</Text>
+                    <Text style={styles.modalSub}>{selectedAppt.patient?.email} • {selectedAppt.patient?.phone}</Text>
+                  </View>
+                </View>
+                <View style={styles.infoSection}>
+                  <Text style={styles.infoTitle}>Channeling Details</Text>
+                  <Text style={styles.infoText}><Text style={{ fontWeight: '600' }}>Doctor:</Text> {selectedAppt.doctor?.name}</Text>
+                  <Text style={styles.infoText}><Text style={{ fontWeight: '600' }}>Specialization:</Text> {selectedAppt.doctor?.specialization}</Text>
+                  <Text style={styles.infoText}><Text style={{ fontWeight: '600' }}>Hospital:</Text> {selectedAppt.doctor?.hospital}</Text>
+                  <Text style={styles.infoText}><Text style={{ fontWeight: '600' }}>Scheduled Date:</Text> {selectedAppt.date}</Text>
+                  <Text style={styles.infoText}><Text style={{ fontWeight: '600' }}>Time Slot:</Text> {selectedAppt.time}</Text>
+                  <Text style={styles.infoText}><Text style={{ fontWeight: '600' }}>Status:</Text> {selectedAppt.status}</Text>
+                </View>
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Receipt Modal (Nurse Tab Lab Appointment Summary) */}
+      <Modal 
+        visible={receiptModalVisible} 
+        animationType="slide" 
+        transparent 
+        onRequestClose={() => setReceiptModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Lab Booking Receipt</Text>
+              <TouchableOpacity onPress={() => setReceiptModalVisible(false)} style={styles.closeBtn}>
+                <X size={20} color={COLORS.textHeader} />
+              </TouchableOpacity>
+            </View>
+
+            {selectedAppt != null && (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {/* Receipt Card Visual Layout */}
+                <View style={styles.receiptCardLayout}>
+                  {/* Status Banner */}
+                  <View style={[styles.receiptStatusBanner, { backgroundColor: selectedAppt.paymentMethod === 'Cash' ? '#FEF3C7' : '#D1FAE5' }]}>
+                    <Text style={[styles.receiptStatusText, { color: selectedAppt.paymentMethod === 'Cash' ? '#B45309' : '#065F46' }]}>
+                      {selectedAppt.paymentMethod === 'Cash' ? 'PAID AT HOSPITAL' : 'PAID'}
+                    </Text>
+                  </View>
+
+                  <Text style={styles.receiptTitleCenter}>MediAI Smart Channeling</Text>
+                  <Text style={styles.receiptSubCenter}>Lab Appointment E-Receipt</Text>
+                  <Text style={styles.receiptRefCenter}>Ref No: {selectedAppt.bookingRef}</Text>
+
+                  <View style={styles.receiptDividerLine} />
+
+                  <View style={styles.receiptDetailsSection}>
+                    <View style={styles.receiptDetailRow}>
+                      <Text style={styles.receiptDetailLabel}>Patient Name</Text>
+                      <Text style={styles.receiptDetailValue}>{selectedAppt.patient?.fullName}</Text>
+                    </View>
+                    <View style={styles.receiptDetailRow}>
+                      <Text style={styles.receiptDetailLabel}>NIC / Passport</Text>
+                      <Text style={styles.receiptDetailValue}>{selectedAppt.patient?.nic}</Text>
+                    </View>
+                    <View style={styles.receiptDetailRow}>
+                      <Text style={styles.receiptDetailLabel}>Phone Number</Text>
+                      <Text style={styles.receiptDetailValue}>{selectedAppt.patient?.mobile}</Text>
+                    </View>
+                    <View style={styles.receiptDetailRow}>
+                      <Text style={styles.receiptDetailLabel}>Gender</Text>
+                      <Text style={styles.receiptDetailValue}>{selectedAppt.patient?.gender}</Text>
+                    </View>
+
+                    <View style={styles.receiptDividerLine} />
+
+                    <View style={styles.receiptDetailRow}>
+                      <Text style={styles.receiptDetailLabel}>Lab Center</Text>
+                      <Text style={styles.receiptDetailValue}>{selectedAppt.lab?.name}</Text>
+                    </View>
+                    <View style={styles.receiptDetailRow}>
+                      <Text style={styles.receiptDetailLabel}>Lab Test</Text>
+                      <Text style={styles.receiptDetailValue}>{selectedAppt.lab?.description || 'Lab Test'}</Text>
+                    </View>
+                    <View style={styles.receiptDetailRow}>
+                      <Text style={styles.receiptDetailLabel}>Date & Time</Text>
+                      <Text style={styles.receiptDetailValue}>
+                        {moment(selectedAppt.appointmentDate).format('YYYY-MM-DD')} at {selectedAppt.scheduleSlot?.startTime || 'N/A'}
+                      </Text>
+                    </View>
+                    <View style={styles.receiptDetailRow}>
+                      <Text style={styles.receiptDetailLabel}>Assigned Nurse</Text>
+                      <Text style={styles.receiptDetailValue}>Nurse {selectedAppt.scheduleSlot?.nurse || 'Assigned Nurse'}</Text>
+                    </View>
+                    <View style={styles.receiptDetailRow}>
+                      <Text style={styles.receiptDetailLabel}>Queue Token</Text>
+                      <Text style={[styles.receiptDetailValue, { color: COLORS.primary, fontWeight: '800' }]}>Token {selectedAppt.queueToken || 1}</Text>
+                    </View>
+                    <View style={styles.receiptDetailRow}>
+                      <Text style={styles.receiptDetailLabel}>Collection Method</Text>
+                      <Text style={styles.receiptDetailValue}>{selectedAppt.collectionMethod}</Text>
+                    </View>
+                    {selectedAppt.collectionMethod === 'Home' && (
+                      <View style={styles.receiptDetailRow}>
+                        <Text style={styles.receiptDetailLabel}>Home Address</Text>
+                        <Text style={styles.receiptDetailValue}>{selectedAppt.homeAddress}</Text>
+                      </View>
+                    )}
+
+                    <View style={styles.receiptDividerLine} />
+
+                    <View style={styles.receiptPriceRow}>
+                      <Text style={styles.receiptPriceLabel}>Total Price</Text>
+                      <Text style={styles.receiptPriceValue}>{selectedAppt.lab?.price || 'LKR 1500'}</Text>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={[styles.modalBtnColumn, { marginTop: 20 }]}>
+                  <TouchableOpacity 
+                    style={styles.actionBtn}
+                    onPress={() => {
+                      handleDownloadLabReceipt(selectedAppt);
+                      setReceiptModalVisible(false);
+                    }}
+                  >
+                    <Download size={18} color="#FFF" />
+                    <Text style={styles.actionBtnText}>Download PDF Receipt</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       <AdminBottomNavBar />
     </SafeAreaView>
@@ -357,7 +798,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB'
   },
   headerGradient: {
-    paddingTop: Platform.OS === 'ios' ? 25 : 32,
+    paddingTop: Platform.OS === 'ios' ? 50 : 40,
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
     paddingBottom: 40,
@@ -396,11 +837,42 @@ const styles = StyleSheet.create({
     marginTop: 2,
     textAlign: 'center',
   },
+  typeSelectorContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#FFF',
+    marginHorizontal: 20,
+    marginTop: -24,
+    borderRadius: 14,
+    padding: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+    zIndex: 20,
+  },
+  typeTab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 10,
+  },
+  typeTabActive: {
+    backgroundColor: COLORS.primary,
+  },
+  typeTabText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#6B7280',
+  },
+  typeTabTextActive: {
+    color: '#FFF',
+  },
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    marginTop: -24,
+    marginTop: 16,
     zIndex: 10
   },
   statCard: {
@@ -484,7 +956,8 @@ const styles = StyleSheet.create({
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
+    paddingVertical: 40
   },
   listContent: {
     paddingHorizontal: 20,
@@ -632,6 +1105,178 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#9CA3AF',
     fontWeight: '600'
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: 20
+  },
+  modalContent: {
+    backgroundColor: '#FFF',
+    borderRadius: 24,
+    padding: 20,
+    maxHeight: '90%'
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: COLORS.textHeader
+  },
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  modalProfileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 20
+  },
+  modalPhotoPlaceholder: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: COLORS.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  modalName: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.textHeader
+  },
+  modalSub: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginTop: 2
+  },
+  infoSection: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 16,
+    padding: 16,
+    gap: 10,
+    marginBottom: 20
+  },
+  infoTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: COLORS.textHeader,
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5
+  },
+  infoText: {
+    fontSize: 13,
+    color: COLORS.textHeader,
+    lineHeight: 18
+  },
+  modalBtnColumn: {
+    gap: 10
+  },
+  // Receipt Card Layout Styles
+  receiptCardLayout: {
+    backgroundColor: '#FFF',
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderRadius: 16,
+    padding: 16,
+    marginVertical: 10,
+    borderStyle: 'dashed',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2
+  },
+  receiptStatusBanner: {
+    alignSelf: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginBottom: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)'
+  },
+  receiptStatusText: {
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.5
+  },
+  receiptTitleCenter: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: COLORS.primary,
+    textAlign: 'center',
+    marginBottom: 4
+  },
+  receiptSubCenter: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginBottom: 2
+  },
+  receiptRefCenter: {
+    fontSize: 11,
+    color: '#6B7280',
+    textAlign: 'center',
+    fontWeight: '600',
+    marginBottom: 10
+  },
+  receiptDividerLine: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 12,
+    borderStyle: 'dashed'
+  },
+  receiptDetailsSection: {
+    gap: 10
+  },
+  receiptDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start'
+  },
+  receiptDetailLabel: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    fontWeight: '600',
+    flex: 1
+  },
+  receiptDetailValue: {
+    fontSize: 13,
+    color: COLORS.textHeader,
+    fontWeight: '700',
+    textAlign: 'right',
+    flex: 2
+  },
+  receiptPriceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 6
+  },
+  receiptPriceLabel: {
+    fontSize: 14,
+    color: COLORS.textHeader,
+    fontWeight: '800'
+  },
+  receiptPriceValue: {
+    fontSize: 18,
+    color: COLORS.primary,
+    fontWeight: '900'
   }
 });
 
