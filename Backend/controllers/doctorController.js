@@ -3,6 +3,7 @@ import User from '../model/User.js';
 import Appointment from '../model/Appointment.js';
 import DoctorAvailability from '../model/DoctorAvailability.js';
 import Specialty from '../model/Specialty.js';
+import MedicalRecord from '../model/MedicalRecord.js';
 
 // @desc    Get doctor dashboard data (Stats & Upcoming appointments)
 // @route   GET /api/doctor/dashboard
@@ -342,6 +343,28 @@ export const getDoctorAvailabilityForPatient = async (req, res) => {
     }
 
     res.json({ success: true, data: availabilityCalendar });
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+// @desc    Get patient profile and reports for doctor
+// @route   GET /api/doctor/patient/:id
+// @access  Private (Doctor only)
+export const getPatientDetailsForDoctor = async (req, res) => {
+  try {
+    const patient = await User.findById(req.params.id);
+    if (!patient || patient.role !== 'patient') {
+      return res.status(404).json({ message: 'Patient not found' });
+    }
+    const reports = await MedicalRecord.find({ patient: req.params.id }).sort({ recordDate: -1 });
+    res.json({
+      success: true,
+      data: {
+        patient,
+        reports
+      }
+    });
   } catch (error) {
     res.status(500).json({ message: 'Server Error', error: error.message });
   }

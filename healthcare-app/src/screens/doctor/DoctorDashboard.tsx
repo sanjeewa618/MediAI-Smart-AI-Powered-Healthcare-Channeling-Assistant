@@ -293,7 +293,6 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
   },
-  content: { padding: 20 },
   sectionTitle: { fontSize: 18, fontWeight: '700', color: '#1F2937', marginBottom: 16, marginTop: 10 },
   slotCard: {
     backgroundColor: '#FFF',
