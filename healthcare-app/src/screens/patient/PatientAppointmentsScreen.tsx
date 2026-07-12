@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, 
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/types';
-import { ArrowLeft, ArrowRight, Home, Calendar, Heart, FileText, User, ChevronLeft, Stethoscope, FlaskConical, CheckCircle2, Clock, XCircle, Plus } from 'lucide-react-native';
+import { ArrowLeft, ArrowRight, Home, Calendar, Heart, FileText, User, ChevronLeft, Stethoscope, FlaskConical, CheckCircle2, Clock, XCircle, Plus, Activity } from 'lucide-react-native';
 import BottomNavBar from '../../components/BottomNavBar';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -75,7 +75,8 @@ const PatientAppointmentsScreen = () => {
                 date: moment(app.date).format('DD MMM YYYY'),
                 time: app.timeSlot || 'TBD',
                 status: mappedStatus,
-                avatar: null
+                avatar: null,
+                queueNumber: app.queueNumber
               };
             });
             setDoctorAppointments(formatted);
@@ -123,11 +124,22 @@ const PatientAppointmentsScreen = () => {
           <Text style={styles.docName}>{item.name}</Text>
           <Text style={styles.specialtyText}>{item.specialty}</Text>
         </View>
-        <View style={[styles.statusBadge, { backgroundColor: activeTab === 'Upcoming' ? '#F3F0FF' : activeTab === 'Completed' ? '#ECFDF5' : '#FEF2F2' }]}>
-          {getStatusIcon(item.status)}
-          <Text style={[styles.statusBadgeText, { color: activeTab === 'Upcoming' ? COLORS.primary : activeTab === 'Completed' ? '#10B981' : '#EF4444' }]}>
-            {item.status}
-          </Text>
+        <View style={[styles.statusBadge, { backgroundColor: activeTab === 'Upcoming' ? '#ECFDF5' : activeTab === 'Completed' ? '#ECFDF5' : '#FEF2F2' }]}>
+          {activeTab === 'Upcoming' ? (
+            <>
+              <Activity size={14} color="#10B981" />
+              <Text style={[styles.statusBadgeText, { color: '#10B981' }]}>
+                {item.queueNumber ? `Queue #${item.queueNumber}` : 'Upcoming'}
+              </Text>
+            </>
+          ) : (
+            <>
+              {getStatusIcon(item.status)}
+              <Text style={[styles.statusBadgeText, { color: activeTab === 'Completed' ? '#10B981' : '#EF4444' }]}>
+                {item.status}
+              </Text>
+            </>
+          )}
         </View>
       </View>
       <View style={styles.cardDivider} />
