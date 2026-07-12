@@ -336,7 +336,25 @@ const BookAppointmentScreen = () => {
 
   const renderMedicalDetails = () => (
     <View style={styles.formSection}>
-      <Text style={styles.sectionTitle}>Medical Info</Text>
+      <Text style={styles.sectionTitle}>Visit & Medical Info</Text>
+      
+      <Text style={styles.inputLabel}>Visit Type</Text>
+      <View style={styles.pillsRow}>
+        {['New Patient', 'Follow-up', 'Review Visit'].map(v => (
+          <TouchableOpacity key={v} style={[styles.pill, medicalInfo.visitType === v && styles.pillActive]} onPress={() => setMedicalInfo({...medicalInfo, visitType: v})}>
+            <Text style={[styles.pillText, medicalInfo.visitType === v && styles.pillTextActive]}>{v}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <Text style={styles.inputLabel}>Consultation Type</Text>
+      <View style={styles.pillsRow}>
+        {['Physical Visit', 'Online Consultation'].map(c => (
+          <TouchableOpacity key={c} style={[styles.pill, medicalInfo.consultation === c && styles.pillActive]} onPress={() => setMedicalInfo({...medicalInfo, consultation: c})}>
+            <Text style={[styles.pillText, medicalInfo.consultation === c && styles.pillTextActive]}>{c}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
       <Text style={styles.inputLabel}>Main Symptoms / Reason for visit</Text>
       <TextInput style={[styles.input, styles.textArea]} multiline numberOfLines={3} placeholder="Describe your symptoms briefly" value={medicalInfo.symptoms} onChangeText={(t) => setMedicalInfo({...medicalInfo, symptoms: t})} />
