@@ -332,6 +332,9 @@ const LabAvailabilityScreen = () => {
       price: 'LKR 1500',
       status: lab.status || 'Available',
       nurse: lab.assignedNurse?.name || 'Assigned Nurse',
+      nursePhoto: lab.assignedNurse?.photo 
+        ? `${API_BASE_URL}${lab.assignedNurse.photo}` 
+        : 'https://img.freepik.com/free-photo/female-nurse-white-coat-standing-with-clipboard-isolated_1303-31411.jpg',
       rating: 4.8,
       queue: 0,
       wait: '15 mins',
@@ -339,7 +342,9 @@ const LabAvailabilityScreen = () => {
       yourToken: 0,
       openTime: lab.openTime || '08:00 AM',
       closeTime: lab.closeTime || '06:00 PM',
-      image: 'https://img.freepik.com/free-photo/lab-technician-holding-blood-tube_23-2148166567.jpg'
+      image: lab.assignedNurse?.photo 
+        ? `${API_BASE_URL}${lab.assignedNurse.photo}` 
+        : 'https://img.freepik.com/free-photo/lab-technician-holding-blood-tube_23-2148166567.jpg'
     }));
 
   useEffect(() => {
@@ -704,7 +709,7 @@ const LabAvailabilityScreen = () => {
                 <Text style={styles.sectionLabel}>Nurse In Charge</Text>
                 <View style={[styles.nurseCardModal, SHADOWS.small]}>
                   <Image 
-                    source={{ uri: 'https://img.freepik.com/free-photo/female-nurse-white-coat-standing-with-clipboard-isolated_1303-31411.jpg' }} 
+                    source={{ uri: selectedLabForAvailability?.nursePhoto || 'https://img.freepik.com/free-photo/female-nurse-white-coat-standing-with-clipboard-isolated_1303-31411.jpg' }} 
                     style={styles.nurseImageSmall} 
                   />
                   <View style={styles.nurseInfo}>

@@ -4,6 +4,7 @@ import Appointment from '../model/Appointment.js';
 import LabTest from '../model/LabTest.js';
 import LabBooking from '../model/LabBooking.js';
 import MedicalRecord from '../model/MedicalRecord.js';
+import PDFDocument from 'pdfkit';
 
 // Helper: builds a live queue snapshot for a list of appointments.
 // For each appointment, the queue snapshot contains:
@@ -54,6 +55,53 @@ const buildQueueSnapshots = async (appointments) => {
       totalInSlot,
       patientsAhead: ahead,
       currentlyServing: currentlyServing?.queueNumber || 1,
+      estimatedWaitMinutes
+    });
+  }
+  return snapshots;
+};
+
+const buildLabQueueSnapshots = async (bookings) => {
+  const snapshots = [];
+  for (const booking of bookings) {
+    const bookingDate = new Date(booking.appointmentDate || booking.date);
+    const startOfDay = new Date(bookingDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(bookingDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const labId = booking.lab?._id || booking.lab;
+    const slotId = booking.scheduleSlot?._id || booking.scheduleSlot;
+
+    if (!labId || !slotId) continue;
+
+    // Total active (non-cancelled) bookings in the same lab + scheduleSlot + day
+    const totalInSlot = await LabBooking.countDocuments({
+      lab: labId,
+      scheduleSlot: slotId,
+      appointmentDate: { $gte: startOfDay, $lte: endOfDay },
+      status: { $ne: 'Cancelled' }
+    });
+
+    // Find the lowest queue token that is still in 'Pending' or 'Confirmed' or 'Checked-In'
+    const currentlyServing = await LabBooking.findOne({
+      lab: labId,
+      scheduleSlot: slotId,
+      appointmentDate: { $gte: startOfDay, $lte: endOfDay },
+      status: { $in: ['Pending', 'Confirmed', 'Checked-In'] }
+    })
+      .sort({ queueToken: 1 })
+      .select('queueToken');
+
+    const ahead = Math.max(0, (booking.queueToken || 1) - (currentlyServing?.queueToken || 1));
+    const estimatedWaitMinutes = ahead * 10;
+
+    snapshots.push({
+      appointmentId: booking._id,
+      queueNumber: booking.queueToken || 1,
+      totalInSlot,
+      patientsAhead: ahead,
+      currentlyServing: currentlyServing?.queueToken || 1,
       estimatedWaitMinutes
     });
   }
@@ -161,8 +209,10 @@ export const getDashboardData = async (req, res) => {
       room: booking.scheduleSlot?.room || 'Room 01'
     }));
 
-    // 3. Build live queue snapshots for the upcoming doctor appointments.
-    const liveQueue = await buildQueueSnapshots(doctorAppointments);
+    // 3. Build live queue snapshots for the upcoming doctor appointments and lab bookings.
+    const doctorQueue = await buildQueueSnapshots(doctorAppointments);
+    const labQueue = await buildLabQueueSnapshots(activeLabBookings);
+    const liveQueue = [...doctorQueue, ...labQueue];
 
     res.json({
       success: true,
@@ -388,6 +438,115 @@ export const uploadPatientAvatar = async (req, res) => {
     } else {
       res.status(404).json({ message: 'User not found' });
     }
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+// @desc    Get patient completed appointments (Doctor/Lab) for report summary
+// @route   GET /api/patient/completed-appointments
+// @access  Private (Patient only)
+export const getCompletedAppointments = async (req, res) => {
+  try {
+    const doctorAppts = await Appointment.find({
+      patient: req.user._id,
+      status: 'completed'
+    }).populate('doctor', 'name specialization hospital');
+
+    const labAppts = await LabBooking.find({
+      patientUser: req.user._id,
+      status: 'Completed'
+    }).populate('lab', 'name floor description');
+
+    res.json({
+      success: true,
+      data: {
+        doctorAppointments: doctorAppts,
+        labAppointments: labAppts
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+// @desc    Generate PDF report summary for completed doctor appointment or lab booking
+// @route   GET /api/patient/reports/generate-pdf/:type/:id
+// @access  Private (Patient only)
+export const generateAppointmentPdf = async (req, res) => {
+  try {
+    const { type, id } = req.params;
+    const doc = new PDFDocument({ size: 'A4', margin: 50 });
+    
+    // Set headers
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=summary_${type}_${id}.pdf`);
+    
+    doc.pipe(res);
+
+    if (type === 'doctor') {
+      const appt = await Appointment.findById(id).populate('doctor', 'name specialization hospital');
+      if (!appt || appt.patient.toString() !== req.user._id.toString()) {
+        return res.status(404).json({ message: 'Appointment not found' });
+      }
+
+      // PDF Content Design
+      doc.fontSize(22).fillColor('#8B3DFF').text('MediAI Channeling Summary', { align: 'center' });
+      doc.moveDown(1.5);
+
+      doc.fontSize(14).fillColor('#111827').text('Patient Details', { underline: true });
+      doc.fontSize(11).fillColor('#4B5563').text(`Name: ${req.user.name}`);
+      doc.text(`Email: ${req.user.email}`);
+      doc.text(`Contact: ${req.user.phone || 'N/A'}`);
+      doc.moveDown(1);
+
+      doc.fontSize(14).fillColor('#111827').text('Appointment Details', { underline: true });
+      doc.fontSize(11).fillColor('#4B5563').text(`Doctor: ${appt.doctor.name}`);
+      doc.text(`Specialization: ${appt.doctor.specialization}`);
+      doc.text(`Hospital: ${appt.doctor.hospital || 'MediAI Hospital'}`);
+      doc.text(`Date: ${new Date(appt.date).toLocaleDateString()}`);
+      doc.text(`Time Slot: ${appt.timeSlot}`);
+      doc.text(`Queue Number: #${appt.queueNumber}`);
+      doc.text(`Status: Completed`);
+      doc.moveDown(1);
+
+      doc.fontSize(14).fillColor('#111827').text("Doctor's Notes & Recommendations", { underline: true });
+      doc.fontSize(11).fillColor('#111827').text(appt.notes || 'No notes added by doctor.');
+      doc.moveDown(2);
+
+      doc.fontSize(9).fillColor('#9CA3AF').text('Generated by MediAI Smart Channeling Assistant', { align: 'center' });
+
+    } else if (type === 'lab') {
+      const booking = await LabBooking.findById(id).populate('lab', 'name floor description');
+      if (!booking || booking.patientUser.toString() !== req.user._id.toString()) {
+        return res.status(404).json({ message: 'Booking not found' });
+      }
+
+      doc.fontSize(22).fillColor('#0EA5E9').text('MediAI Laboratory Summary', { align: 'center' });
+      doc.moveDown(1.5);
+
+      doc.fontSize(14).fillColor('#111827').text('Patient Details', { underline: true });
+      doc.fontSize(11).fillColor('#4B5563').text(`Name: ${req.user.name}`);
+      doc.text(`Email: ${req.user.email}`);
+      doc.text(`Contact: ${req.user.phone || 'N/A'}`);
+      doc.moveDown(1);
+
+      doc.fontSize(14).fillColor('#111827').text('Test Details', { underline: true });
+      doc.fontSize(11).fillColor('#4B5563').text(`Laboratory: ${booking.lab?.name || 'MediAI Lab'}`);
+      doc.text(`Floor: ${booking.lab?.floor || '1st Floor'}`);
+      doc.text(`Date: ${new Date(booking.appointmentDate).toLocaleDateString()}`);
+      doc.text(`Queue Token: #${booking.queueToken}`);
+      doc.text(`Collection Method: ${booking.collectionMethod}`);
+      doc.text(`Payment Status: ${booking.paymentStatus}`);
+      doc.text(`Status: Completed`);
+      doc.moveDown(1.5);
+
+      doc.fontSize(9).fillColor('#9CA3AF').text('Generated by MediAI Smart Channeling Assistant', { align: 'center' });
+    } else {
+      return res.status(400).json({ message: 'Invalid summary type' });
+    }
+
+    doc.end();
   } catch (error) {
     res.status(500).json({ message: 'Server Error', error: error.message });
   }

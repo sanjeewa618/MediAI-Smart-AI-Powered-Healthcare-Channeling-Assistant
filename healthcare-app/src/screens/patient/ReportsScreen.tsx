@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, TextInput, Modal, Platform, ActivityIndicator, Alert, Image, Linking } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, TextInput, Modal, Platform, ActivityIndicator, Alert, Image, Linking, Animated, PanResponder } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import { FileText, Search, Filter, Bell, ArrowLeft, Download, Share2, Eye, Upload, CheckCircle2, Clock, Plus, Calendar, ChevronDown } from 'lucide-react-native';
 import BottomNavBar from '../../components/BottomNavBar';
@@ -28,6 +28,11 @@ const ReportsScreen = () => {
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
+  const [activeTab, setActiveTab] = useState<'Uploads' | 'Summaries'>('Uploads');
+  const [completedDoctorAppts, setCompletedDoctorAppts] = useState<any[]>([]);
+  const [completedLabAppts, setCompletedLabAppts] = useState<any[]>([]);
+  const [summariesLoading, setSummariesLoading] = useState(true);
+
   const [uploadModalVisible, setUploadModalVisible] = useState(false);
   const [uploadTitle, setUploadTitle] = useState('');
   const [uploadCategory, setUploadCategory] = useState('Lab Reports');
@@ -37,8 +42,30 @@ const ReportsScreen = () => {
   const [uploading, setUploading] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
 
+  // Draggable FAB setup
+  const pan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        return Math.abs(gestureState.dx) > 2 || Math.abs(gestureState.dy) > 2;
+      },
+      onPanResponderGrant: () => {
+        pan.extractOffset();
+      },
+      onPanResponderMove: Animated.event(
+        [null, { dx: pan.x, dy: pan.y }],
+        { useNativeDriver: false }
+      ),
+      onPanResponderRelease: () => {
+        pan.flattenOffset();
+      }
+    })
+  ).current;
+
   useEffect(() => {
     fetchReports();
+    fetchCompletedAppointments();
   }, []);
 
   const fetchReports = async () => {
@@ -54,6 +81,23 @@ const ReportsScreen = () => {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCompletedAppointments = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/patient/completed-appointments`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        setCompletedDoctorAppts(json.data.doctorAppointments || []);
+        setCompletedLabAppts(json.data.labAppointments || []);
+      }
+    } catch (err) {
+      console.error('Completed appointments fetch error:', err);
+    } finally {
+      setSummariesLoading(false);
     }
   };
 
@@ -112,6 +156,36 @@ const ReportsScreen = () => {
     } catch (error) {
       console.error(error);
       Alert.alert('Error', 'Failed to download report.');
+    }
+  };
+
+  const handleDownloadSummary = async (type: 'doctor' | 'lab', id: string) => {
+    try {
+      const fileUrl = `${API_BASE_URL}/api/patient/reports/generate-pdf/${type}/${id}`;
+      const fileName = `medical_summary_${type}_${id}.pdf`;
+      const fileUri = FileSystem.documentDirectory + fileName;
+
+      const downloadResumable = FileSystem.createDownloadResumable(
+        fileUrl, 
+        fileUri,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+      const result = await downloadResumable.downloadAsync();
+      
+      if (result) {
+        Alert.alert('Success', 'Summary PDF successfully downloaded!');
+        const isAvailable = await Sharing.isAvailableAsync();
+        if (isAvailable) {
+          await Sharing.shareAsync(result.uri);
+        }
+      }
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Error', 'Failed to download summary report.');
     }
   };
 
@@ -251,76 +325,156 @@ const ReportsScreen = () => {
           </View>
         </LinearGradient>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-          {/* Report Categories */}
-          <View style={styles.categoriesSection}>
-            <Text style={styles.sectionTitle}>Report Categories</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryScroll}>
-              {reportCategories.map((cat) => (
-                <TouchableOpacity 
-                  key={cat}
-                  style={[styles.categoryChip, activeCategory === cat && styles.categoryChipActive]}
-                  onPress={() => setActiveCategory(cat)}
-                >
-                  <Text style={[styles.categoryText, activeCategory === cat && styles.categoryTextActive]}>
-                    {cat}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
+        {/* Segment Tabs */}
+        <View style={styles.segmentContainer}>
+          <TouchableOpacity 
+            style={[styles.segmentBtn, activeTab === 'Uploads' && styles.segmentBtnActive]}
+            onPress={() => setActiveTab('Uploads')}
+          >
+            <Text style={[styles.segmentText, activeTab === 'Uploads' && styles.segmentTextActive]}>My Uploads</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.segmentBtn, activeTab === 'Summaries' && styles.segmentBtnActive]}
+            onPress={() => setActiveTab('Summaries')}
+          >
+            <Text style={[styles.segmentText, activeTab === 'Summaries' && styles.segmentTextActive]}>Medical Summaries</Text>
+          </TouchableOpacity>
+        </View>
 
-          {/* Reports List */}
-          <View style={styles.reportsSection}>
-            <Text style={styles.sectionTitle}>Your Reports</Text>
-            {filteredReports.length > 0 ? (
-              filteredReports.map((report, index) => (
-                <TouchableOpacity 
-                  key={report._id || index.toString()}
-                  style={[styles.reportCard, SHADOWS.small]}
-                  onPress={() => { setSelectedReport(report); setModalVisible(true); }}
-                >
-                  <View style={styles.reportCardLeft}>
-                    <View style={[styles.reportIcon, { backgroundColor: '#F5F3FF' }]}>
-                      <FileText size={24} color={COLORS.primary} />
-                    </View>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+          {activeTab === 'Uploads' ? (
+            <>
+              {/* Reports List */}
+              <View style={styles.reportsSection}>
+                <Text style={styles.sectionTitle}>Your Reports</Text>
+                {filteredReports.length > 0 ? (
+                  filteredReports.map((report, index) => (
+                    <TouchableOpacity 
+                      key={report._id || index.toString()}
+                      style={[styles.reportCard, SHADOWS.small]}
+                      onPress={() => { setSelectedReport(report); setModalVisible(true); }}
+                    >
+                      <View style={styles.reportCardLeft}>
+                        <View style={[styles.reportIcon, { backgroundColor: '#F5F3FF' }]}>
+                          <FileText size={24} color={COLORS.primary} />
+                        </View>
+                      </View>
+                      <View style={styles.reportCardCenter}>
+                        <Text style={styles.reportTitle}>{report.title}</Text>
+                        <Text style={styles.reportHospital}>{report.hospital || 'Patient Upload'}</Text>
+                        <View style={styles.reportMeta}>
+                          <Text style={styles.reportMetaText}>
+                            {report.doctor ? `Dr. ${report.doctor.split(' ')[1] || report.doctor}` : 'Self Uploaded'}
+                          </Text>
+                          <Text style={styles.reportMetaDot}>•</Text>
+                          <Text style={styles.reportMetaText}>
+                            {report.date ? report.date : report.recordDate ? new Date(report.recordDate).toLocaleDateString() : 'No Date'}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.reportCardRight}>
+                        <View style={[styles.statusBadge, { borderColor: getStatusColor(report.status) }]}>
+                          {getStatusIcon(report.status)}
+                          <Text style={[styles.statusText, { color: getStatusColor(report.status) }]}>
+                            {report.status}
+                          </Text>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <View style={styles.emptyState}>
+                    <FileText size={48} color={COLORS.primary} />
+                    <Text style={styles.emptyText}>No reports found</Text>
                   </View>
-                  <View style={styles.reportCardCenter}>
-                    <Text style={styles.reportTitle}>{report.title}</Text>
-                    <Text style={styles.reportHospital}>{report.hospital || 'Patient Upload'}</Text>
-                    <View style={styles.reportMeta}>
-                      <Text style={styles.reportMetaText}>
-                        {report.doctor ? `Dr. ${report.doctor.split(' ')[1] || report.doctor}` : 'Self Uploaded'}
-                      </Text>
-                      <Text style={styles.reportMetaDot}>•</Text>
-                      <Text style={styles.reportMetaText}>
-                        {report.date ? report.date : report.recordDate ? new Date(report.recordDate).toLocaleDateString() : 'No Date'}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={styles.reportCardRight}>
-                    <View style={[styles.statusBadge, { borderColor: getStatusColor(report.status) }]}>
-                      {getStatusIcon(report.status)}
-                      <Text style={[styles.statusText, { color: getStatusColor(report.status) }]}>
-                        {report.status}
-                      </Text>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              ))
-            ) : (
-              <View style={styles.emptyState}>
-                <FileText size={48} color={COLORS.primary} />
-                <Text style={styles.emptyText}>No reports found</Text>
+                )}
               </View>
-            )}
-          </View>
+            </>
+          ) : (
+            <View style={styles.summariesSection}>
+              <Text style={styles.sectionTitle}>Completed Doctor Consultations</Text>
+              {completedDoctorAppts.length > 0 ? (
+                completedDoctorAppts.map((appt) => (
+                  <View key={appt._id} style={[styles.summaryCard, SHADOWS.small]}>
+                    <View style={styles.summaryHeader}>
+                      <View style={[styles.summaryIcon, { backgroundColor: '#F3F0FF' }]}>
+                        <FileText size={24} color="#8B3DFF" />
+                      </View>
+                      <View style={styles.summaryTitleArea}>
+                        <Text style={styles.summaryTitle}>Doctor Channeling Summary</Text>
+                        <Text style={styles.summarySubtitle}>{appt.doctor?.name || 'Doctor'}</Text>
+                        <Text style={styles.summaryMetaText}>{appt.doctor?.specialization} • {appt.doctor?.hospital || 'MediAI Hospital'}</Text>
+                        <Text style={styles.summaryDateText}>{new Date(appt.date).toLocaleDateString()} • {appt.timeSlot}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.summaryNotesBox}>
+                      <Text style={styles.notesTitle}>Doctor's Notes:</Text>
+                      <Text style={styles.notesText}>{appt.notes || 'No notes added by doctor.'}</Text>
+                    </View>
+                    <TouchableOpacity 
+                      style={styles.downloadSummaryBtn}
+                      onPress={() => handleDownloadSummary('doctor', appt._id)}
+                    >
+                      <Download size={16} color="#FFF" />
+                      <Text style={styles.downloadSummaryBtnText}>Download PDF Report</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))
+              ) : (
+                <View style={styles.emptyState}>
+                  <FileText size={48} color="#9CA3AF" />
+                  <Text style={styles.emptyText}>No doctor summaries available</Text>
+                </View>
+              )}
+
+              <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Completed Laboratory Tests</Text>
+              {completedLabAppts.length > 0 ? (
+                completedLabAppts.map((booking) => (
+                  <View key={booking._id} style={[styles.summaryCard, SHADOWS.small]}>
+                    <View style={styles.summaryHeader}>
+                      <View style={[styles.summaryIcon, { backgroundColor: '#E0F2FE' }]}>
+                        <FileText size={24} color="#0EA5E9" />
+                      </View>
+                      <View style={styles.summaryTitleArea}>
+                        <Text style={styles.summaryTitle}>Laboratory Test Summary</Text>
+                        <Text style={styles.summarySubtitle}>{booking.lab?.name || 'Lab Test'}</Text>
+                        <Text style={styles.summaryMetaText}>{booking.lab?.floor || '1st Floor'}</Text>
+                        <Text style={styles.summaryDateText}>{new Date(booking.appointmentDate).toLocaleDateString()} • Token #{booking.queueToken}</Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity 
+                      style={[styles.downloadSummaryBtn, { backgroundColor: '#0EA5E9' }]}
+                      onPress={() => handleDownloadSummary('lab', booking._id)}
+                    >
+                      <Download size={16} color="#FFF" />
+                      <Text style={styles.downloadSummaryBtnText}>Download PDF Report</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))
+              ) : (
+                <View style={styles.emptyState}>
+                  <FileText size={48} color="#9CA3AF" />
+                  <Text style={styles.emptyText}>No lab summaries available</Text>
+                </View>
+              )}
+            </View>
+          )}
         </ScrollView>
 
         {/* Floating Action Button */}
-        <TouchableOpacity style={styles.fab} onPress={() => setUploadModalVisible(true)}>
-          <Plus size={24} color="#FFF" />
-        </TouchableOpacity>
+        <Animated.View
+          {...panResponder.panHandlers}
+          style={[
+            styles.fab,
+            {
+              transform: pan.getTranslateTransform()
+            }
+          ]}
+        >
+          <TouchableOpacity onPress={() => setUploadModalVisible(true)} style={styles.fabInner}>
+            <Plus size={24} color="#FFF" />
+          </TouchableOpacity>
+        </Animated.View>
 
         {/* Upload Modal */}
         <Modal visible={uploadModalVisible} transparent animationType="slide">
@@ -816,20 +970,135 @@ const styles = StyleSheet.create({
   },
   fab: {
     position: 'absolute',
-    bottom: 80,
+    bottom: 100,
     right: 24,
     width: 60,
     height: 60,
     borderRadius: 30,
     backgroundColor: COLORS.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
     zIndex: 10,
+  },
+  fabInner: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 14,
+    padding: 4,
+    marginHorizontal: 20,
+    marginTop: 16,
+  },
+  segmentBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+  },
+  segmentBtnActive: {
+    backgroundColor: '#FFFFFF',
+    ...SHADOWS.small,
+  },
+  segmentText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  segmentTextActive: {
+    color: COLORS.primary,
+    fontWeight: '800',
+  },
+  summariesSection: {
+    marginBottom: 24,
+  },
+  summaryCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  summaryHeader: {
+    flexDirection: 'row',
+    gap: 14,
+    marginBottom: 12,
+  },
+  summaryIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  summaryTitleArea: {
+    flex: 1,
+  },
+  summaryTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: COLORS.textHeader,
+  },
+  summarySubtitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  summaryMetaText: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    marginTop: 2,
+  },
+  summaryDateText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.primary,
+    marginTop: 4,
+  },
+  summaryNotesBox: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 4,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  notesTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+    marginBottom: 4,
+  },
+  notesText: {
+    fontSize: 12,
+    color: COLORS.textHeader,
+    lineHeight: 18,
+  },
+  downloadSummaryBtn: {
+    backgroundColor: COLORS.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  downloadSummaryBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
   },
   uploadModalOverlay: {
     flex: 1,

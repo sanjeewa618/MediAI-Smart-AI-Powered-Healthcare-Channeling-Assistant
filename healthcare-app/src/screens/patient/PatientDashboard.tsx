@@ -138,33 +138,37 @@ const QueueAppointmentCard = ({
       ? `~${waitHours}h ${waitMinutes}m wait`
       : `~${waitMinutes}m wait`;
 
+  const isLab = !!appointment?.testName;
   const statusColor = isYourTurn ? '#10B981' : patientsAhead <= 2 ? '#F59E0B' : COLORS.primary;
   const statusBg = isYourTurn ? '#D1FAE5' : patientsAhead <= 2 ? '#FEF3C7' : '#F3F0FF';
-
   const dateLabel = appointment?.date ? moment(appointment.date).format('ddd, DD MMM YYYY') : '';
   const timeLabel = appointment?.timeSlot || '';
-  const doctorName = appointment?.doctor?.name || 'Doctor';
-  const specialization = appointment?.doctor?.specialization || 'Consultation';
-  const hospital = appointment?.doctor?.hospital || '';
+  const displayName = isLab ? appointment.testName : (appointment?.doctor?.name || 'Doctor');
+  const displaySpec = isLab ? (appointment.room || 'Room 01') : (appointment?.doctor?.specialization || 'Consultation');
+  const displayHospital = isLab ? 'Laboratory' : (appointment?.doctor?.hospital || '');
 
   return (
     <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={styles.queueCardOuter}>
       <LinearGradient
-        colors={getGradientForDate(appointment?.date)}
+        colors={isLab ? (isYourTurn ? ['#2563EB', '#1D4ED8'] : ['#3B82F6', '#2563EB']) : (isYourTurn ? ['#065F46', '#10B981'] : ['#5F0FFF', '#8B3DFF'])}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.queueCardGradient}
       >
-        {/* Top Row: Doctor Info + Live Status Pill */}
+        {/* Top Row: Doctor/Lab Info + Live Status Pill */}
         <View style={styles.queueCardTopRow}>
           <View style={styles.queueDoctorInfo}>
-            <View style={styles.queueDoctorAvatar}>
-              <Stethoscope size={20} color="#FFFFFF" />
+            <View style={[styles.queueDoctorAvatar, isLab && { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+              {isLab ? (
+                <FlaskConical size={20} color="#FFFFFF" />
+              ) : (
+                <Stethoscope size={20} color="#FFFFFF" />
+              )}
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.queueDoctorName} numberOfLines={1}>{doctorName}</Text>
+              <Text style={styles.queueDoctorName} numberOfLines={1}>{displayName}</Text>
               <Text style={styles.queueDoctorSpec} numberOfLines={1}>
-                {specialization}{hospital ? `  •  ${hospital}` : ''}
+                {displaySpec}{displayHospital ? `  •  ${displayHospital}` : ''}
               </Text>
             </View>
           </View>
@@ -1033,40 +1037,14 @@ const PatientDashboard = () => {
             upcomingLabAppointments.length > 0 ? (
               <View style={styles.appointmentSubSection}>
                 {upcomingLabAppointments.map((appt, idx) => (
-                  <TouchableOpacity
-                    key={idx}
-                    style={[styles.mainAppointmentCard, SHADOWS.small, { marginBottom: 15, padding: 0, overflow: 'hidden', borderWidth: 0 }]}
-                    onPress={() => navigation.navigate('Reports')}
-                    activeOpacity={0.9}
-                  >
-                    <LinearGradient
-                      colors={getGradientForDate(appt.date)}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={{ padding: 16, flexDirection: 'row', alignItems: 'center' }}
-                    >
-                      <View style={[styles.mainAppIconWrap, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-                        <FlaskConical size={28} color="#FFF" />
-                      </View>
-                      <View style={styles.mainAppInfo}>
-                        <Text style={[styles.mainAppTitle, { color: '#FFF' }]}>
-                          {appt.testName || 'Lab Test'}
-                        </Text>
-                        <Text style={[styles.mainAppSub, { color: 'rgba(255,255,255,0.8)' }]}>
-                          Lab Visit  •  {moment(appt.date).format('DD MMM')}  •  {appt.timeSlot || 'TBD'}
-                        </Text>
-                        <View style={[styles.countdownPill, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-                          <Activity size={11} color="#FFF" />
-                          <Text style={[styles.countdownText, { color: '#FFF' }]}>
-                            {appt.queueNumber
-                              ? `Queue #${appt.queueNumber}`
-                              : 'Upcoming'}
-                          </Text>
-                        </View>
-                      </View>
-                      <ChevronRight size={20} color="rgba(255,255,255,0.6)" />
-                    </LinearGradient>
-                  </TouchableOpacity>
+                  <View key={idx} style={{ marginBottom: 15 }}>
+                    <QueueAppointmentCard
+                      appointment={appt}
+                      queueInfo={liveQueue.find((q) => q.appointmentId === appt._id)}
+                      onPress={() => navigation.navigate('PatientAppointments')}
+                      lastRefresh={lastQueueRefresh}
+                    />
+                  </View>
                 ))}
               </View>
             ) : (
