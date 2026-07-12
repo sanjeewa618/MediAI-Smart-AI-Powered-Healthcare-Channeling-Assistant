@@ -41,6 +41,7 @@ type UserItem = {
   status: 'pending' | 'approved' | 'rejected' | 'active' | 'suspended' | 'disabled' | 'verified';
   specialization?: string;
   department?: string;
+  photo?: string;
 };
 
 const UserManagementScreen = () => {
@@ -388,7 +389,14 @@ const UserManagementScreen = () => {
               return (
                 <View style={[styles.userCard, SHADOWS.light]}>
                   <View style={styles.userInfoRow}>
-                    <Image source={{ uri: `https://i.pravatar.cc/150?u=${item._id}` }} style={styles.avatar} />
+                    <Image 
+                      source={
+                        item.photo 
+                          ? { uri: item.photo.startsWith('http') ? item.photo : `${API_BASE_URL}${item.photo}` } 
+                          : { uri: `https://i.pravatar.cc/150?u=${item._id}` }
+                      } 
+                      style={styles.avatar} 
+                    />
                     <View style={styles.userDetails}>
                       <Text style={styles.userName}>{item.name}</Text>
                       <Text style={styles.userId}>{renderUserId(item)} • {item.phone}</Text>
@@ -437,7 +445,14 @@ const UserManagementScreen = () => {
               return (
                 <View style={[styles.userCard, SHADOWS.light]}>
                   <View style={styles.userInfoRow}>
-                    <Image source={{ uri: `https://i.pravatar.cc/150?u=${item._id}` }} style={styles.avatar} />
+                    <Image 
+                      source={
+                        item.photo 
+                          ? { uri: item.photo.startsWith('http') ? item.photo : `${API_BASE_URL}${item.photo}` } 
+                          : { uri: `https://i.pravatar.cc/150?u=${item._id}` }
+                      } 
+                      style={styles.avatar} 
+                    />
                     <View style={styles.userDetails}>
                       <Text style={styles.userName}>{item.name}</Text>
                       <Text style={styles.userId}>{renderUserId(item)} • {item.specialization || 'No specialty'}</Text>
@@ -495,7 +510,14 @@ const UserManagementScreen = () => {
               return (
                 <View style={[styles.userCard, SHADOWS.light]}>
                   <View style={styles.userInfoRow}>
-                    <Image source={{ uri: `https://i.pravatar.cc/150?u=${item._id}` }} style={styles.avatar} />
+                    <Image 
+                      source={
+                        item.photo 
+                          ? { uri: item.photo.startsWith('http') ? item.photo : `${API_BASE_URL}${item.photo}` } 
+                          : { uri: `https://i.pravatar.cc/150?u=${item._id}` }
+                      } 
+                      style={styles.avatar} 
+                    />
                     <View style={styles.userDetails}>
                       <Text style={styles.userName}>{item.name}</Text>
                       <Text style={styles.userId}>{renderUserId(item)} • Dept: {item.department || 'Unknown'}</Text>
