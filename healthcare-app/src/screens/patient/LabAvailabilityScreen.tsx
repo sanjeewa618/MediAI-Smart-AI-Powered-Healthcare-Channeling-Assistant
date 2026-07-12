@@ -155,6 +155,19 @@ const LabAvailabilityScreen = () => {
   const [selectedCategory, setSelectedCategory] = useState('1');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDate, setSelectedDate] = useState(moment().format('YYYY-MM-DD'));
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 12) {
+      return 'Good Morning 👋';
+    } else if (hour >= 12 && hour < 17) {
+      return 'Good Afternoon ☀️';
+    } else if (hour >= 17 && hour < 22) {
+      return 'Good Evening 🌆';
+    } else {
+      return 'Good Night 🌙';
+    }
+  };
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedLabForAvailability, setSelectedLabForAvailability] = useState<any>(null);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState('');
@@ -436,7 +449,7 @@ const LabAvailabilityScreen = () => {
             <ArrowLeft size={24} color="#FFF" />
           </TouchableOpacity>
           <View style={styles.headerTitleContainer}>
-            <Text style={styles.headerGreeting}>Good Morning 👋</Text>
+            <Text style={styles.headerGreeting}>{getGreeting()}</Text>
             <Text style={styles.headerTitle}>Book Your Lab Test</Text>
           </View>
           <TouchableOpacity style={styles.notificationBtn}>
