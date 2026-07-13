@@ -359,17 +359,15 @@ const AdminAppointmentsScreen = () => {
   const stats = useMemo(() => {
     if (selectedType === 'doctor') {
       return {
-        total: appointments.length,
+        cancelled: appointments.filter(a => a.status === 'cancelled').length,
         pending: appointments.filter(a => a.status === 'pending').length,
-        confirmed: appointments.filter(a => a.status === 'completed').length,
-        confirmedLabel: 'Completed'
+        completed: appointments.filter(a => a.status === 'completed').length
       };
     } else {
       return {
-        total: labBookings.length,
+        cancelled: labBookings.filter(b => b.status === 'Cancelled').length,
         pending: labBookings.filter(b => b.status === 'Pending').length,
-        confirmed: labBookings.filter(b => b.status === 'Completed').length,
-        confirmedLabel: 'Completed'
+        completed: labBookings.filter(b => b.status === 'Completed').length
       };
     }
   }, [appointments, labBookings, selectedType]);
@@ -378,7 +376,19 @@ const AdminAppointmentsScreen = () => {
   const filteredData = useMemo(() => {
     if (selectedType === 'doctor') {
       return appointments.filter(appt => {
-        const matchFilter = activeFilter.toLowerCase() === 'all' || appt.status.toLowerCase() === activeFilter.toLowerCase();
+        const statusLower = appt.status.toLowerCase();
+        let matchFilter = false;
+        
+        if (activeFilter.toLowerCase() === 'all') {
+          matchFilter = true;
+        } else if (activeFilter.toLowerCase() === 'today') {
+          matchFilter = ['started', 'ready', 'nextin', 'skipped'].includes(statusLower);
+        } else if (activeFilter.toLowerCase() === 'activein') {
+          matchFilter = ['ready', 'nextin', 'in'].includes(statusLower);
+        } else {
+          matchFilter = statusLower === activeFilter.toLowerCase();
+        }
+        
         const docName = appt.doctor?.name || '';
         const patName = appt.patient?.name || '';
         const matchSearch = docName.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -392,7 +402,8 @@ const AdminAppointmentsScreen = () => {
         
         if (activeFilter.toLowerCase() === 'all') {
           matchFilter = true;
-        } else if (activeFilter.toLowerCase() === 'confirmed') {
+        } else if (activeFilter.toLowerCase() === 'today' || activeFilter.toLowerCase() === 'activein') {
+          // Lab bookings do not use these statuses, so default to confirmed/in-progress equivalent
           matchFilter = ['confirmed', 'checked-in', 'sample-collected', 'testing'].includes(statusLower);
         } else {
           matchFilter = statusLower === activeFilter.toLowerCase();
@@ -477,15 +488,15 @@ const AdminAppointmentsScreen = () => {
 
       {/* Overview Cards */}
       <View style={styles.statsContainer}>
-        <View style={[styles.statCard, SHADOWS.light, { borderLeftColor: '#F59E0B' }]}>
-          <Text style={styles.statLabel}>Total Logs</Text>
+        <View style={[styles.statCard, SHADOWS.light, { borderLeftColor: '#EF4444' }]}>
+          <Text style={styles.statLabel}>Cancelled</Text>
           <View style={styles.statRow}>
-            <Calendar size={20} color="#6B7280" />
-            <Text style={styles.statVal}>{stats.total}</Text>
+            <AlertTriangle size={20} color="#EF4444" />
+            <Text style={[styles.statVal, { color: '#EF4444' }]}>{stats.cancelled}</Text>
           </View>
         </View>
 
-        <View style={[styles.statCard, SHADOWS.light, { borderLeftColor: '#3B82F6' }]}>
+        <View style={[styles.statCard, SHADOWS.light, { borderLeftColor: '#F59E0B' }]}>
           <Text style={styles.statLabel}>Pending</Text>
           <View style={styles.statRow}>
             <Clock size={20} color="#F59E0B" />
@@ -494,10 +505,10 @@ const AdminAppointmentsScreen = () => {
         </View>
 
         <View style={[styles.statCard, SHADOWS.light, { borderLeftColor: '#10B981' }]}>
-          <Text style={styles.statLabel}>{stats.confirmedLabel}</Text>
+          <Text style={styles.statLabel}>Completed</Text>
           <View style={styles.statRow}>
             <CheckCircle size={20} color="#10B981" />
-            <Text style={[styles.statVal, { color: '#10B981' }]}>{stats.confirmed}</Text>
+            <Text style={[styles.statVal, { color: '#10B981' }]}>{stats.completed}</Text>
           </View>
         </View>
       </View>
@@ -529,7 +540,7 @@ const AdminAppointmentsScreen = () => {
         <FlatList 
           horizontal
           showsHorizontalScrollIndicator={false}
-          data={['all', 'pending', 'confirmed', 'completed', 'cancelled'] as const}
+          data={['all', 'pending', 'today', 'activeIN', 'completed', 'cancelled'] as const}
           keyExtractor={(item) => item}
           contentContainerStyle={styles.tabsList}
           renderItem={({ item }) => (
