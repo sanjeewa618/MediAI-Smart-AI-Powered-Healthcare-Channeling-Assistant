@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, Platform, Modal, Animated, PanResponder, Dimensions, BackHandler, Alert } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, Platform, Modal, Animated, PanResponder, Dimensions, BackHandler, Alert, TextInput, ActivityIndicator } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import { Bell, Calendar, LogOut, X, Clock, FileEdit, Plus, Play, Users, CheckSquare, Activity, Search, MessageCircle, RefreshCcw } from 'lucide-react-native';
 
@@ -44,6 +44,13 @@ const DoctorDashboard = () => {
   const [todayAppointments, setTodayAppointments] = useState<any[]>([]);
   const [stats, setStats] = useState({ totalPatients: 0, todayAppointments: 0, pendingApprovals: 0 });
   const [currentTime, setCurrentTime] = useState(Date.now());
+
+  // Search and Patient Details State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [patientModalVisible, setPatientModalVisible] = useState(false);
+  const [selectedPatientDetails, setSelectedPatientDetails] = useState<any>(null);
+  const [loadingPatientDetails, setLoadingPatientDetails] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(Date.now()), 60000); // update every minute
@@ -129,6 +136,46 @@ const DoctorDashboard = () => {
     } catch (error: any) {
       console.error('Failed to start session from dashboard', error);
       Alert.alert('Error', error.message || 'Failed to start session from dashboard');
+    }
+  };
+
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
+      setSearchResults([]);
+    } else {
+      const query = searchQuery.toLowerCase();
+      const uniquePatients = new Map();
+      todayAppointments.forEach(appt => {
+        if (appt.patient && appt.patient.name && appt.patient.name.toLowerCase().includes(query)) {
+          uniquePatients.set(appt.patient._id, appt.patient);
+        }
+      });
+      setSearchResults(Array.from(uniquePatients.values()));
+    }
+  }, [searchQuery, todayAppointments]);
+
+  const handleSelectPatient = async (patientId: string) => {
+    setSearchQuery('');
+    setSearchResults([]);
+    setPatientModalVisible(true);
+    setLoadingPatientDetails(true);
+    
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/doctor/patient/${patientId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSelectedPatientDetails(data.data);
+      } else {
+        Alert.alert('Error', 'Failed to load patient details');
+        setPatientModalVisible(false);
+      }
+    } catch (err) {
+      Alert.alert('Error', 'Network error');
+      setPatientModalVisible(false);
+    } finally {
+      setLoadingPatientDetails(false);
     }
   };
 
@@ -246,30 +293,43 @@ const DoctorDashboard = () => {
             </LinearGradient>
           </ScrollView>
 
-          {/* Quick Actions */}
-          <Text style={[styles.sectionTitle, { marginTop: 16 }]}>Quick Actions</Text>
-          <View style={styles.quickActionsRow}>
-            <TouchableOpacity style={styles.quickActionBtn}>
-              <View style={[styles.quickActionIconBox, { backgroundColor: '#DBEAFE' }]}>
-                <Search size={24} color="#2563EB" />
-              </View>
-              <Text style={styles.quickActionText}>Search</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.quickActionBtn}>
-              <View style={[styles.quickActionIconBox, { backgroundColor: '#FCE7F3' }]}>
-                <FileEdit size={24} color="#DB2777" />
-              </View>
-              <Text style={styles.quickActionText}>Prescribe</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.quickActionBtn}>
-              <View style={[styles.quickActionIconBox, { backgroundColor: '#E0E7FF' }]}>
-                <MessageCircle size={24} color="#4F46E5" />
-              </View>
-              <Text style={styles.quickActionText}>Messages</Text>
-            </TouchableOpacity>
+          {/* Quick Search */}
+          <Text style={[styles.sectionTitle, { marginTop: 16 }]}>Patient Search</Text>
+          <View style={styles.searchContainer}>
+            <Search size={20} color="#9CA3AF" />
+            <TextInput 
+              style={styles.searchInput}
+              placeholder="Search today's patients..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery !== '' && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <X size={18} color="#9CA3AF" />
+              </TouchableOpacity>
+            )}
           </View>
+          
+          {searchResults.length > 0 && (
+            <View style={styles.searchResultsContainer}>
+              {searchResults.map(patient => (
+                <TouchableOpacity 
+                  key={patient._id} 
+                  style={styles.searchResultItem}
+                  onPress={() => handleSelectPatient(patient._id)}
+                >
+                  <View style={styles.searchResultAvatar}>
+                    <Text style={styles.searchResultAvatarText}>{patient.name.charAt(0).toUpperCase()}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.searchResultName}>{patient.name}</Text>
+                    <Text style={styles.searchResultPhone}>{patient.phone || 'No phone provided'}</Text>
+                  </View>
+                  <Activity size={18} color={COLORS.primary} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
 
           <Text style={[styles.sectionTitle, { marginTop: 16 }]}>Today's Schedule</Text>
           {todaySlots.length === 0 ? (
@@ -409,6 +469,68 @@ const DoctorDashboard = () => {
             </Animated.View>
           </View>
         </Modal>
+        {/* Patient Details Modal */}
+        <Modal visible={patientModalVisible} animationType="slide" transparent>
+          <View style={styles.modalOverlay}>
+            <View style={styles.patientModalContent}>
+              <View style={styles.patientModalHeader}>
+                <Text style={styles.patientModalTitle}>Patient Details</Text>
+                <TouchableOpacity onPress={() => setPatientModalVisible(false)} style={styles.patientModalCloseBtn}>
+                  <X size={20} color="#1F2937" />
+                </TouchableOpacity>
+              </View>
+              
+              {loadingPatientDetails ? (
+                <View style={{ padding: 40, alignItems: 'center' }}>
+                  <ActivityIndicator size="large" color={COLORS.primary} />
+                </View>
+              ) : selectedPatientDetails ? (
+                <ScrollView showsVerticalScrollIndicator={false}>
+                  <View style={styles.patientProfileTop}>
+                    <View style={styles.patientBigAvatar}>
+                      <Text style={styles.patientBigAvatarText}>
+                        {selectedPatientDetails.patient?.name?.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    <Text style={styles.patientBigName}>{selectedPatientDetails.patient?.name}</Text>
+                    <Text style={styles.patientSubDetail}>{selectedPatientDetails.patient?.email}</Text>
+                  </View>
+                  
+                  <View style={styles.patientInfoBox}>
+                    <View style={styles.patientInfoRow}>
+                      <Text style={styles.patientInfoLabel}>Phone</Text>
+                      <Text style={styles.patientInfoVal}>{selectedPatientDetails.patient?.phone || 'N/A'}</Text>
+                    </View>
+                    <View style={styles.patientInfoRow}>
+                      <Text style={styles.patientInfoLabel}>Gender</Text>
+                      <Text style={styles.patientInfoVal}>{selectedPatientDetails.patient?.gender || 'N/A'}</Text>
+                    </View>
+                    <View style={styles.patientInfoRow}>
+                      <Text style={styles.patientInfoLabel}>NIC</Text>
+                      <Text style={styles.patientInfoVal}>{selectedPatientDetails.patient?.nic || 'N/A'}</Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.patientSectionTitle}>Medical History</Text>
+                  {selectedPatientDetails.reports?.length > 0 ? (
+                    selectedPatientDetails.reports.map((report: any, idx: number) => (
+                      <View key={idx} style={styles.reportCard}>
+                        <FileEdit size={16} color={COLORS.primary} />
+                        <View style={{ marginLeft: 12, flex: 1 }}>
+                          <Text style={styles.reportTitle}>{report.title || 'Medical Report'}</Text>
+                          <Text style={styles.reportDate}>{new Date(report.recordDate || report.createdAt).toLocaleDateString()}</Text>
+                        </View>
+                      </View>
+                    ))
+                  ) : (
+                    <Text style={styles.noReportsText}>No medical records found.</Text>
+                  )}
+                </ScrollView>
+              ) : null}
+            </View>
+          </View>
+        </Modal>
+
       </View>
     </SafeAreaView>
   );
@@ -520,6 +642,174 @@ const styles = StyleSheet.create({
   },
   slotLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   slotIconBox: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#F5F3FF', alignItems: 'center', justifyContent: 'center' },
+  patientModalCloseBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
+  // Search Styles
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+    marginHorizontal: 20,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: 8,
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#1F2937',
+  },
+  searchResultsContainer: {
+    marginHorizontal: 20,
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: 16,
+    maxHeight: 200,
+  },
+  searchResultItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  searchResultAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  searchResultAvatarText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.primary,
+  },
+  searchResultName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  searchResultPhone: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  // Patient Details Modal Styles
+  patientModalContent: {
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+    height: '80%',
+  },
+  patientModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  patientModalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1F2937',
+  },
+  patientProfileTop: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  patientBigAvatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: COLORS.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  patientBigAvatarText: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: COLORS.primary,
+  },
+  patientBigName: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#1F2937',
+  },
+  patientSubDetail: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 4,
+  },
+  patientInfoBox: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+  },
+  patientInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  patientInfoLabel: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  patientInfoVal: {
+    fontSize: 13,
+    color: '#1F2937',
+    fontWeight: '600',
+  },
+  patientSectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 12,
+  },
+  reportCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: 8,
+  },
+  reportTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  reportDate: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  noReportsText: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 10,
+  },
+
   slotTime: { fontSize: 15, fontWeight: '700', color: '#1F2937' },
   slotMeta: { fontSize: 13, color: '#6B7280', marginTop: 2 },
   startBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#10B981', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 },
