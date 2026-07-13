@@ -434,6 +434,11 @@ const AdminAppointmentsScreen = () => {
       case 'testing': return { bg: '#F5F3FF', text: '#7C3AED' };
       case 'completed': return { bg: '#ECFDF5', text: '#10B981' };
       case 'cancelled': return { bg: '#FEF2F2', text: '#EF4444' };
+      case 'started': return { bg: '#E0E7FF', text: '#4F46E5' };
+      case 'ready': return { bg: '#DCFCE7', text: '#16A34A' };
+      case 'nextin': return { bg: '#FEF9C3', text: '#CA8A04' };
+      case 'in': return { bg: '#DBEAFE', text: '#2563EB' };
+      case 'skipped': return { bg: '#FEE2E2', text: '#DC2626' };
       default: return { bg: '#F3F4F6', text: '#6B7280' };
     }
   };
