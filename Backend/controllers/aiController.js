@@ -1,5 +1,6 @@
 import AIAnalysisLog from '../model/AIAnalysisLog.js';
 import MedicalRecord from '../model/MedicalRecord.js';
+import User from '../model/User.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -43,10 +44,10 @@ async function callGemini(apiKey, modelName, messages) {
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 // ── Try each model name until one works ──────────────────────────────────────
-async function analyzeWithGemini(apiKey, symptoms, medicalHistoryText = '', attachmentDataList = []) {
-  const systemInstruction = `You are MediAI, an advanced medical assistant bot. You analyze patient symptoms and respond ONLY in strict JSON matching this structure exactly:
+async function analyzeWithGemini(apiKey, symptoms, medicalHistoryText = '', attachmentDataList = [], patientName = 'Patient') {
+  const systemInstruction = `You are MediAI, an advanced medical assistant bot. You are assisting a patient named ${patientName}. You analyze patient symptoms and respond ONLY in strict JSON matching this structure exactly:
 {
-  "aiResponse": "A friendly, detailed analysis of the symptoms including general advice and safety warnings. You can refer to the patient's medical history or uploaded documents to provide better context.",
+  "aiResponse": "A friendly, detailed analysis of the symptoms including general advice and safety warnings. Start by greeting the patient by their name. You can refer to the patient's medical history or uploaded documents to provide better context.",
   "predictedConditions": ["Condition 1", "Condition 2"],
   "recommendedSpecialist": "One doctor specialty (e.g. Cardiologist, Neurologist, General Practitioner, Dermatologist, Orthopedic, Pediatrician, Gynecologist)"
 }
@@ -117,6 +118,8 @@ export const analyzeSymptoms = async (req, res) => {
   try {
     const { symptoms } = req.body;
     const patientId = req.user.id;
+    const user = await User.findById(patientId);
+    const patientName = user ? user.name : 'Patient';
 
     if (!symptoms) {
       return res.status(400).json({ message: 'Symptoms description is required' });
@@ -129,7 +132,7 @@ export const analyzeSymptoms = async (req, res) => {
 
     // Try all available Gemini models until one succeeds
     const context = await fetchPatientContext(patientId);
-    const parsedData = await analyzeWithGemini(apiKey, symptoms, context.formattedRecords, context.attachmentDataList);
+    const parsedData = await analyzeWithGemini(apiKey, symptoms, context.formattedRecords, context.attachmentDataList, patientName);
 
     // Save the successful analysis to DB
     const log = await AIAnalysisLog.create({
@@ -166,8 +169,8 @@ export const getAIHistory = async (req, res) => {
   }
 };
 
-async function chatWithGemini(apiKey, message, medicalHistoryText, attachmentDataList = []) {
-  const systemInstruction = `You are MediAI, an advanced medical assistant bot. A patient is asking you a question about their medical reports. Use their provided medical history and any attached documents to answer accurately, safely, and politely. DO NOT provide a JSON response. Respond in plain conversational text or markdown. If their question is unrelated to medical context, answer it briefly but remind them you are a medical assistant.
+async function chatWithGemini(apiKey, message, medicalHistoryText, attachmentDataList = [], patientName = 'Patient') {
+  const systemInstruction = `You are MediAI, an advanced medical assistant bot. A patient named ${patientName} is asking you a question about their medical reports. Use their provided medical history and any attached documents to answer accurately, safely, and politely. Start by greeting the patient by their name if appropriate. DO NOT provide a JSON response. Respond in plain conversational text or markdown. If their question is unrelated to medical context, answer it briefly but remind them you are a medical assistant.
 
 Patient's Medical History:
 ${medicalHistoryText || 'No medical history available.'}`;
@@ -283,6 +286,8 @@ export const analyzeReports = async (req, res) => {
   try {
     const { message } = req.body;
     const patientId = req.user.id;
+    const user = await User.findById(patientId);
+    const patientName = user ? user.name : 'Patient';
 
     if (!message) {
       return res.status(400).json({ message: 'Message is required' });
@@ -295,7 +300,7 @@ export const analyzeReports = async (req, res) => {
 
     const context = await fetchPatientContext(patientId);
     
-    const aiResponse = await chatWithGemini(apiKey, message, context.formattedRecords, context.attachmentDataList);
+    const aiResponse = await chatWithGemini(apiKey, message, context.formattedRecords, context.attachmentDataList, patientName);
 
     res.status(200).json({ success: true, data: { reply: aiResponse } });
   } catch (error) {

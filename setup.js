@@ -83,7 +83,7 @@ try {
   const apiUrl = updateFrontendEnv(ip);
   console.log(`✅ frontend/.env updated → EXPO_PUBLIC_API_URL=${apiUrl}`);
 
-  const backendDir  = join(__dirname, 'Backend');
+  const backendDir = join(__dirname, 'Backend');
   const frontendDir = join(__dirname, 'healthcare-app');
 
   // Step 3: Start Backend in a SEPARATE terminal window
