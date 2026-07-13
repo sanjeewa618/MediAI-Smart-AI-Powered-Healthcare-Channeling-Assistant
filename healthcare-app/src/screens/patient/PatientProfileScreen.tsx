@@ -36,6 +36,7 @@ import {
   Activity,
   CheckCircle2,
   Camera,
+  Trash2,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -415,6 +416,72 @@ const PatientProfileScreen = () => {
     } catch (err) {
       Alert.alert('Error', 'An error occurred while updating the profile');
       console.error(err);
+    }
+  };
+
+  const [editReportsModalVisible, setEditReportsModalVisible] = useState(false);
+  const [confirmDeleteModalVisible, setConfirmDeleteModalVisible] = useState(false);
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [userReports, setUserReports] = useState<any[]>([]);
+  const [loadingReports, setLoadingReports] = useState(false);
+
+  const fetchUserReports = async () => {
+    setLoadingReports(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/medical-records`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setUserReports(data.data);
+      } else {
+        Alert.alert('Error', 'Failed to fetch reports');
+      }
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Error', 'Network error while fetching reports');
+    } finally {
+      setLoadingReports(false);
+    }
+  };
+
+  const openEditReportsModal = () => {
+    setEditReportsModalVisible(true);
+    fetchUserReports();
+  };
+
+  const handleDeleteRequest = (id: string) => {
+    setSelectedReportId(id);
+    setDeletePassword('');
+    setConfirmDeleteModalVisible(true);
+  };
+
+  const confirmAndDelete = async () => {
+    if (!deletePassword) {
+      Alert.alert('Error', 'Password is required to delete a report');
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/medical-records/${selectedReportId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ password: deletePassword })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        Alert.alert('Success', 'Report successfully deleted');
+        setConfirmDeleteModalVisible(false);
+        fetchUserReports(); // refresh the list
+      } else {
+        Alert.alert('Error', data.message || 'Incorrect password or failed to delete');
+      }
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Error', 'An error occurred during deletion');
     }
   };
 
@@ -873,6 +940,14 @@ const PatientProfileScreen = () => {
             </View>
           </View>
 
+          {/* Edit Reports Button */}
+          <View style={styles.section}>
+            <TouchableOpacity style={[styles.logoutBtn, SHADOWS.small, { backgroundColor: COLORS.primary, borderColor: COLORS.primary }]} onPress={openEditReportsModal}>
+              <FileText size={20} color="#FFF" />
+              <Text style={[styles.logoutBtnText, { color: '#FFF' }]}>Edit Medical Reports</Text>
+            </TouchableOpacity>
+          </View>
+
           {/* Logout Button */}
           <View style={styles.section}>
             <TouchableOpacity style={[styles.logoutBtn, SHADOWS.small]} onPress={handleLogout}>
@@ -960,6 +1035,86 @@ const PatientProfileScreen = () => {
             </View>
           </View>
         </TouchableOpacity>
+      </Modal>
+
+      {/* Edit Reports Modal */}
+      <Modal
+        visible={editReportsModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setEditReportsModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { height: '80%', padding: 0 }]}>
+            <View style={{ padding: 20, borderBottomWidth: 1, borderBottomColor: '#E5E7EB', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={[styles.modalTitle, { marginBottom: 0 }]}>My Medical Reports</Text>
+              <TouchableOpacity onPress={() => setEditReportsModalVisible(false)} style={{ padding: 4 }}>
+                <Text style={{ fontSize: 24, color: '#9CA3AF', fontWeight: 'bold' }}>×</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {loadingReports ? (
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <Text style={{ color: COLORS.textSecondary }}>Loading reports...</Text>
+              </View>
+            ) : userReports.length === 0 ? (
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <Text style={{ color: COLORS.textSecondary }}>No reports found.</Text>
+              </View>
+            ) : (
+              <ScrollView style={{ flex: 1, padding: 20 }}>
+                {userReports.map((report: any) => (
+                  <View key={report._id} style={[styles.infoCard, SHADOWS.small, { marginBottom: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 16, fontWeight: '700', color: COLORS.textHeader }}>{report.title || 'Medical Report'}</Text>
+                      <Text style={{ fontSize: 12, color: COLORS.textSecondary, marginTop: 4 }}>
+                        {new Date(report.recordDate || report.createdAt).toLocaleDateString()}
+                      </Text>
+                    </View>
+                    <TouchableOpacity style={{ padding: 10, backgroundColor: '#FEE2E2', borderRadius: 8 }} onPress={() => handleDeleteRequest(report._id)}>
+                      <Trash2 size={20} color="#EF4444" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Confirm Delete Password Modal */}
+      <Modal
+        visible={confirmDeleteModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setConfirmDeleteModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Confirm Deletion</Text>
+            <Text style={{ fontSize: 14, color: COLORS.textSecondary, marginBottom: 16, textAlign: 'center' }}>
+              Do you really want to delete this report? Please enter your password to confirm.
+            </Text>
+            
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Enter your password"
+              placeholderTextColor="#9CA3AF"
+              secureTextEntry
+              value={deletePassword}
+              onChangeText={setDeletePassword}
+            />
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setConfirmDeleteModalVisible(false)}>
+                <Text style={styles.modalCancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalSaveBtn, { backgroundColor: '#EF4444' }]} onPress={confirmAndDelete}>
+                <Text style={styles.modalSaveBtnText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
 
       <Modal

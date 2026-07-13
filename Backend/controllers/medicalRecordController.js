@@ -1,5 +1,7 @@
 import mongoose from 'mongoose';
 import MedicalRecord from '../model/MedicalRecord.js';
+import User from '../model/User.js';
+import bcrypt from 'bcryptjs';
 
 const listMedicalRecords = async (req, res, next) => {
   try {
@@ -188,9 +190,14 @@ const updateMedicalRecord = async (req, res, next) => {
 const deleteMedicalRecord = async (req, res, next) => {
   try {
     const { id } = req.params;
+    const { password } = req.body;
 
     if (!mongoose.isValidObjectId(id)) {
       return res.status(400).json({ success: false, message: 'Invalid medical record id' });
+    }
+
+    if (!password) {
+      return res.status(400).json({ success: false, message: 'Password is required to delete a record' });
     }
 
     const record = await MedicalRecord.findById(id);
@@ -200,6 +207,17 @@ const deleteMedicalRecord = async (req, res, next) => {
 
     if (req.user.role === 'patient' && record.patient.toString() !== req.user.id) {
       return res.status(403).json({ success: false, message: 'Unauthorized delete action' });
+    }
+
+    // Verify password
+    const user = await User.findById(req.user.id).select('+password');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: 'Incorrect password' });
     }
 
     await MedicalRecord.findByIdAndDelete(id);

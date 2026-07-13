@@ -31,6 +31,7 @@ const DoctorProfileScreen = () => {
 
   // Profile Info State
   const [profileInfo, setProfileInfo] = useState({
+    name: '',
     phone: '',
     email: '',
     hospital: '',
@@ -60,6 +61,7 @@ const DoctorProfileScreen = () => {
           setDoctorName(name.startsWith('Dr.') ? name : `Dr. ${name}`);
           setDoctorSpec(data.specialization || 'General Practitioner');
           setProfileInfo({
+            name: data.name || '',
             phone: data.phone || '+94 77 123 4567',
             email: data.email || 'dr.saman@mediAI.lk',
             hospital: data.hospital || 'National Hospital, Colombo',
@@ -103,6 +105,9 @@ const DoctorProfileScreen = () => {
       });
       if (response.ok) {
         Alert.alert('Success', 'Profile updated successfully!');
+        if (profileInfo.name) {
+          setDoctorName(profileInfo.name.startsWith('Dr.') ? profileInfo.name : `Dr. ${profileInfo.name}`);
+        }
         setEditModalVisible(false);
       } else {
         Alert.alert('Error', 'Failed to update profile');
@@ -311,6 +316,15 @@ const DoctorProfileScreen = () => {
               </TouchableOpacity>
             </View>
             <ScrollView contentContainerStyle={styles.modalBody} showsVerticalScrollIndicator={false}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Full Name</Text>
+                <TextInput
+                  style={styles.input}
+                  value={profileInfo.name}
+                  onChangeText={(t) => setProfileInfo({ ...profileInfo, name: t })}
+                  placeholder="e.g. Saman Kumara"
+                />
+              </View>
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Phone Number</Text>
                 <TextInput

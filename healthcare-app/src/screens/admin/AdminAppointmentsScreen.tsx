@@ -83,6 +83,20 @@ const AdminAppointmentsScreen = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<string>('all');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  
+  const [globalStats, setGlobalStats] = useState({
+    cancelled: 0,
+    pending: 0,
+    completed: 0
+  });
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
   
   // Modal states
   const [modalVisible, setModalVisible] = useState(false);
@@ -93,20 +107,25 @@ const AdminAppointmentsScreen = () => {
     setLoading(true);
     try {
       // 1. Fetch Doctor appointments
-      const apptResponse = await fetch(`${API_BASE_URL}/api/appointments`, {
+      const apptUrl = `${API_BASE_URL}/api/appointments?status=${activeFilter}&search=${encodeURIComponent(debouncedSearchQuery)}`;
+      const apptResponse = await fetch(apptUrl, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
       const apptData = await apptResponse.json();
-      if (apptResponse.ok && apptData.success && apptData.data && apptData.data.length > 0) {
+      if (apptResponse.ok && apptData.success && apptData.data) {
         setAppointments(apptData.data);
+        if (apptData.stats) {
+          if (selectedType === 'doctor') setGlobalStats(apptData.stats);
+        }
       } else {
-        setAppointments(MOCK_APPOINTMENTS);
+        setAppointments([]);
       }
 
       // 2. Fetch Lab test bookings (booked by patients)
-      const labResponse = await fetch(`${API_BASE_URL}/api/labs/bookings?limit=100`, {
+      const labUrl = `${API_BASE_URL}/api/labs/bookings?limit=100&status=${activeFilter}&search=${encodeURIComponent(debouncedSearchQuery)}`;
+      const labResponse = await fetch(labUrl, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -114,6 +133,9 @@ const AdminAppointmentsScreen = () => {
       const labData = await labResponse.json();
       if (labResponse.ok && labData.success) {
         setLabBookings(labData.data || []);
+        if (labData.stats) {
+          if (selectedType === 'lab') setGlobalStats(labData.stats);
+        }
       } else {
         setLabBookings([]);
       }
@@ -129,7 +151,7 @@ const AdminAppointmentsScreen = () => {
     if (token) {
       fetchAllData();
     }
-  }, [token]);
+  }, [token, activeFilter, debouncedSearchQuery, selectedType]);
 
   const handleUpdateStatus = async (id: string, newStatus: string) => {
     try {
@@ -355,61 +377,19 @@ const AdminAppointmentsScreen = () => {
     }
   };
 
-  // Stats derived dynamically based on selectedType
+  // Stats derived dynamically based on globalStats
   const stats = useMemo(() => {
-    if (selectedType === 'doctor') {
-      return {
-        total: appointments.length,
-        pending: appointments.filter(a => a.status === 'pending').length,
-        confirmed: appointments.filter(a => a.status === 'completed').length,
-        confirmedLabel: 'Completed'
-      };
-    } else {
-      return {
-        total: labBookings.length,
-        pending: labBookings.filter(b => b.status === 'Pending').length,
-        confirmed: labBookings.filter(b => b.status === 'Completed').length,
-        confirmedLabel: 'Completed'
-      };
-    }
-  }, [appointments, labBookings, selectedType]);
+    return {
+      cancelled: globalStats.cancelled || 0,
+      pending: globalStats.pending || 0,
+      completed: globalStats.completed || 0
+    };
+  }, [globalStats]);
 
-  // Filters + Search Query matching names and codes
+  // Filters + Search Query are now handled by the backend
   const filteredData = useMemo(() => {
-    if (selectedType === 'doctor') {
-      return appointments.filter(appt => {
-        const matchFilter = activeFilter.toLowerCase() === 'all' || appt.status.toLowerCase() === activeFilter.toLowerCase();
-        const docName = appt.doctor?.name || '';
-        const patName = appt.patient?.name || '';
-        const matchSearch = docName.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                            patName.toLowerCase().includes(searchQuery.toLowerCase());
-        return matchFilter && matchSearch;
-      });
-    } else {
-      return labBookings.filter(booking => {
-        const statusLower = booking.status ? booking.status.toLowerCase() : '';
-        let matchFilter = false;
-        
-        if (activeFilter.toLowerCase() === 'all') {
-          matchFilter = true;
-        } else if (activeFilter.toLowerCase() === 'confirmed') {
-          matchFilter = ['confirmed', 'checked-in', 'sample-collected', 'testing'].includes(statusLower);
-        } else {
-          matchFilter = statusLower === activeFilter.toLowerCase();
-        }
-        
-        const labName = booking.lab?.name || '';
-        const patName = booking.patient?.fullName || '';
-        const refId = booking.bookingRef || '';
-        const nurseName = booking.scheduleSlot?.nurse || '';
-        const matchSearch = labName.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                            patName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            refId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            nurseName.toLowerCase().includes(searchQuery.toLowerCase());
-        return matchFilter && matchSearch;
-      });
-    }
-  }, [appointments, labBookings, selectedType, activeFilter, searchQuery]);
+    return selectedType === 'doctor' ? appointments : labBookings;
+  }, [appointments, labBookings, selectedType]);
 
   const getStatusColor = (status: string) => {
     if (!status) return { bg: '#F3F4F6', text: '#6B7280' };
@@ -423,6 +403,11 @@ const AdminAppointmentsScreen = () => {
       case 'testing': return { bg: '#F5F3FF', text: '#7C3AED' };
       case 'completed': return { bg: '#ECFDF5', text: '#10B981' };
       case 'cancelled': return { bg: '#FEF2F2', text: '#EF4444' };
+      case 'started': return { bg: '#E0E7FF', text: '#4F46E5' };
+      case 'ready': return { bg: '#DCFCE7', text: '#16A34A' };
+      case 'nextin': return { bg: '#FEF9C3', text: '#CA8A04' };
+      case 'in': return { bg: '#DBEAFE', text: '#2563EB' };
+      case 'skipped': return { bg: '#FEE2E2', text: '#DC2626' };
       default: return { bg: '#F3F4F6', text: '#6B7280' };
     }
   };
@@ -477,15 +462,15 @@ const AdminAppointmentsScreen = () => {
 
       {/* Overview Cards */}
       <View style={styles.statsContainer}>
-        <View style={[styles.statCard, SHADOWS.light, { borderLeftColor: '#F59E0B' }]}>
-          <Text style={styles.statLabel}>Total Logs</Text>
+        <View style={[styles.statCard, SHADOWS.light, { borderLeftColor: '#EF4444' }]}>
+          <Text style={styles.statLabel}>Cancelled</Text>
           <View style={styles.statRow}>
-            <Calendar size={20} color="#6B7280" />
-            <Text style={styles.statVal}>{stats.total}</Text>
+            <AlertTriangle size={20} color="#EF4444" />
+            <Text style={[styles.statVal, { color: '#EF4444' }]}>{stats.cancelled}</Text>
           </View>
         </View>
 
-        <View style={[styles.statCard, SHADOWS.light, { borderLeftColor: '#3B82F6' }]}>
+        <View style={[styles.statCard, SHADOWS.light, { borderLeftColor: '#F59E0B' }]}>
           <Text style={styles.statLabel}>Pending</Text>
           <View style={styles.statRow}>
             <Clock size={20} color="#F59E0B" />
@@ -494,10 +479,10 @@ const AdminAppointmentsScreen = () => {
         </View>
 
         <View style={[styles.statCard, SHADOWS.light, { borderLeftColor: '#10B981' }]}>
-          <Text style={styles.statLabel}>{stats.confirmedLabel}</Text>
+          <Text style={styles.statLabel}>Completed</Text>
           <View style={styles.statRow}>
             <CheckCircle size={20} color="#10B981" />
-            <Text style={[styles.statVal, { color: '#10B981' }]}>{stats.confirmed}</Text>
+            <Text style={[styles.statVal, { color: '#10B981' }]}>{stats.completed}</Text>
           </View>
         </View>
       </View>
@@ -529,7 +514,11 @@ const AdminAppointmentsScreen = () => {
         <FlatList 
           horizontal
           showsHorizontalScrollIndicator={false}
-          data={['all', 'pending', 'confirmed', 'completed', 'cancelled'] as const}
+          data={
+            selectedType === 'doctor' 
+              ? (['all', 'pending', 'today', 'activeIN', 'completed', 'cancelled'] as const)
+              : (['all', 'pending', 'confirmed', 'completed', 'cancelled'] as const)
+          }
           keyExtractor={(item) => item}
           contentContainerStyle={styles.tabsList}
           renderItem={({ item }) => (
@@ -1112,9 +1101,9 @@ const styles = StyleSheet.create({
   },
   appointmentCard: {
     backgroundColor: '#FFF',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: '#F3F4F6'
   },
@@ -1129,9 +1118,9 @@ const styles = StyleSheet.create({
     flex: 1
   },
   avatarPlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: '#F3E8FF',
     justifyContent: 'center',
     alignItems: 'center',
@@ -1164,7 +1153,7 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     backgroundColor: '#F3F4F6',
-    marginVertical: 12
+    marginVertical: 8
   },
   cardBody: {
     paddingHorizontal: 2
@@ -1191,9 +1180,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     backgroundColor: '#F9FAFB',
-    borderRadius: 10,
-    padding: 10,
-    marginTop: 12
+    borderRadius: 8,
+    padding: 8,
+    marginTop: 8
   },
   infoCol: {
     flex: 1
@@ -1214,10 +1203,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: 8,
-    marginTop: 14,
+    marginTop: 10,
     borderTopWidth: 1,
     borderTopColor: '#F3F4F6',
-    paddingTop: 12
+    paddingTop: 10
   },
   actionBtn: {
     flexDirection: 'row',
