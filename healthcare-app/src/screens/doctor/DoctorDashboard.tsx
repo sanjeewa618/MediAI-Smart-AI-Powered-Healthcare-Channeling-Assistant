@@ -111,11 +111,14 @@ const DoctorDashboard = () => {
     }
   };
 
-  useEffect(() => {
-    if (token) {
-      fetchDashboardData();
-    }
-  }, [token]);
+  // Refresh data every time the screen comes into focus (e.g. returning from DoctorSession)
+  useFocusEffect(
+    useCallback(() => {
+      if (token) {
+        fetchDashboardData();
+      }
+    }, [token])
+  );
 
   const handleStartSessionFromDashboard = async (slot: any) => {
     try {

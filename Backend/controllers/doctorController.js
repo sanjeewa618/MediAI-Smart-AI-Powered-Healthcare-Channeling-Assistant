@@ -33,17 +33,12 @@ export const getDoctorDashboard = async (req, res) => {
     const todayAppointments = await Appointment.find({
       doctor: req.user._id,
       date: { $gte: todayStart, $lte: todayEnd },
-      status: { $in: ['confirmed', 'started', 'ready', 'in', 'skipped', 'completed'] }
+      status: { $in: ['pending', 'confirmed', 'started', 'ready', 'in', 'skipped', 'completed'] }
     }).populate('patient', 'name email phone').sort({ queueNumber: 1 });
 
     const todayAppointmentsCount = todayAppointments.length;
     const completedTodayCount = todayAppointments.filter(app => app.status === 'completed').length;
-
-    // Count ALL pending appointments for this doctor (regardless of date)
-    const pendingApprovalsCount = await Appointment.countDocuments({
-      doctor: req.user._id,
-      status: 'pending'
-    });
+    const pendingTodayCount = todayAppointments.filter(app => app.status === 'pending').length;
 
     // 4. Fetch today's slots
     const today = new Date();
@@ -80,7 +75,7 @@ export const getDoctorDashboard = async (req, res) => {
         stats: {
           totalPatients: completedTodayCount,
           todayAppointments: todayAppointmentsCount,
-          pendingApprovals: pendingApprovalsCount
+          pendingApprovals: pendingTodayCount
         },
         upcomingAppointments,
         todayAppointments,
