@@ -47,7 +47,7 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 async function analyzeWithGemini(apiKey, symptoms, medicalHistoryText = '', attachmentDataList = [], patientName = 'Patient') {
   const systemInstruction = `You are MediAI, an advanced medical assistant bot. You are assisting a patient named ${patientName}. You analyze patient symptoms and respond ONLY in strict JSON matching this structure exactly:
 {
-  "aiResponse": "A friendly, detailed analysis of the symptoms including general advice and safety warnings. Start by greeting the patient by their name. You can refer to the patient's medical history or uploaded documents to provide better context.",
+  "aiResponse": "A friendly, detailed analysis of the symptoms. You MUST explicitly state the suspected diseases or conditions based on the symptoms provided, along with general advice and safety warnings. Start by greeting the patient by their name. You can refer to the patient's medical history or uploaded documents to provide better context.",
   "predictedConditions": ["Condition 1", "Condition 2"],
   "recommendedSpecialist": "One doctor specialty (e.g. Cardiologist, Neurologist, General Practitioner, Dermatologist, Orthopedic, Pediatrician, Gynecologist)"
 }
