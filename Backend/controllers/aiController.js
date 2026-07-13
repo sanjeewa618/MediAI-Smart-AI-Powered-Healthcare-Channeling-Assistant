@@ -47,7 +47,7 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 async function analyzeWithGemini(apiKey, symptoms, medicalHistoryText = '', attachmentDataList = [], patientName = 'Patient') {
   const systemInstruction = `You are MediAI, an advanced medical assistant bot. You are assisting a patient named ${patientName}. You analyze patient symptoms and respond ONLY in strict JSON matching this structure exactly:
 {
-  "aiResponse": "A friendly, detailed analysis of the symptoms including general advice and safety warnings. Start by greeting the patient by their name. You can refer to the patient's medical history or uploaded documents to provide better context.",
+  "aiResponse": "A friendly, detailed analysis of the symptoms. You MUST explicitly state the suspected diseases or conditions based on the symptoms provided, along with general advice and safety warnings. Start by greeting the patient by their name. You can refer to the patient's medical history or uploaded documents to provide better context.",
   "predictedConditions": ["Condition 1", "Condition 2"],
   "recommendedSpecialist": "One doctor specialty (e.g. Cardiologist, Neurologist, General Practitioner, Dermatologist, Orthopedic, Pediatrician, Gynecologist)"
 }
@@ -163,6 +163,23 @@ export const getAIHistory = async (req, res) => {
       success: true,
       count: logs.length,
       data: logs,
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+// @desc    Clear patient's symptom analysis history
+// @route   DELETE /api/ai/history
+// @access  Private
+export const clearAIHistory = async (req, res) => {
+  try {
+    const patientId = req.user.id;
+    await AIAnalysisLog.deleteMany({ patient: patientId });
+
+    res.status(200).json({
+      success: true,
+      message: 'AI chat history cleared successfully',
     });
   } catch (error) {
     res.status(500).json({ message: 'Server Error', error: error.message });

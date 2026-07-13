@@ -133,7 +133,14 @@ export const getAllDoctors = async (req, res) => {
     
     // Optional filter by specialty from query string: ?specialty=Cardiology
     if (req.query.specialty && req.query.specialty !== 'All') {
-      filter.specialization = req.query.specialty;
+      const searchStr = req.query.specialty;
+      if (searchStr.toLowerCase().includes('general')) {
+        filter.specialization = { $regex: 'General', $options: 'i' };
+      } else {
+        // Strip common suffixes to match variations like Cardiology <-> Cardiologist
+        const baseSpecialty = searchStr.replace(/(ist|y|ian|ic|ics|s)$/i, '');
+        filter.specialization = { $regex: baseSpecialty, $options: 'i' };
+      }
     }
 
     // Optional text search by name

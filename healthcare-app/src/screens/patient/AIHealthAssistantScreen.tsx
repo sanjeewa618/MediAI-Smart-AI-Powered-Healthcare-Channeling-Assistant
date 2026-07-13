@@ -7,7 +7,7 @@ import {
 import { COLORS, SHADOWS } from '../../theme/theme';
 import {
   Send, Mic, ChevronLeft, Sparkles, Brain, Shield,
-  Clock, Stethoscope, ChevronRight, X,
+  Clock, Stethoscope, ChevronRight, X, User, MoreVertical
 } from 'lucide-react-native';
 import BottomNavBar from '../../components/BottomNavBar';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -16,7 +16,7 @@ import { useAuth } from '../../context/AuthContext';
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
-type Message = { id: number; text: string; sender: 'ai' | 'user' };
+type Message = { id: number; text: string; sender: 'ai' | 'user'; recommendedSpecialist?: string };
 
 // ─── AI Feature highlights ───────────────────────────────────────────────────
 const AI_FEATURES = [
@@ -73,8 +73,34 @@ const AIHealthAssistantScreen = ({ navigation }: any) => {
   const [isTyping, setIsTyping]     = useState(false);
   const [showFeatures, setShowFeatures] = useState(true);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const typingDot = useRef(new Animated.Value(0)).current;
+
+  // Clear History Handler
+  const handleClearHistory = async () => {
+    setShowMenu(false);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/ai/history`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
+        setMessages([
+          {
+            id: 1,
+            text: "👋 Hi! I'm MediAI, your personal health assistant powered by AI.\n\nTell me how you're feeling or pick a quick option below — I'll help you understand your symptoms and find the right care.",
+            sender: 'ai',
+          }
+        ]);
+        setShowFeatures(true);
+      }
+    } catch (error) {
+      console.error('Failed to clear history:', error);
+    }
+  };
 
   // Show/hide bottom nav with keyboard
   useEffect(() => {
@@ -90,6 +116,61 @@ const AIHealthAssistantScreen = ({ navigation }: any) => {
       hideSub.remove();
     };
   }, []);
+
+  // Fetch Chat History (Last 3 Days)
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/ai/history`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const data = await response.json();
+        
+        if (response.ok && data.success && data.data.length > 0) {
+          const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+          const now = Date.now();
+          
+          // Filter logs from the last 3 days and reverse to chronological order
+          const recentLogs = data.data
+            .filter((log: any) => now - new Date(log.createdAt).getTime() <= THREE_DAYS_MS)
+            .reverse();
+
+          if (recentLogs.length > 0) {
+            setShowFeatures(false);
+            
+            const historyMessages: Message[] = [];
+            let msgIdCounter = Date.now() - 100000; // to avoid id collision
+            
+            recentLogs.forEach((log: any) => {
+              historyMessages.push({
+                id: msgIdCounter++,
+                text: log.symptomsProvided,
+                sender: 'user'
+              });
+              
+              historyMessages.push({
+                id: msgIdCounter++,
+                text: log.aiResponse,
+                sender: 'ai',
+                recommendedSpecialist: log.recommendedSpecialist
+              });
+            });
+            
+            setMessages(prev => [...prev, ...historyMessages]);
+            setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch AI history:', error);
+      }
+    };
+    
+    if (token) {
+      fetchHistory();
+    }
+  }, [token]);
 
   // Typing indicator animation
   useEffect(() => {
@@ -128,7 +209,12 @@ const AIHealthAssistantScreen = ({ navigation }: any) => {
       if (response.ok && data.success) {
         setMessages(prev => [
           ...prev,
-          { id: Date.now() + 1, text: data.data.aiResponse, sender: 'ai' },
+          { 
+            id: Date.now() + 1, 
+            text: data.data.aiResponse, 
+            sender: 'ai',
+            recommendedSpecialist: data.data.recommendedSpecialist
+          },
         ]);
       } else {
         setMessages(prev => [
@@ -158,7 +244,7 @@ const AIHealthAssistantScreen = ({ navigation }: any) => {
       >
 
         {/* ── Header ─────────────────────────────────────────────── */}
-        <LinearGradient colors={COLORS.screenHeaderGradient} style={styles.header}>
+        <LinearGradient colors={COLORS.screenHeaderGradient} style={[styles.header, { zIndex: 10 }]}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <ChevronLeft size={26} color="#FFF" />
           </TouchableOpacity>
@@ -174,9 +260,25 @@ const AIHealthAssistantScreen = ({ navigation }: any) => {
             </View>
           </View>
 
-          <TouchableOpacity style={styles.headerIconBtn}>
-            <Sparkles size={20} color="#FFD700" fill="#FFD700" />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <TouchableOpacity style={styles.headerIconBtn}>
+              <Sparkles size={20} color="#FFD700" fill="#FFD700" />
+            </TouchableOpacity>
+
+            <View style={{ zIndex: 100 }}>
+              <TouchableOpacity style={styles.headerIconBtn} onPress={() => setShowMenu(!showMenu)}>
+                <MoreVertical size={20} color="#FFF" />
+              </TouchableOpacity>
+              
+              {showMenu && (
+                <View style={styles.dropdownMenu}>
+                  <TouchableOpacity style={styles.dropdownItem} onPress={handleClearHistory}>
+                    <Text style={styles.dropdownItemText}>Clear History</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          </View>
         </LinearGradient>
 
         {/* ── Chat Area ──────────────────────────────────────────── */}
@@ -186,6 +288,7 @@ const AIHealthAssistantScreen = ({ navigation }: any) => {
           contentContainerStyle={styles.chatContent}
           showsVerticalScrollIndicator={false}
           onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
+          onTouchStart={() => { if (showMenu) setShowMenu(false); }}
         >
 
           {/* AI Feature highlight cards (shown only at start) */}
@@ -208,24 +311,42 @@ const AIHealthAssistantScreen = ({ navigation }: any) => {
 
           {/* Messages */}
           {messages.map(msg => (
-            <View
-              key={msg.id}
-              style={[styles.msgRow, msg.sender === 'user' ? styles.userRow : styles.aiRow]}
-            >
-              {msg.sender === 'ai' && (
-                <View style={styles.aiBotAvatar}>
-                  <Image source={require('../../../assets/bot2.jpg')} style={styles.botAvatarImg} />
+            <View key={msg.id} style={{ marginBottom: 14 }}>
+              <View
+                style={[styles.msgRow, msg.sender === 'user' ? styles.userRow : styles.aiRow, { marginBottom: msg.recommendedSpecialist ? 8 : 0 }]}
+              >
+                {msg.sender === 'ai' && (
+                  <View style={styles.aiBotAvatar}>
+                    <Image source={require('../../../assets/bot2.jpg')} style={styles.botAvatarImg} />
+                  </View>
+                )}
+                <View style={[
+                  styles.bubble,
+                  msg.sender === 'user' ? styles.userBubble : styles.aiBubble,
+                  SHADOWS.small,
+                ]}>
+                  <Text style={msg.sender === 'user' ? styles.userBubbleText : styles.aiBubbleText}>
+                    {msg.text}
+                  </Text>
+                </View>
+              </View>
+              {msg.recommendedSpecialist && (
+                <View style={styles.specialistSuggestionContainer}>
+                   <View style={styles.specialistIconWrap}>
+                     <User size={18} color={COLORS.primary} />
+                   </View>
+                   <View style={{ flex: 1 }}>
+                     <Text style={styles.specialistLabel}>Suggested Specialist</Text>
+                     <Text style={styles.specialistName}>{msg.recommendedSpecialist}</Text>
+                   </View>
+                   <TouchableOpacity
+                     style={styles.bookBtn}
+                     onPress={() => navigation.navigate('SpecialtyDoctors', { specialty: msg.recommendedSpecialist })}
+                   >
+                     <Text style={styles.bookBtnText}>Find</Text>
+                   </TouchableOpacity>
                 </View>
               )}
-              <View style={[
-                styles.bubble,
-                msg.sender === 'user' ? styles.userBubble : styles.aiBubble,
-                SHADOWS.small,
-              ]}>
-                <Text style={msg.sender === 'user' ? styles.userBubbleText : styles.aiBubbleText}>
-                  {msg.text}
-                </Text>
-              </View>
             </View>
           ))}
 
@@ -335,6 +456,32 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.18)',
     alignItems: 'center', justifyContent: 'center',
   },
+  
+  // Dropdown Menu
+  dropdownMenu: {
+    position: 'absolute',
+    top: 45,
+    right: 0,
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    paddingVertical: 8,
+    minWidth: 140,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+    zIndex: 100,
+  },
+  dropdownItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  dropdownItemText: {
+    fontSize: 14,
+    color: '#EF4444',
+    fontWeight: '600',
+  },
 
   // Chat
   chatScroll: { flex: 1 },
@@ -371,6 +518,34 @@ const styles = StyleSheet.create({
   aiBubbleText:  { fontSize: 14, color: '#1F2937', lineHeight: 22 },
   userBubbleText: { fontSize: 14, color: '#FFF', lineHeight: 22 },
   typingText: { fontSize: 13, color: '#9CA3AF', fontStyle: 'italic' },
+  
+  // Specialist Suggestion Card
+  specialistSuggestionContainer: {
+    marginLeft: 42,
+    marginRight: '15%',
+    backgroundColor: '#F3F0FF',
+    borderRadius: 16,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 4,
+  },
+  specialistIconWrap: {
+    width: 36, height: 36,
+    borderRadius: 10,
+    backgroundColor: '#FFF',
+    alignItems: 'center', justifyContent: 'center'
+  },
+  specialistLabel: { fontSize: 11, color: '#6B7280', fontWeight: '500' },
+  specialistName: { fontSize: 13, color: '#1F2937', fontWeight: '800' },
+  bookBtn: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  bookBtnText: { color: '#FFF', fontSize: 12, fontWeight: '700' },
 
   // Chips
   chipsScroll: { maxHeight: 54 },
