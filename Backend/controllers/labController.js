@@ -560,12 +560,25 @@ const listBookings = async (req, res, next) => {
       }
     }
 
-    const validStatuses = ['Pending', 'Confirmed', 'Checked-In', 'Sample-Collected', 'Testing', 'Completed', 'Cancelled'];
-    if (status) {
-      if (!validStatuses.includes(status)) {
-        return res.status(400).json({ success: false, message: `status must be one of: ${validStatuses.join(', ')}` });
+    if (status && status !== 'all') {
+      const statusLower = status.toLowerCase();
+      if (statusLower === 'today' || statusLower === 'activein') {
+        filter.status = { $in: ['Confirmed', 'Checked-In', 'Sample-Collected', 'Testing'] };
+      } else {
+        const validStatuses = ['Pending', 'Confirmed', 'Checked-In', 'Sample-Collected', 'Testing', 'Completed', 'Cancelled'];
+        const matchedStatus = validStatuses.find(s => s.toLowerCase() === statusLower);
+        if (matchedStatus) {
+          filter.status = matchedStatus;
+        }
       }
-      filter.status = status;
+    }
+
+    if (req.query.search) {
+      const searchRegex = new RegExp(req.query.search, 'i');
+      filter.$or = [
+        { 'patient.fullName': searchRegex },
+        { bookingRef: searchRegex }
+      ];
     }
 
     if (date) {
@@ -599,10 +612,21 @@ const listBookings = async (req, res, next) => {
       LabBooking.countDocuments(filter),
     ]);
 
+    let globalStats = null;
+    if (req.user && req.user.role === 'admin') {
+      const allBookings = await LabBooking.find({});
+      globalStats = {
+        cancelled: allBookings.filter(b => b.status === 'Cancelled').length,
+        pending: allBookings.filter(b => b.status === 'Pending').length,
+        completed: allBookings.filter(b => b.status === 'Completed').length,
+      };
+    }
+
     res.status(200).json({
       success: true,
       data: bookings,
       meta: { total, page: pageNum, limit: pageSize, totalPages: Math.ceil(total / pageSize) },
+      stats: globalStats
     });
   } catch (err) {
     next(err);

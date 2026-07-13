@@ -83,6 +83,20 @@ const AdminAppointmentsScreen = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<string>('all');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  
+  const [globalStats, setGlobalStats] = useState({
+    cancelled: 0,
+    pending: 0,
+    completed: 0
+  });
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
   
   // Modal states
   const [modalVisible, setModalVisible] = useState(false);
@@ -93,20 +107,25 @@ const AdminAppointmentsScreen = () => {
     setLoading(true);
     try {
       // 1. Fetch Doctor appointments
-      const apptResponse = await fetch(`${API_BASE_URL}/api/appointments`, {
+      const apptUrl = `${API_BASE_URL}/api/appointments?status=${activeFilter}&search=${encodeURIComponent(debouncedSearchQuery)}`;
+      const apptResponse = await fetch(apptUrl, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
       const apptData = await apptResponse.json();
-      if (apptResponse.ok && apptData.success && apptData.data && apptData.data.length > 0) {
+      if (apptResponse.ok && apptData.success && apptData.data) {
         setAppointments(apptData.data);
+        if (apptData.stats) {
+          if (selectedType === 'doctor') setGlobalStats(apptData.stats);
+        }
       } else {
-        setAppointments(MOCK_APPOINTMENTS);
+        setAppointments([]);
       }
 
       // 2. Fetch Lab test bookings (booked by patients)
-      const labResponse = await fetch(`${API_BASE_URL}/api/labs/bookings?limit=100`, {
+      const labUrl = `${API_BASE_URL}/api/labs/bookings?limit=100&status=${activeFilter}&search=${encodeURIComponent(debouncedSearchQuery)}`;
+      const labResponse = await fetch(labUrl, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -114,6 +133,9 @@ const AdminAppointmentsScreen = () => {
       const labData = await labResponse.json();
       if (labResponse.ok && labData.success) {
         setLabBookings(labData.data || []);
+        if (labData.stats) {
+          if (selectedType === 'lab') setGlobalStats(labData.stats);
+        }
       } else {
         setLabBookings([]);
       }
@@ -129,7 +151,7 @@ const AdminAppointmentsScreen = () => {
     if (token) {
       fetchAllData();
     }
-  }, [token]);
+  }, [token, activeFilter, debouncedSearchQuery, selectedType]);
 
   const handleUpdateStatus = async (id: string, newStatus: string) => {
     try {
@@ -355,72 +377,19 @@ const AdminAppointmentsScreen = () => {
     }
   };
 
-  // Stats derived dynamically based on selectedType
+  // Stats derived dynamically based on globalStats
   const stats = useMemo(() => {
-    if (selectedType === 'doctor') {
-      return {
-        cancelled: appointments.filter(a => a.status === 'cancelled').length,
-        pending: appointments.filter(a => a.status === 'pending').length,
-        completed: appointments.filter(a => a.status === 'completed').length
-      };
-    } else {
-      return {
-        cancelled: labBookings.filter(b => b.status === 'Cancelled').length,
-        pending: labBookings.filter(b => b.status === 'Pending').length,
-        completed: labBookings.filter(b => b.status === 'Completed').length
-      };
-    }
-  }, [appointments, labBookings, selectedType]);
+    return {
+      cancelled: globalStats.cancelled || 0,
+      pending: globalStats.pending || 0,
+      completed: globalStats.completed || 0
+    };
+  }, [globalStats]);
 
-  // Filters + Search Query matching names and codes
+  // Filters + Search Query are now handled by the backend
   const filteredData = useMemo(() => {
-    if (selectedType === 'doctor') {
-      return appointments.filter(appt => {
-        const statusLower = appt.status.toLowerCase();
-        let matchFilter = false;
-        
-        if (activeFilter.toLowerCase() === 'all') {
-          matchFilter = true;
-        } else if (activeFilter.toLowerCase() === 'today') {
-          matchFilter = ['started', 'ready', 'nextin', 'skipped'].includes(statusLower);
-        } else if (activeFilter.toLowerCase() === 'activein') {
-          matchFilter = ['ready', 'nextin', 'in'].includes(statusLower);
-        } else {
-          matchFilter = statusLower === activeFilter.toLowerCase();
-        }
-        
-        const docName = appt.doctor?.name || '';
-        const patName = appt.patient?.name || '';
-        const matchSearch = docName.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                            patName.toLowerCase().includes(searchQuery.toLowerCase());
-        return matchFilter && matchSearch;
-      });
-    } else {
-      return labBookings.filter(booking => {
-        const statusLower = booking.status ? booking.status.toLowerCase() : '';
-        let matchFilter = false;
-        
-        if (activeFilter.toLowerCase() === 'all') {
-          matchFilter = true;
-        } else if (activeFilter.toLowerCase() === 'today' || activeFilter.toLowerCase() === 'activein') {
-          // Lab bookings do not use these statuses, so default to confirmed/in-progress equivalent
-          matchFilter = ['confirmed', 'checked-in', 'sample-collected', 'testing'].includes(statusLower);
-        } else {
-          matchFilter = statusLower === activeFilter.toLowerCase();
-        }
-        
-        const labName = booking.lab?.name || '';
-        const patName = booking.patient?.fullName || '';
-        const refId = booking.bookingRef || '';
-        const nurseName = booking.scheduleSlot?.nurse || '';
-        const matchSearch = labName.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                            patName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            refId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            nurseName.toLowerCase().includes(searchQuery.toLowerCase());
-        return matchFilter && matchSearch;
-      });
-    }
-  }, [appointments, labBookings, selectedType, activeFilter, searchQuery]);
+    return selectedType === 'doctor' ? appointments : labBookings;
+  }, [appointments, labBookings, selectedType]);
 
   const getStatusColor = (status: string) => {
     if (!status) return { bg: '#F3F4F6', text: '#6B7280' };

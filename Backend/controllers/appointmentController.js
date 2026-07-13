@@ -173,7 +173,41 @@ export const getMyAppointments = async (req, res) => {
       filter.date = { $gte: startOfDay, $lte: endOfDay };
     }
 
-    // If an Admin hits this route, they see everything because filter remains {}
+    // Optional status filter
+    if (req.query.status && req.query.status !== 'all') {
+      const statusStr = String(req.query.status).toLowerCase();
+      if (statusStr === 'today') {
+        filter.status = { $in: ['started', 'ready', 'nextin', 'skipped'] };
+      } else if (statusStr === 'activein') {
+        filter.status = { $in: ['ready', 'nextin', 'in'] };
+      } else {
+        filter.status = statusStr;
+      }
+    }
+
+    // Optional search filter
+    if (req.query.search) {
+      const searchRegex = new RegExp(req.query.search, 'i');
+      const matchingUsers = await User.find({ name: searchRegex }).select('_id');
+      const userIds = matchingUsers.map(u => u._id);
+      
+      filter.$or = [
+        { patient: { $in: userIds } },
+        { doctor: { $in: userIds } }
+      ];
+    }
+
+    // If an Admin hits this route, they see everything matching the filters.
+    // Calculate global stats for admin before returning.
+    let globalStats = null;
+    if (req.user.role === 'admin') {
+      const allAppts = await Appointment.find({});
+      globalStats = {
+        cancelled: allAppts.filter(a => a.status === 'cancelled').length,
+        pending: allAppts.filter(a => a.status === 'pending').length,
+        completed: allAppts.filter(a => a.status === 'completed').length,
+      };
+    }
 
     const appointments = await Appointment.find(filter)
       .populate('patient', 'name email phone')
@@ -183,7 +217,8 @@ export const getMyAppointments = async (req, res) => {
     res.json({
       success: true,
       count: appointments.length,
-      data: appointments
+      data: appointments,
+      stats: globalStats
     });
   } catch (error) {
     res.status(500).json({ message: 'Server Error', error: error.message });
