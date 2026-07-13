@@ -1,4 +1,7 @@
 import AIAnalysisLog from '../model/AIAnalysisLog.js';
+import MedicalRecord from '../model/MedicalRecord.js';
+import fs from 'fs';
+import path from 'path';
 
 // ── Current Gemini model names to try in order (most recent first) ────────────
 const GEMINI_MODELS = [
@@ -40,13 +43,16 @@ async function callGemini(apiKey, modelName, messages) {
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 // ── Try each model name until one works ──────────────────────────────────────
-async function analyzeWithGemini(apiKey, symptoms) {
+async function analyzeWithGemini(apiKey, symptoms, medicalHistoryText = '', attachmentDataList = []) {
   const systemInstruction = `You are MediAI, an advanced medical assistant bot. You analyze patient symptoms and respond ONLY in strict JSON matching this structure exactly:
 {
-  "aiResponse": "A friendly, detailed analysis of the symptoms including general advice and safety warnings.",
+  "aiResponse": "A friendly, detailed analysis of the symptoms including general advice and safety warnings. You can refer to the patient's medical history or uploaded documents to provide better context.",
   "predictedConditions": ["Condition 1", "Condition 2"],
   "recommendedSpecialist": "One doctor specialty (e.g. Cardiologist, Neurologist, General Practitioner, Dermatologist, Orthopedic, Pediatrician, Gynecologist)"
-}`;
+}
+
+Patient's Medical History:
+${medicalHistoryText || 'No medical history available.'}`;
 
   const messages = [
     {
@@ -57,6 +63,17 @@ async function analyzeWithGemini(apiKey, symptoms) {
       ],
     },
   ];
+
+  if (attachmentDataList && attachmentDataList.length > 0) {
+    for (const attachment of attachmentDataList) {
+      messages[0].parts.push({
+        inlineData: {
+          mimeType: attachment.mimeType,
+          data: attachment.base64Data
+        }
+      });
+    }
+  }
 
   let lastError = null;
   const MAX_RETRIES = 3;
@@ -111,7 +128,8 @@ export const analyzeSymptoms = async (req, res) => {
     }
 
     // Try all available Gemini models until one succeeds
-    const parsedData = await analyzeWithGemini(apiKey, symptoms);
+    const context = await fetchPatientContext(patientId);
+    const parsedData = await analyzeWithGemini(apiKey, symptoms, context.formattedRecords, context.attachmentDataList);
 
     // Save the successful analysis to DB
     const log = await AIAnalysisLog.create({
@@ -147,3 +165,142 @@ export const getAIHistory = async (req, res) => {
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
+
+async function chatWithGemini(apiKey, message, medicalHistoryText, attachmentDataList = []) {
+  const systemInstruction = `You are MediAI, an advanced medical assistant bot. A patient is asking you a question about their medical reports. Use their provided medical history and any attached documents to answer accurately, safely, and politely. DO NOT provide a JSON response. Respond in plain conversational text or markdown. If their question is unrelated to medical context, answer it briefly but remind them you are a medical assistant.
+
+Patient's Medical History:
+${medicalHistoryText || 'No medical history available.'}`;
+
+  const messages = [
+    {
+      role: 'user',
+      parts: [
+        { text: systemInstruction },
+        { text: `Patient Question: "${message}"` },
+      ],
+    },
+  ];
+
+  // Append multimodal attachments if present
+  if (attachmentDataList && attachmentDataList.length > 0) {
+    for (const attachment of attachmentDataList) {
+      messages[0].parts.push({
+        inlineData: {
+          mimeType: attachment.mimeType,
+          data: attachment.base64Data
+        }
+      });
+    }
+  }
+
+  let lastError = null;
+  const MAX_RETRIES = 3;
+
+  for (const modelName of GEMINI_MODELS) {
+    let attempt = 0;
+    while (attempt <= MAX_RETRIES) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+        const body = {
+          contents: messages,
+          // Removed responseMimeType to allow plain text/markdown
+        };
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`[${response.status}] ${errText}`);
+        }
+        const data = await response.json();
+        const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!aiText) throw new Error('Empty response from model');
+        return aiText;
+      } catch (err) {
+        lastError = err;
+        const errMsg = err.message || '';
+        if (errMsg.includes('429') || errMsg.includes('503')) {
+          await sleep(Math.pow(2, attempt) * 1000);
+          attempt++;
+        } else {
+          break;
+        }
+      }
+    }
+  }
+  throw new Error(`All Gemini models failed. Last error: ${lastError?.message}`);
+}
+
+async function fetchPatientContext(patientId) {
+  const records = await MedicalRecord.find({ patient: patientId }).sort({ date: -1 }).limit(10);
+    
+  let formattedRecords = '';
+  const attachmentDataList = [];
+
+  if (records.length > 0) {
+    formattedRecords = records.map((r, i) => {
+      let details = `Report ${i + 1}:\n- Title: ${r.title}\n- Date: ${new Date(r.date || r.createdAt).toLocaleDateString()}\n- Type: ${r.category || r.type}\n`;
+      if (r.hospital) details += `- Hospital/Lab: ${r.hospital}\n`;
+      if (r.doctor) details += `- Doctor: ${r.doctor}\n`;
+      if (r.doctorNotes) details += `- Notes: ${r.doctorNotes}\n`;
+      if (r.values && Object.keys(r.values).length > 0) {
+        details += `- Values: ${JSON.stringify(r.values)}\n`;
+      }
+      
+      if (i < 3 && r.attachments && r.attachments.length > 0) {
+        for (const attachmentPath of r.attachments) {
+          try {
+            const fullPath = path.join(process.cwd(), attachmentPath);
+            if (fs.existsSync(fullPath)) {
+              const fileBuffer = fs.readFileSync(fullPath);
+              const base64Data = fileBuffer.toString('base64');
+              
+              const ext = path.extname(fullPath).toLowerCase();
+              let mimeType = 'image/jpeg';
+              if (ext === '.pdf') mimeType = 'application/pdf';
+              else if (ext === '.png') mimeType = 'image/png';
+              else if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
+
+              attachmentDataList.push({ base64Data, mimeType });
+            }
+          } catch (err) {
+            console.error(`Failed to load attachment ${attachmentPath}:`, err.message);
+          }
+        }
+      }
+      
+      return details;
+    }).join('\n');
+  }
+
+  return { formattedRecords, attachmentDataList };
+}
+
+export const analyzeReports = async (req, res) => {
+  try {
+    const { message } = req.body;
+    const patientId = req.user.id;
+
+    if (!message) {
+      return res.status(400).json({ message: 'Message is required' });
+    }
+
+    const apiKey = process.env.Gemini_API_KEY || process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ message: 'Gemini API Key is missing on the server' });
+    }
+
+    const context = await fetchPatientContext(patientId);
+    
+    const aiResponse = await chatWithGemini(apiKey, message, context.formattedRecords, context.attachmentDataList);
+
+    res.status(200).json({ success: true, data: { reply: aiResponse } });
+  } catch (error) {
+    console.error('Gemini Chat Error:', error.message);
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+

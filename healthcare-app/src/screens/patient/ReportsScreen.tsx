@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, TextInput, Modal, Platform, ActivityIndicator, Alert, Image, Linking, Animated, PanResponder } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
-import { FileText, Search, Filter, Bell, ArrowLeft, Download, Share2, Eye, Upload, CheckCircle2, Clock, Plus, Calendar, ChevronDown } from 'lucide-react-native';
+import { FileText, Search, Filter, Bell, ArrowLeft, Download, Share2, Eye, Upload, CheckCircle2, Clock, Plus, Calendar, ChevronDown, Brain } from 'lucide-react-native';
 import BottomNavBar from '../../components/BottomNavBar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
@@ -643,6 +643,16 @@ const ReportsScreen = () => {
           </SafeAreaView>
         </Modal>
 
+        {/* AI Chat FAB */}
+        <TouchableOpacity 
+          style={styles.aiFab} 
+          onPress={() => (navigation as any).navigate('PatientAIChat')}
+        >
+          <LinearGradient colors={['#8B3DFF', '#5F0FFF']} style={styles.aiFabGradient}>
+            <Brain size={24} color="#FFF" />
+          </LinearGradient>
+        </TouchableOpacity>
+
         <BottomNavBar />
       </View>
     </SafeAreaView>
@@ -690,6 +700,35 @@ const styles = StyleSheet.create({
   headerSub: {
     fontSize: 13,
     color: 'rgba(255,255,255,0.8)',
+  },
+  statusIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  aiFab: {
+    position: 'absolute',
+    bottom: 200,
+    right: 24,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    elevation: 8,
+    shadowColor: '#8B3DFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  aiFabGradient: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   notificationBtn: {
     width: 44,
@@ -970,7 +1009,7 @@ const styles = StyleSheet.create({
   },
   fab: {
     position: 'absolute',
-    bottom: 100,
+    bottom: 125,
     right: 24,
     width: 60,
     height: 60,
