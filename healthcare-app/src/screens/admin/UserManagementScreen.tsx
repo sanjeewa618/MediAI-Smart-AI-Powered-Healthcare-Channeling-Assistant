@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import {
   ScrollView,
   Platform
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import { useAuth } from '../../context/AuthContext';
@@ -30,7 +30,7 @@ import {
 } from 'lucide-react-native';
 import AdminBottomNavBar from '../../components/AdminBottomNavBar';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.158.225.227:4000';
 
 type UserItem = {
   _id: string;
@@ -92,9 +92,11 @@ const UserManagementScreen = () => {
     }
   };
 
-  useEffect(() => {
-    fetchUsers();
-  }, [token]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchUsers();
+    }, [token])
+  );
 
   const updateUserStatus = async (userId: string, status: UserItem['status'], successMessage: string) => {
     if (!token) {
