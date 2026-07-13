@@ -33,7 +33,7 @@ import {
 } from 'lucide-react-native';
 import AdminBottomNavBar from '../../components/AdminBottomNavBar';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.158.225.227:4000';
 
 type ReportKey = 'patient-registration' | 'doctor-consultation' | 'appointment-activity' | 'ai-diagnostics';
 type RangeKey = '7d' | '30d' | '90d' | 'thisMonth' | 'lastMonth';
