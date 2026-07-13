@@ -198,14 +198,19 @@ export const getMyAppointments = async (req, res) => {
     }
 
     // If an Admin hits this route, they see everything matching the filters.
-    // Calculate global stats for admin before returning.
+    // Calculate global stats for admin before returning. (Requested: Show ONLY today's counts for doctor side)
     let globalStats = null;
     if (req.user.role === 'admin') {
-      const allAppts = await Appointment.find({});
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date();
+      todayEnd.setHours(23, 59, 59, 999);
+      
+      const todayAppts = await Appointment.find({ date: { $gte: todayStart, $lte: todayEnd } });
       globalStats = {
-        cancelled: allAppts.filter(a => a.status === 'cancelled').length,
-        pending: allAppts.filter(a => a.status === 'pending').length,
-        completed: allAppts.filter(a => a.status === 'completed').length,
+        cancelled: todayAppts.filter(a => a.status === 'cancelled').length,
+        pending: todayAppts.filter(a => a.status === 'pending').length,
+        completed: todayAppts.filter(a => a.status === 'completed').length,
       };
     }
 

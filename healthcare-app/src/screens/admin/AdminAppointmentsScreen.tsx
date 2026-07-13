@@ -514,7 +514,11 @@ const AdminAppointmentsScreen = () => {
         <FlatList 
           horizontal
           showsHorizontalScrollIndicator={false}
-          data={['all', 'pending', 'today', 'activeIN', 'completed', 'cancelled'] as const}
+          data={
+            selectedType === 'doctor' 
+              ? (['all', 'pending', 'today', 'activeIN', 'completed', 'cancelled'] as const)
+              : (['all', 'pending', 'confirmed', 'completed', 'cancelled'] as const)
+          }
           keyExtractor={(item) => item}
           contentContainerStyle={styles.tabsList}
           renderItem={({ item }) => (
@@ -1097,9 +1101,9 @@ const styles = StyleSheet.create({
   },
   appointmentCard: {
     backgroundColor: '#FFF',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: '#F3F4F6'
   },
@@ -1114,9 +1118,9 @@ const styles = StyleSheet.create({
     flex: 1
   },
   avatarPlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: '#F3E8FF',
     justifyContent: 'center',
     alignItems: 'center',
@@ -1149,7 +1153,7 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     backgroundColor: '#F3F4F6',
-    marginVertical: 12
+    marginVertical: 8
   },
   cardBody: {
     paddingHorizontal: 2
@@ -1176,9 +1180,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     backgroundColor: '#F9FAFB',
-    borderRadius: 10,
-    padding: 10,
-    marginTop: 12
+    borderRadius: 8,
+    padding: 8,
+    marginTop: 8
   },
   infoCol: {
     flex: 1
@@ -1199,10 +1203,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: 8,
-    marginTop: 14,
+    marginTop: 10,
     borderTopWidth: 1,
     borderTopColor: '#F3F4F6',
-    paddingTop: 12
+    paddingTop: 10
   },
   actionBtn: {
     flexDirection: 'row',
