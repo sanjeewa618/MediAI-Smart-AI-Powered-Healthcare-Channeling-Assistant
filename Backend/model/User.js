@@ -5,10 +5,12 @@ const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-    phone: { type: String, required: true, unique: true },
-    password: { type: String, required: true, select: false },
+    phone: { type: String, unique: true, sparse: true },
+    password: { type: String, select: false },
     role: { type: String, enum: ['patient', 'doctor', 'nurse', 'admin'], default: 'patient' },
     status: { type: String, enum: ['pending', 'approved', 'rejected', 'active', 'suspended', 'disabled', 'verified'], default: 'approved' },
+    googleId: { type: String },
+    authProvider: { type: String, enum: ['local', 'google'], default: 'local' },
     staffId: { type: String }, // Store Doctor ID or Nurse ID
     
     // Patient Specific Profile
@@ -58,7 +60,7 @@ const userSchema = new mongoose.Schema(
 
 // Hash password before saving
 userSchema.pre('save', async function () {
-  if (!this.isModified('password')) return;
+  if (!this.isModified('password') || !this.password) return;
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
 });
