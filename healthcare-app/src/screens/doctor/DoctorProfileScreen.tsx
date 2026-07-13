@@ -9,7 +9,7 @@ import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../context/AuthContext';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.158.225.227:4000';
 
 const MENU_ITEMS = [
   { icon: Bell, label: 'Notifications', sub: 'Appointment alerts & reminders', color: '#F59E0B', action: null },
@@ -60,6 +60,9 @@ const DoctorProfileScreen = () => {
           const name = data.name || 'Doctor';
           setDoctorName(name.startsWith('Dr.') ? name : `Dr. ${name}`);
           setDoctorSpec(data.specialization || 'General Practitioner');
+          if (data.photo) {
+            setProfileImage(data.photo.startsWith('http') ? data.photo : `${API_BASE_URL}${data.photo}`);
+          }
           setProfileInfo({
             name: data.name || '',
             phone: data.phone || '+94 77 123 4567',
@@ -151,25 +154,54 @@ const DoctorProfileScreen = () => {
   };
 
   const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-    if (status !== 'granted') {
-      Alert.alert('Permission Denied', 'Sorry, we need camera roll permissions to change your profile picture.');
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 1,
-    });
-
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      const selectedAsset = result.assets[0];
-      if (selectedAsset && selectedAsset.uri) {
-        setProfileImage(selectedAsset.uri);
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Sorry, we need camera roll permissions to change your profile picture.');
+        return;
       }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const formData = new FormData();
+        const filename = asset.uri.split('/').pop() || 'profile.jpg';
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : `image/jpeg`;
+
+        formData.append('avatar', {
+          uri: asset.uri,
+          name: filename,
+          type: type,
+        } as any);
+
+        const response = await fetch(`${API_BASE_URL}/api/doctor/profile/upload-avatar`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json',
+          },
+          body: formData,
+        });
+
+        const uploadData = await response.json();
+        if (response.ok && uploadData.success && uploadData.photo) {
+          setProfileImage(uploadData.photo.startsWith('http') ? uploadData.photo : `${API_BASE_URL}${uploadData.photo}`);
+          Alert.alert('Success', 'Profile picture updated successfully!');
+        } else {
+          Alert.alert('Error', uploadData.message || 'Failed to upload profile picture');
+        }
+      }
+    } catch (error) {
+      console.error('Image picking/upload error:', error);
+      Alert.alert('Error', 'An error occurred while uploading');
     }
   };
 

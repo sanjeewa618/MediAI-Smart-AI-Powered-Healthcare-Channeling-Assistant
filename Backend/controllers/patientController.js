@@ -186,7 +186,7 @@ export const getDashboardData = async (req, res) => {
       date: { $gte: today },
       status: { $in: ['pending', 'confirmed', 'started', 'ready', 'in', 'skipped', 'nextIn'] }
     })
-      .populate('doctor', 'name specialization hospital')
+      .populate('doctor', 'name specialization hospital photo')
       .sort({ date: 1, timeSlot: 1 })
       .limit(10);
 
@@ -494,7 +494,7 @@ export const getCompletedAppointments = async (req, res) => {
     const doctorAppts = await Appointment.find({
       patient: req.user._id,
       status: 'completed'
-    }).populate('doctor', 'name specialization hospital');
+    }).populate('doctor', 'name specialization hospital photo');
 
     const labAppts = await LabBooking.find({
       patientUser: req.user._id,
@@ -528,7 +528,7 @@ export const generateAppointmentPdf = async (req, res) => {
     doc.pipe(res);
 
     if (type === 'doctor') {
-      const appt = await Appointment.findById(id).populate('doctor', 'name specialization hospital');
+      const appt = await Appointment.findById(id).populate('doctor', 'name specialization hospital photo');
       if (!appt || appt.patient.toString() !== req.user._id.toString()) {
         return res.status(404).json({ message: 'Appointment not found' });
       }

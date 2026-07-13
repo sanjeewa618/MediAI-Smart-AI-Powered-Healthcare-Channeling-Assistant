@@ -9,7 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.158.225.227:4000';
 
 const greyShadow = {
   shadowColor: '#000',
@@ -35,10 +35,11 @@ const parseTime = (timeStr: string) => {
 const DoctorDashboard = () => {
   const navigation = useNavigation<any>();
   const isLoggingOut = useRef(false);
-  const { token } = useAuth();
+  const { token, setToken, setRole } = useAuth();
 
   const [doctorName, setDoctorName] = useState('Loading...');
   const [doctorSpecialty, setDoctorSpecialty] = useState('Doctor');
+  const [doctorPhoto, setDoctorPhoto] = useState('');
   const [timeSlotModalVisible, setTimeSlotModalVisible] = useState(false);
   const [todaySlots, setTodaySlots] = useState<any[]>([]);
   const [todayAppointments, setTodayAppointments] = useState<any[]>([]);
@@ -92,8 +93,11 @@ const DoctorDashboard = () => {
       const profileData = await profileRes.json();
       if (profileRes.ok && profileData) {
         const name = profileData.name || 'Doctor';
-        setDoctorName(name.startsWith('Dr.') ? name : `Dr. ${name}`);
+        const rawName = name.replace(/^Dr\.\s*/i, '').trim();
+        const firstName = rawName.split(' ')[0] || 'Doctor';
+        setDoctorName(`Dr. ${firstName}`);
         setDoctorSpecialty(profileData.specialization || 'General Practitioner');
+        setDoctorPhoto(profileData.photo || '');
       }
 
       const dashboardData = await dashboardRes.json();
@@ -235,7 +239,14 @@ const DoctorDashboard = () => {
         <LinearGradient colors={['#8B3DFF', '#6A11CB', '#5F0FFF']} style={styles.headerGradient}>
           <View style={styles.headerTop}>
             <View style={styles.headerProfile}>
-              <Image source={{ uri: 'https://img.icons8.com/bubbles/100/000000/doctor-male.png' }} style={styles.docAvatar} />
+              <Image 
+                source={
+                  doctorPhoto 
+                    ? { uri: doctorPhoto.startsWith('http') ? doctorPhoto : `${API_BASE_URL}${doctorPhoto}` } 
+                    : { uri: 'https://img.icons8.com/bubbles/100/000000/doctor-male.png' }
+                } 
+                style={styles.docAvatar} 
+              />
               <View>
                 <Text style={styles.docName}>{doctorName}</Text>
                 <Text style={styles.docSpecialty}>{doctorSpecialty}</Text>
@@ -253,6 +264,8 @@ const DoctorDashboard = () => {
                 style={styles.iconBtn}
                 onPress={() => {
                   isLoggingOut.current = true;
+                  setToken(null);
+                  setRole(null);
                   navigation.reset({
                     index: 0,
                     routes: [{ name: 'SignIn', params: { role: 'doctor' } }],

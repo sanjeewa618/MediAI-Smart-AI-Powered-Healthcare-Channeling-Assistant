@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, Dimensions, Animated, PanResponder, Pressable, StatusBar, Modal, BackHandler, Easing, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, Dimensions, Animated, PanResponder, Pressable, StatusBar, Modal, BackHandler, Easing, Alert, ActivityIndicator } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
-import { Search, Calendar, User, FileText, Activity, MoreHorizontal, Home, Heart, Shield, MessageCircle, FileEdit, FlaskConical, ChevronRight, Baby, Droplets, Sparkles, Plus, Bell, LogOut, Pill, Truck, Settings, X, LifeBuoy, Stethoscope, Dna, Brain, Bone, Eye, Smile, Wallet, Clock, AlertCircle, Hourglass, Users, RefreshCw, CheckCircle, XCircle } from 'lucide-react-native';
+import { Search, Calendar, User, FileText, Activity, MoreHorizontal, Home, Heart, Shield, MessageCircle, FileEdit, FlaskConical, ChevronRight, Baby, Droplets, Sparkles, Plus, Bell, LogOut, Pill, Truck, Settings, X, LifeBuoy, Stethoscope, Dna, Brain, Bone, Eye, Smile, Wallet, Clock, AlertCircle, Hourglass, Users, RefreshCw, CheckCircle, XCircle, Trash2, BellOff } from 'lucide-react-native';
 import BottomNavBar from '../../components/BottomNavBar';
 import { useAuth } from '../../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import moment from 'moment';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.158.225.227:4000';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/types';
@@ -185,6 +185,11 @@ const QueueAppointmentCard = ({
             <View style={[styles.queueDoctorAvatar, isLab && { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
               {isLab ? (
                 <FlaskConical size={20} color="#FFFFFF" />
+              ) : appointment?.doctor?.photo ? (
+                <Image 
+                  source={{ uri: appointment.doctor.photo.startsWith('http') ? appointment.doctor.photo : `${API_BASE_URL}${appointment.doctor.photo}` }} 
+                  style={{ width: 44, height: 44, borderRadius: 14 }} 
+                />
               ) : (
                 <Stethoscope size={20} color="#FFFFFF" />
               )}
@@ -510,6 +515,11 @@ const PatientDashboard = () => {
   const [todayCompletedCount, setTodayCompletedCount] = useState(0);
   const [todayCancelledCount, setTodayCancelledCount] = useState(0);
 
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notificationsModalVisible, setNotificationsModalVisible] = useState(false);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+
   const handleRequestAdmin = async (appointmentId: string) => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/patient/request-next-in/${appointmentId}`, {
@@ -657,6 +667,75 @@ const PatientDashboard = () => {
       }
     }, [token, refreshTrigger])
   );
+
+  const fetchNotifications = async () => {
+    if (!token) return;
+    setNotificationsLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/notifications`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setNotifications(data.data || []);
+        setUnreadCount(data.meta?.unreadCount || 0);
+      }
+    } catch (err) {
+      console.error('Failed to fetch notifications:', err);
+    } finally {
+      setNotificationsLoading(false);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchNotifications();
+      const interval = setInterval(fetchNotifications, 15000);
+      return () => clearInterval(interval);
+    }, [token, refreshTrigger])
+  );
+
+  const handleMarkAsRead = async (id: string) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/notifications/${id}/read`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        fetchNotifications();
+      }
+    } catch (err) {
+      console.error('Failed to mark notification as read:', err);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/notifications/read-all`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        fetchNotifications();
+      }
+    } catch (err) {
+      console.error('Failed to mark all as read:', err);
+    }
+  };
+
+  const handleDeleteNotification = async (id: string) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/notifications/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        fetchNotifications();
+      }
+    } catch (err) {
+      console.error('Failed to delete notification:', err);
+    }
+  };
 
 
 
@@ -936,12 +1015,19 @@ const PatientDashboard = () => {
               <View style={styles.headerActions}>
                 <TouchableOpacity
                   style={styles.headerActionButton}
-                  onPress={() => setRefreshTrigger(prev => prev + 1)}
+                  onPress={() => {
+                    setRefreshTrigger(prev => prev + 1);
+                    Alert.alert('Refreshed', 'Dashboard updated successfully');
+                  }}
                 >
                   <RefreshCw size={20} color="#FFFFFF" />
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.headerActionButton, { marginLeft: 10 }]}>
+                <TouchableOpacity 
+                  style={[styles.headerActionButton, { marginLeft: 10 }]}
+                  onPress={() => setNotificationsModalVisible(true)}
+                >
                   <Bell size={20} color="#FFFFFF" />
+                  {unreadCount > 0 && <View style={styles.badgeDot} />}
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.headerActionButton, { marginLeft: 10 }]}
@@ -979,30 +1065,7 @@ const PatientDashboard = () => {
             </TouchableOpacity>
           )}
 
-          {/* Summary Cards */}
-          <StaggeredView delay={250}>
-            <View style={styles.summaryCardsRow}>
-              <View style={[styles.summaryCard, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0', borderWidth: 1 }]}>
-                <View style={[styles.summaryCardIconWrap, { backgroundColor: '#DCFCE7' }]}>
-                  <CheckCircle size={20} color="#16A34A" />
-                </View>
-                <View style={styles.summaryCardTextWrap}>
-                  <Text style={styles.summaryCardValue}>{todayCompletedCount}</Text>
-                  <Text style={styles.summaryCardLabel}>Completed</Text>
-                </View>
-              </View>
 
-              <View style={[styles.summaryCard, { backgroundColor: '#FEF2F2', borderColor: '#FECACA', borderWidth: 1 }]}>
-                <View style={[styles.summaryCardIconWrap, { backgroundColor: '#FEE2E2' }]}>
-                  <XCircle size={20} color="#DC2626" />
-                </View>
-                <View style={styles.summaryCardTextWrap}>
-                  <Text style={styles.summaryCardValue}>{todayCancelledCount}</Text>
-                  <Text style={styles.summaryCardLabel}>Cancelled</Text>
-                </View>
-              </View>
-            </View>
-          </StaggeredView>
 
           {/* AI Health Assistant Card */}
           <StaggeredView delay={300}>
@@ -1514,6 +1577,80 @@ const PatientDashboard = () => {
                 </View>
               </View>
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Notifications Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={notificationsModalVisible}
+        onRequestClose={() => setNotificationsModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <Pressable
+            style={styles.modalDismissArea}
+            onPress={() => setNotificationsModalVisible(false)}
+          />
+          <View style={[styles.modalContent, { maxHeight: '80%' }]}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>Notifications</Text>
+                {unreadCount > 0 && (
+                  <Text style={{ fontSize: 12, color: COLORS.textSecondary, marginTop: 2 }}>
+                    You have {unreadCount} unread message{unreadCount > 1 ? 's' : ''}
+                  </Text>
+                )}
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                {unreadCount > 0 && (
+                  <TouchableOpacity onPress={handleMarkAllAsRead}>
+                    <Text style={{ color: COLORS.primary, fontWeight: '700', fontSize: 13 }}>Mark read</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity onPress={() => setNotificationsModalVisible(false)}>
+                  <X size={24} color={COLORS.textHeader} />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {notificationsLoading && notifications.length === 0 ? (
+              <View style={{ padding: 40, alignItems: 'center', justifyContent: 'center' }}>
+                <ActivityIndicator size="large" color={COLORS.primary} />
+              </View>
+            ) : notifications.length === 0 ? (
+              <View style={{ padding: 40, alignItems: 'center', justifyContent: 'center' }}>
+                <BellOff size={48} color="#D1D5DB" style={{ marginBottom: 16 }} />
+                <Text style={{ fontSize: 16, fontWeight: '600', color: COLORS.textHeader, marginBottom: 4 }}>No notifications yet</Text>
+                <Text style={{ fontSize: 14, color: COLORS.textSecondary, textAlign: 'center' }}>We'll notify you when doctor/nurse appointments are accepted or updated.</Text>
+              </View>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false} style={{ paddingHorizontal: 16 }}>
+                {notifications.map((item) => (
+                  <TouchableOpacity
+                    key={item._id}
+                    style={[
+                      styles.notificationCard,
+                      !item.isRead && styles.notificationCardUnread
+                    ]}
+                    onPress={() => handleMarkAsRead(item._id)}
+                  >
+                    <View style={styles.notificationHeaderRow}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        {!item.isRead && <View style={styles.unreadDot} />}
+                        <Text style={[styles.notificationTitle, !item.isRead && { fontWeight: '700' }]}>{item.title}</Text>
+                      </View>
+                      <TouchableOpacity onPress={() => handleDeleteNotification(item._id)}>
+                        <Trash2 size={16} color="#9CA3AF" />
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={styles.notificationMessage}>{item.message}</Text>
+                    <Text style={styles.notificationTime}>{moment(item.createdAt).fromNow()}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
           </View>
         </View>
       </Modal>
@@ -2563,6 +2700,55 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.textSecondary,
     marginTop: 2,
+  },
+  notificationCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  notificationCardUnread: {
+    backgroundColor: '#F3F4F6',
+    borderColor: '#E5E7EB',
+  },
+  notificationHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  notificationTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.textHeader,
+  },
+  notificationMessage: {
+    fontSize: 13.5,
+    color: COLORS.textSecondary,
+    lineHeight: 18,
+    marginBottom: 8,
+  },
+  notificationTime: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    fontWeight: '500',
+  },
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.primary,
+  },
+  badgeDot: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#EF4444',
   }
 });
 

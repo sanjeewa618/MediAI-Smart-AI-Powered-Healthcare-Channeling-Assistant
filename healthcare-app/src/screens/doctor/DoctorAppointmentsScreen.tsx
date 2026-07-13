@@ -11,7 +11,7 @@ import NurseBottomNavBar from '../../components/NurseBottomNavBar';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.158.225.227:4000';
 
 const generateMonthDays = (targetDate: Date) => {
   const days = [];
@@ -142,6 +142,29 @@ const DoctorAppointmentsScreen = () => {
       console.error(error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUpdateStatus = async (id: string, newStatus: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/appointments/${id}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        Alert.alert('Success', `Appointment has been ${newStatus}.`);
+        fetchAppointments();
+      } else {
+        Alert.alert('Error', data.message || 'Failed to update status');
+      }
+    } catch (error) {
+      console.error('Update status error:', error);
+      Alert.alert('Error', 'Unable to update status.');
     }
   };
 
@@ -314,11 +337,36 @@ const DoctorAppointmentsScreen = () => {
                 </View>
 
                 <View style={styles.actions}>
-                  <TouchableOpacity style={styles.btnPrimary} onPress={() => openPatientProfile(appt)}>
-                    <LinearGradient colors={['#9333EA', '#5B21B6']} style={styles.gradBtn}>
-                      <Text style={styles.btnPrimaryText}>View Details</Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
+                  {appt.status === 'pending' ? (
+                    <>
+                      <TouchableOpacity 
+                        style={[styles.btnOutline, { flex: 1, borderColor: '#DC2626' }]} 
+                        onPress={() => handleUpdateStatus(appt._id, 'cancelled')}
+                      >
+                        <Text style={[styles.btnOutlineText, { color: '#DC2626' }]}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[styles.btnPrimary, { flex: 1 }]} 
+                        onPress={() => handleUpdateStatus(appt._id, 'confirmed')}
+                      >
+                        <LinearGradient colors={['#10B981', '#059669']} style={styles.gradBtn}>
+                          <Text style={styles.btnPrimaryText}>Accept</Text>
+                        </LinearGradient>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[styles.btnOutline, { flex: 0.8, borderColor: '#9333EA' }]} 
+                        onPress={() => openPatientProfile(appt)}
+                      >
+                        <Text style={[styles.btnOutlineText, { color: '#9333EA' }]}>Details</Text>
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <TouchableOpacity style={styles.btnPrimary} onPress={() => openPatientProfile(appt)}>
+                      <LinearGradient colors={['#9333EA', '#5B21B6']} style={styles.gradBtn}>
+                        <Text style={styles.btnPrimaryText}>View Details</Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
             );

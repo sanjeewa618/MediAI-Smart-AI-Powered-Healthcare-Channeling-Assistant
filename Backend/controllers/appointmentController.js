@@ -2,6 +2,7 @@ import Appointment from '../model/Appointment.js';
 import User from '../model/User.js';
 import DoctorAvailability from '../model/DoctorAvailability.js';
 import DailySession from '../model/DailySession.js';
+import Notification from '../model/Notification.js';
 
 // @desc    Create a new appointment
 // @route   POST /api/appointments
@@ -216,7 +217,7 @@ export const getMyAppointments = async (req, res) => {
 
     const appointments = await Appointment.find(filter)
       .populate('patient', 'name email phone')
-      .populate('doctor', 'name specialization hospital')
+      .populate('doctor', 'name specialization hospital photo')
       .sort({ date: 1 });
 
     res.json({
@@ -258,6 +259,39 @@ export const updateAppointmentStatus = async (req, res) => {
 
     appointment.status = status;
     const updatedAppointment = await appointment.save();
+
+    // Create notification for patient
+    try {
+      const doctorUser = await User.findById(appointment.doctor);
+      const doctorName = doctorUser ? doctorUser.name : 'Doctor';
+      const formattedDate = new Date(appointment.date).toLocaleDateString('en-US', {
+        weekday: 'short',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+
+      let title = `Appointment ${status.charAt(0).toUpperCase() + status.slice(1)}`;
+      let message = `Your appointment with ${doctorName} on ${formattedDate} at ${appointment.timeSlot} has been updated to ${status}.`;
+
+      if (status === 'confirmed') {
+        title = 'Appointment Accepted';
+        message = `Dr. ${doctorName.replace(/^Dr\.\s*/i, '')} has accepted your appointment on ${formattedDate} at ${appointment.timeSlot}.`;
+      } else if (status === 'cancelled') {
+        title = 'Appointment Cancelled';
+        message = `Your appointment with Dr. ${doctorName.replace(/^Dr\.\s*/i, '')} on ${formattedDate} at ${appointment.timeSlot} has been cancelled.`;
+      }
+
+      await Notification.create({
+        user: appointment.patient,
+        title,
+        message,
+        type: 'appointment',
+        isRead: false
+      });
+    } catch (err) {
+      console.error('Failed to create appointment status update notification:', err);
+    }
 
     res.json({
       success: true,

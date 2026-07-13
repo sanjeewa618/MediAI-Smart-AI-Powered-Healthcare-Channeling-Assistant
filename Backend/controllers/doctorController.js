@@ -29,16 +29,21 @@ export const getDoctorDashboard = async (req, res) => {
       .sort({ date: 1 })
       .limit(10);
 
-    // 2. Calculate Today's Appointments Count
+    // 2. Calculate Today's Appointments Count (Excluding pending and cancelled appointments)
     const todayAppointments = await Appointment.find({
       doctor: req.user._id,
       date: { $gte: todayStart, $lte: todayEnd },
-      status: { $ne: 'cancelled' }
+      status: { $in: ['confirmed', 'started', 'ready', 'in', 'skipped', 'completed'] }
     }).populate('patient', 'name email phone').sort({ queueNumber: 1 });
 
     const todayAppointmentsCount = todayAppointments.length;
     const completedTodayCount = todayAppointments.filter(app => app.status === 'completed').length;
-    const pendingTodayCount = todayAppointments.filter(app => ['pending', 'started', 'ready', 'skipped'].includes(app.status)).length;
+
+    // Count ALL pending appointments for this doctor (regardless of date)
+    const pendingApprovalsCount = await Appointment.countDocuments({
+      doctor: req.user._id,
+      status: 'pending'
+    });
 
     // 4. Fetch today's slots
     const today = new Date();
@@ -75,7 +80,7 @@ export const getDoctorDashboard = async (req, res) => {
         stats: {
           totalPatients: completedTodayCount,
           todayAppointments: todayAppointmentsCount,
-          pendingApprovals: pendingTodayCount
+          pendingApprovals: pendingApprovalsCount
         },
         upcomingAppointments,
         todayAppointments,
@@ -638,6 +643,34 @@ export const getDoctorAnalytics = async (req, res) => {
       }
     });
 
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+// @desc    Upload doctor avatar
+// @route   POST /api/doctor/profile/upload-avatar
+// @access  Private (Doctor only)
+export const uploadDoctorAvatar = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'Please upload an image file' });
+    }
+    const user = await User.findById(req.user._id);
+
+    if (user) {
+      const avatarUrl = `/uploads/${req.file.filename}`;
+      user.photo = avatarUrl;
+      const updatedUser = await user.save();
+      res.json({
+        success: true,
+        message: 'Avatar uploaded successfully',
+        photo: avatarUrl,
+        data: updatedUser
+      });
+    } else {
+      res.status(404).json({ message: 'User not found' });
+    }
   } catch (error) {
     res.status(500).json({ message: 'Server Error', error: error.message });
   }

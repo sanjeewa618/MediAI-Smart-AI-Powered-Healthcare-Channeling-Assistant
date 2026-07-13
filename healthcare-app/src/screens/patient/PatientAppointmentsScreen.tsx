@@ -76,7 +76,7 @@ const PatientAppointmentsScreen = () => {
                 date: moment(app.date).format('DD MMM YYYY'),
                 time: app.timeSlot || 'TBD',
                 status: mappedStatus,
-                avatar: null,
+                avatar: app.doctor?.photo ? (app.doctor.photo.startsWith('http') ? app.doctor.photo : `${API_BASE_URL}${app.doctor.photo}`) : null,
                 queueNumber: app.queueNumber
               };
             });
@@ -181,7 +181,7 @@ const PatientAppointmentsScreen = () => {
             <View style={styles.cardHeader}>
               <View style={[styles.avatarWrap, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
                 {item.avatar ? (
-                  <Image source={item.avatar} style={styles.avatar} />
+                  <Image source={{ uri: item.avatar }} style={styles.avatar} />
                 ) : (
                   <View style={{ width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center' }}>
                     <Text style={{ fontSize: 20, color: '#FFF', fontWeight: 'bold' }}>{item.name.charAt(0)}</Text>
