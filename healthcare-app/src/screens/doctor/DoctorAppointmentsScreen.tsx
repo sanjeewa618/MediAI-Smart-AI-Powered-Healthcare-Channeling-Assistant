@@ -188,7 +188,7 @@ const DoctorAppointmentsScreen = () => {
     <SafeAreaView style={styles.safe}>
       <LinearGradient colors={['#8B3DFF', '#6A11CB']} style={styles.header}>
         <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <TouchableOpacity onPress={() => navigation.canGoBack() ? navigation.goBack() : navigation.navigate('DoctorDashboard')} style={styles.backBtn}>
             <ChevronRight size={22} color="#FFF" style={{ transform: [{ rotate: '180deg' }] }} />
           </TouchableOpacity>
           <View style={styles.headerTextWrap}>
