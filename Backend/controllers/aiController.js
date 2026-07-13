@@ -169,6 +169,23 @@ export const getAIHistory = async (req, res) => {
   }
 };
 
+// @desc    Clear patient's symptom analysis history
+// @route   DELETE /api/ai/history
+// @access  Private
+export const clearAIHistory = async (req, res) => {
+  try {
+    const patientId = req.user.id;
+    await AIAnalysisLog.deleteMany({ patient: patientId });
+
+    res.status(200).json({
+      success: true,
+      message: 'AI chat history cleared successfully',
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
 async function chatWithGemini(apiKey, message, medicalHistoryText, attachmentDataList = [], patientName = 'Patient') {
   const systemInstruction = `You are MediAI, an advanced medical assistant bot. A patient named ${patientName} is asking you a question about their medical reports. Use their provided medical history and any attached documents to answer accurately, safely, and politely. Start by greeting the patient by their name if appropriate. DO NOT provide a JSON response. Respond in plain conversational text or markdown. If their question is unrelated to medical context, answer it briefly but remind them you are a medical assistant.
 

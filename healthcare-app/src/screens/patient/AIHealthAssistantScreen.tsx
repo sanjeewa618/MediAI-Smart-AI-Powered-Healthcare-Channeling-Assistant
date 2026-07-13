@@ -7,7 +7,7 @@ import {
 import { COLORS, SHADOWS } from '../../theme/theme';
 import {
   Send, Mic, ChevronLeft, Sparkles, Brain, Shield,
-  Clock, Stethoscope, ChevronRight, X, User
+  Clock, Stethoscope, ChevronRight, X, User, MoreVertical
 } from 'lucide-react-native';
 import BottomNavBar from '../../components/BottomNavBar';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -73,8 +73,34 @@ const AIHealthAssistantScreen = ({ navigation }: any) => {
   const [isTyping, setIsTyping]     = useState(false);
   const [showFeatures, setShowFeatures] = useState(true);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const typingDot = useRef(new Animated.Value(0)).current;
+
+  // Clear History Handler
+  const handleClearHistory = async () => {
+    setShowMenu(false);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/ai/history`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
+        setMessages([
+          {
+            id: 1,
+            text: "👋 Hi! I'm MediAI, your personal health assistant powered by AI.\n\nTell me how you're feeling or pick a quick option below — I'll help you understand your symptoms and find the right care.",
+            sender: 'ai',
+          }
+        ]);
+        setShowFeatures(true);
+      }
+    } catch (error) {
+      console.error('Failed to clear history:', error);
+    }
+  };
 
   // Show/hide bottom nav with keyboard
   useEffect(() => {
@@ -218,7 +244,7 @@ const AIHealthAssistantScreen = ({ navigation }: any) => {
       >
 
         {/* ── Header ─────────────────────────────────────────────── */}
-        <LinearGradient colors={COLORS.screenHeaderGradient} style={styles.header}>
+        <LinearGradient colors={COLORS.screenHeaderGradient} style={[styles.header, { zIndex: 10 }]}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <ChevronLeft size={26} color="#FFF" />
           </TouchableOpacity>
@@ -234,9 +260,25 @@ const AIHealthAssistantScreen = ({ navigation }: any) => {
             </View>
           </View>
 
-          <TouchableOpacity style={styles.headerIconBtn}>
-            <Sparkles size={20} color="#FFD700" fill="#FFD700" />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <TouchableOpacity style={styles.headerIconBtn}>
+              <Sparkles size={20} color="#FFD700" fill="#FFD700" />
+            </TouchableOpacity>
+
+            <View style={{ zIndex: 100 }}>
+              <TouchableOpacity style={styles.headerIconBtn} onPress={() => setShowMenu(!showMenu)}>
+                <MoreVertical size={20} color="#FFF" />
+              </TouchableOpacity>
+              
+              {showMenu && (
+                <View style={styles.dropdownMenu}>
+                  <TouchableOpacity style={styles.dropdownItem} onPress={handleClearHistory}>
+                    <Text style={styles.dropdownItemText}>Clear History</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          </View>
         </LinearGradient>
 
         {/* ── Chat Area ──────────────────────────────────────────── */}
@@ -246,6 +288,7 @@ const AIHealthAssistantScreen = ({ navigation }: any) => {
           contentContainerStyle={styles.chatContent}
           showsVerticalScrollIndicator={false}
           onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
+          onTouchStart={() => { if (showMenu) setShowMenu(false); }}
         >
 
           {/* AI Feature highlight cards (shown only at start) */}
@@ -412,6 +455,32 @@ const styles = StyleSheet.create({
     width: 38, height: 38, borderRadius: 12,
     backgroundColor: 'rgba(255,255,255,0.18)',
     alignItems: 'center', justifyContent: 'center',
+  },
+  
+  // Dropdown Menu
+  dropdownMenu: {
+    position: 'absolute',
+    top: 45,
+    right: 0,
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    paddingVertical: 8,
+    minWidth: 140,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+    zIndex: 100,
+  },
+  dropdownItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  dropdownItemText: {
+    fontSize: 14,
+    color: '#EF4444',
+    fontWeight: '600',
   },
 
   // Chat
