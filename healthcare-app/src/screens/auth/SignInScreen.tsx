@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Image, Dimensions, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Image, Dimensions, Animated, Alert } from 'react-native';
 import { COLORS, SHADOWS } from '../../theme/theme';
 import { CustomInput } from '../../components/CustomInput';
 import { CustomButton } from '../../components/CustomButton';
@@ -8,6 +8,13 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/types';
 import { ArrowLeft, EyeOff, Eye } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
+
+const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '';
+
+GoogleSignin.configure({
+  webClientId: GOOGLE_WEB_CLIENT_ID,
+});
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
 
@@ -112,6 +119,48 @@ const SignInScreen = () => {
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    try {
+      await GoogleSignin.hasPlayServices();
+      const response = await GoogleSignin.signIn();
+      const idToken = response.data?.idToken;
+
+      if (!idToken) {
+        Alert.alert('Google Sign-In', 'Failed to get authentication token from Google.');
+        return;
+      }
+
+      setLoading(true);
+      const res = await fetch(`${API_BASE_URL}/api/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        const targetRole = data.role || 'patient';
+        setRole(targetRole);
+        setToken(data.token);
+
+        if (targetRole === 'patient') navigation.replace('PatientDashboard');
+        else if (targetRole === 'doctor') navigation.replace('DoctorDashboard');
+        else if (targetRole === 'admin') navigation.replace('AdminDashboard');
+        else if (targetRole === 'lab' || targetRole === 'nurse') navigation.replace('LabDashboard');
+      } else {
+        Alert.alert('Google Sign-In', data.message || 'Failed to sign in with Google.');
+      }
+    } catch (error: any) {
+      console.error('Google Sign-In Error:', error);
+      if (error.code !== 'SIGN_IN_CANCELLED') {
+        Alert.alert('Google Sign-In', 'An error occurred during Google Sign-In. Please try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -184,7 +233,7 @@ const SignInScreen = () => {
 
         <StaggeredView delay={650}>
           <View style={styles.socialContainer}>
-            <TouchableOpacity style={[styles.socialButton, SHADOWS.light]}>
+            <TouchableOpacity style={[styles.socialButton, SHADOWS.light]} onPress={handleGoogleSignIn}>
               <Image source={{ uri: 'https://cdn-icons-png.flaticon.com/512/2991/2991148.png' }} style={styles.socialIcon} />
             </TouchableOpacity>
             <TouchableOpacity style={[styles.socialButton, SHADOWS.light]}>

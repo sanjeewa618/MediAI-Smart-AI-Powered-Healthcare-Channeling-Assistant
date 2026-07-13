@@ -147,6 +147,86 @@ export const registerUser = async (req, res) => {
   }
 };
 
+// @desc    Google Sign-In / Sign-Up (Patients only)
+// @route   POST /api/auth/google
+// @access  Public
+export const googleLogin = async (req, res) => {
+  try {
+    const { idToken } = req.body;
+
+    if (!idToken) {
+      return res.status(400).json({ message: 'Google ID token is required' });
+    }
+
+    // Verify the ID token with Google
+    const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`);
+    if (!googleRes.ok) {
+      return res.status(401).json({ message: 'Invalid Google token' });
+    }
+
+    const googlePayload = await googleRes.json();
+    const { sub: googleId, email, name, picture } = googlePayload;
+
+    if (!email) {
+      return res.status(400).json({ message: 'Could not retrieve email from Google account' });
+    }
+
+    // Check if user already exists by email
+    let user = await User.findOne({ email: email.toLowerCase() });
+
+    if (user) {
+      // Existing user — check status
+      if (user.status === 'pending') {
+        return res.status(401).json({ message: 'Your account is pending admin approval' });
+      }
+      if (user.status === 'rejected') {
+        return res.status(401).json({ message: 'Your request was rejected' });
+      }
+
+      // Link Google ID if not already linked
+      if (!user.googleId) {
+        user.googleId = googleId;
+        user.authProvider = 'google';
+        await user.save();
+      }
+
+      return res.json({
+        _id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        status: user.status,
+        token: generateToken(user._id),
+      });
+    }
+
+    // New user — auto-create as patient
+    user = await User.create({
+      name: name || 'Google User',
+      email: email.toLowerCase(),
+      googleId,
+      authProvider: 'google',
+      role: 'patient',
+      status: 'approved',
+      photo: picture || undefined,
+    });
+
+    res.status(201).json({
+      _id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      status: user.status,
+      token: generateToken(user._id),
+    });
+  } catch (error) {
+    console.error('Google Login Error:', error);
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
 // @desc    Authenticate a user (Login)
 // @route   POST /api/auth/login
 // @access  Public
@@ -166,7 +246,12 @@ export const loginUser = async (req, res) => {
       ] 
     }).select('+password');
 
-    if (user && (await bcrypt.compare(password, user.password))) {
+    // If this user registered via Google and has no password, tell them
+    if (user && user.authProvider === 'google' && !user.password) {
+      return res.status(401).json({ message: 'This account uses Google Sign-In. Please use the Google button to log in.' });
+    }
+
+    if (user && user.password && (await bcrypt.compare(password, user.password))) {
       if (user.status === 'pending') {
         return res.status(401).json({ message: 'Your account is pending admin approval' });
       }

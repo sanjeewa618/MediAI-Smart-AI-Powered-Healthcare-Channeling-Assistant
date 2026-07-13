@@ -32,7 +32,13 @@
       }
     },
     "plugins": [
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.314421120723-hdcrt00jbrqeln92317hksntfc032v3r"
+        }
+      ]
     ]
   }
 }
