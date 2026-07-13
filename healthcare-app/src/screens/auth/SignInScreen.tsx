@@ -8,15 +8,33 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../navigation/types';
 import { ArrowLeft, EyeOff, Eye } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { NativeModules } from 'react-native';
+
+let GoogleSignin: any = {
+  configure: () => {},
+  hasPlayServices: async () => false,
+  signIn: async () => { throw new Error('Google Sign-in is only available in standalone builds.'); }
+};
+
+if (NativeModules.RNGoogleSignin) {
+  try {
+    GoogleSignin = require('@react-native-google-signin/google-signin').GoogleSignin;
+  } catch (e) {
+    console.warn('Failed to load native Google Sign-in module', e);
+  }
+}
 
 const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '';
 
-GoogleSignin.configure({
-  webClientId: GOOGLE_WEB_CLIENT_ID,
-});
+try {
+  GoogleSignin.configure({
+    webClientId: GOOGLE_WEB_CLIENT_ID,
+  });
+} catch (e) {
+  console.warn('Failed to configure Google Sign-in:', e);
+}
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.158.225.227:4000';
 
 const { width, height } = Dimensions.get('window');
 

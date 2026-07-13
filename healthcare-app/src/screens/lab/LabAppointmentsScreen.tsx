@@ -19,7 +19,7 @@ import { useAuth } from '../../context/AuthContext';
 import moment from 'moment';
 import { useCallback } from 'react';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.158.225.227:4000';
 
 
 
@@ -68,7 +68,15 @@ const LabAppointmentsScreen: React.FC = () => {
   
   const [department, setDepartment] = useState('');
   const [appointments, setAppointments] = useState<any[]>([]);
-  const [stats, setStats] = useState({ todayTotal: 0, pending: 0, processing: 0, completed: 0 });
+  const [stats, setStats] = useState({ 
+    todayTotal: 0, 
+    pending: 0, 
+    processing: 0, 
+    completed: 0,
+    totalTestsDone: 0,
+    totalRevenue: 'Rs. 0',
+    avgWaitTime: '15 mins'
+  });
   const [loading, setLoading] = useState(false);
 
   const fetchProfile = async () => {
@@ -103,11 +111,31 @@ const LabAppointmentsScreen: React.FC = () => {
         const processingApps = list.filter((b: any) => ['Confirmed', 'Checked-In', 'Sample-Collected', 'Testing'].includes(b.status)).length;
         const completedApps = list.filter((b: any) => b.status === 'Completed').length;
 
+        // History calculations
+        const totalCompleted = list.filter((b: any) => b.status === 'Completed').length;
+        const totalRev = `Rs. ${(totalCompleted * 2500).toLocaleString()}`;
+        
+        let totalWait = 0;
+        let waitCount = 0;
+        list.forEach((b: any) => {
+          if (b.status === 'Completed' && b.checkedInAt && b.completedAt) {
+            const diff = moment(b.completedAt).diff(moment(b.checkedInAt), 'minutes');
+            if (diff > 0) {
+              totalWait += diff;
+              waitCount++;
+            }
+          }
+        });
+        const avgWait = waitCount > 0 ? `${Math.round(totalWait / waitCount)} mins` : '15 mins';
+
         setStats({
           todayTotal: todayApps,
           pending: pendingApps,
           processing: processingApps,
           completed: completedApps,
+          totalTestsDone: totalCompleted,
+          totalRevenue: totalRev,
+          avgWaitTime: avgWait
         });
 
         // Show alert if there is a new pending booking
@@ -424,34 +452,45 @@ const LabAppointmentsScreen: React.FC = () => {
             <TouchableOpacity><Text style={styles.viewAllText}>View All</Text></TouchableOpacity>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 20, paddingBottom: 10 }}>
-            {PAST_HISTORY.map((hist) => (
-              <View key={hist.id} style={styles.historyItemCard}>
-                <View style={styles.historyItemHeader}>
-                  <Image source={{ uri: hist.photo }} style={styles.historyItemPhoto} />
-                  <View>
-                    <Text style={styles.historyItemName}>{hist.patientName}</Text>
-                    <Text style={styles.historyItemTest}>{hist.testType}</Text>
-                  </View>
-                </View>
-                <View style={styles.historyItemDetails}>
-                  <View style={styles.detailRow}><Clock size={12} color={COLORS.textSecondary} /><Text style={styles.detailTextSmall}>{hist.date} • {hist.time}</Text></View>
-                  <View style={styles.detailRow}><Activity size={12} color={COLORS.textSecondary} /><Text style={styles.detailTextSmall}>{hist.lab}</Text></View>
-                  <View style={styles.detailRow}><User size={12} color={COLORS.textSecondary} /><Text style={styles.detailTextSmall}>{hist.nurse}</Text></View>
-                </View>
-                <TouchableOpacity style={styles.viewReportBtn}>
-                  <FileText size={14} color={COLORS.primary} />
-                  <Text style={styles.viewReportBtnText}>View Report</Text>
-                </TouchableOpacity>
+            {appointments.filter((b: any) => b.status === 'Completed').length === 0 ? (
+              <View style={{ padding: 20, alignItems: 'center', justifyContent: 'center', width: 300 }}>
+                <Text style={{ color: COLORS.textSecondary, fontWeight: '600' }}>No past appointments found</Text>
               </View>
-            ))}
+            ) : (
+              appointments.filter((b: any) => b.status === 'Completed').map((hist: any) => {
+                const patientPhoto = 'https://img.icons8.com/bubbles/100/000000/user.png';
+                const formattedDate = moment(hist.appointmentDate).format('MMM DD, YYYY');
+                const formattedTime = hist.scheduleSlot?.startTime || 'N/A';
+                return (
+                  <View key={hist._id} style={styles.historyItemCard}>
+                    <View style={styles.historyItemHeader}>
+                      <Image source={{ uri: patientPhoto }} style={styles.historyItemPhoto} />
+                      <View>
+                        <Text style={styles.historyItemName}>{hist.patient?.fullName || 'Unknown Patient'}</Text>
+                        <Text style={styles.historyItemTest}>{hist.lab?.name || 'Lab Test'}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.historyItemDetails}>
+                      <View style={styles.detailRow}><Clock size={12} color={COLORS.textSecondary} /><Text style={styles.detailTextSmall}>{formattedDate} • {formattedTime}</Text></View>
+                      <View style={styles.detailRow}><Activity size={12} color={COLORS.textSecondary} /><Text style={styles.detailTextSmall}>{hist.lab?.name || 'Lab'}</Text></View>
+                      <View style={styles.detailRow}><User size={12} color={COLORS.textSecondary} /><Text style={styles.detailTextSmall}>{hist.scheduleSlot?.nurse || 'Nurse'}</Text></View>
+                    </View>
+                    <TouchableOpacity style={styles.viewReportBtn}>
+                      <FileText size={14} color={COLORS.primary} />
+                      <Text style={styles.viewReportBtnText}>View Report</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })
+            )}
           </ScrollView>
 
           <Text style={[styles.sectionTitle, { marginTop: 10 }]}>Performance Summary</Text>
           <View style={styles.historyCard}>
             <View style={styles.historyRow}>
-              <View><Text style={styles.historyLabel}>Total Tests Done</Text><Text style={styles.historyValue}>{HISTORY_STATS.totalTests}</Text></View>
-              <View><Text style={styles.historyLabel}>Total Revenue</Text><Text style={styles.historyValue}>{HISTORY_STATS.revenue}</Text></View>
-              <View><Text style={styles.historyLabel}>Avg Wait Time</Text><Text style={styles.historyValue}>{HISTORY_STATS.avgWaitTime}</Text></View>
+              <View><Text style={styles.historyLabel}>Total Tests Done</Text><Text style={styles.historyValue}>{stats.totalTestsDone}</Text></View>
+              <View><Text style={styles.historyLabel}>Total Revenue</Text><Text style={styles.historyValue}>{stats.totalRevenue}</Text></View>
+              <View><Text style={styles.historyLabel}>Avg Wait Time</Text><Text style={styles.historyValue}>{stats.avgWaitTime}</Text></View>
             </View>
           </View>
         </View>
