@@ -305,6 +305,7 @@ export const updateProfile = async (req, res) => {
     if (user) {
       user.name = req.body.name || user.name;
       user.phone = req.body.phone || user.phone;
+      user.nic = req.body.nic || user.nic;
       user.dob = req.body.dob || user.dob;
       user.gender = req.body.gender || user.gender;
       user.address = req.body.address || user.address;
@@ -333,6 +334,7 @@ export const updateProfile = async (req, res) => {
           name: updatedUser.name,
           email: updatedUser.email,
           phone: updatedUser.phone,
+          nic: updatedUser.nic,
           dob: updatedUser.dob,
           gender: updatedUser.gender,
           address: updatedUser.address,
