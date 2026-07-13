@@ -11,10 +11,12 @@ import {
   getDoctorAvailabilityForPatient,
   getPatientDetailsForDoctor,
   updateSessionState,
-  getDoctorAnalytics
+  getDoctorAnalytics,
+  uploadDoctorAvatar
 } from '../controllers/doctorController.js';
 import { protect } from '../middlewares/authMiddleware.js';
 import { doctorOnly } from '../middlewares/roleMiddleware.js';
+import upload from '../middlewares/uploadMiddleware.js';
 
 const router = express.Router();
 
@@ -30,6 +32,7 @@ router.use(protect);
 router.get('/dashboard', doctorOnly, getDoctorDashboard);
 router.get('/analytics', doctorOnly, getDoctorAnalytics);
 router.put('/profile', doctorOnly, updateDoctorProfile);
+router.post('/profile/upload-avatar', doctorOnly, upload.single('avatar'), uploadDoctorAvatar);
 router.get('/patient/:id', doctorOnly, getPatientDetailsForDoctor);
 router.put('/session/:action', doctorOnly, updateSessionState);
 

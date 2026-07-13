@@ -5,7 +5,7 @@ import NotificationSetting from '../model/NotificationSetting.js';
 const listNotifications = async (req, res, next) => {
   try {
     const { page = 1, limit = 20, isRead } = req.query;
-    const filter = { recipient: req.user.id };
+    const filter = { user: req.user.id };
 
     if (isRead !== undefined) {
       filter.isRead = isRead === 'true';
@@ -21,7 +21,7 @@ const listNotifications = async (req, res, next) => {
         .skip(skip)
         .limit(pageSize),
       Notification.countDocuments(filter),
-      Notification.countDocuments({ recipient: req.user.id, isRead: false })
+      Notification.countDocuments({ user: req.user.id, isRead: false })
     ]);
 
     res.status(200).json({
@@ -49,7 +49,7 @@ const markAsRead = async (req, res, next) => {
     }
 
     const notification = await Notification.findOneAndUpdate(
-      { _id: id, recipient: req.user.id },
+      { _id: id, user: req.user.id },
       { $set: { isRead: true } },
       { new: true }
     );
@@ -67,7 +67,7 @@ const markAsRead = async (req, res, next) => {
 const markAllAsRead = async (req, res, next) => {
   try {
     await Notification.updateMany(
-      { recipient: req.user.id, isRead: false },
+      { user: req.user.id, isRead: false },
       { $set: { isRead: true } }
     );
 
@@ -85,7 +85,7 @@ const deleteNotification = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Invalid notification id' });
     }
 
-    const result = await Notification.findOneAndDelete({ _id: id, recipient: req.user.id });
+    const result = await Notification.findOneAndDelete({ _id: id, user: req.user.id });
 
     if (!result) {
       return res.status(404).json({ success: false, message: 'Notification not found' });
@@ -112,29 +112,33 @@ const createNotification = async (req, res, next) => {
       }
     }
 
-    const validTypes = ['Appointment', 'LabResult', 'General', 'Promo'];
+    const validTypes = ['Appointment', 'LabResult', 'General', 'Promo', 'appointment', 'lab_report', 'system', 'message'];
     if (!validTypes.includes(type)) {
       return res.status(400).json({ success: false, message: `type must be one of: ${validTypes.join(', ')}` });
     }
 
+    let dbType = type.toLowerCase();
+    if (dbType === 'labresult') dbType = 'lab_report';
+    if (dbType === 'general' || dbType === 'promo') dbType = 'system';
+
     const setting = await NotificationSetting.findOne({ user: recipientId });
     if (setting) {
-      if (type === 'Appointment' && !setting.appointmentReminders) {
+      if ((type === 'Appointment' || type === 'appointment') && !setting.appointmentReminders) {
         return res.status(200).json({ success: true, message: 'Notification skipped due to user preference' });
       }
-      if (type === 'LabResult' && !setting.labResultAlerts) {
+      if ((type === 'LabResult' || type === 'lab_report') && !setting.labResultAlerts) {
         return res.status(200).json({ success: true, message: 'Notification skipped due to user preference' });
       }
-      if (type === 'Promo' && !setting.promoNotifications) {
+      if ((type === 'Promo' || type === 'promo') && !setting.promoNotifications) {
         return res.status(200).json({ success: true, message: 'Notification skipped due to user preference' });
       }
     }
 
     const notification = await Notification.create({
-      recipient: recipientId,
+      user: recipientId,
       title,
       message,
-      type,
+      type: dbType,
       isRead: false
     });
 

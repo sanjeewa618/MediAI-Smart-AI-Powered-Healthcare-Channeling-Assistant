@@ -611,6 +611,22 @@ const AdminAppointmentsScreen = () => {
 
                   {/* Doctor Card Status Actions */}
                   <View style={styles.cardActions}>
+                    {item.status === 'pending' && (
+                      <>
+                        <TouchableOpacity 
+                          style={[styles.actionBtn, { backgroundColor: '#FEE2E2', marginRight: 8 }]}
+                          onPress={() => handleUpdateStatus(item._id, 'cancelled')}
+                        >
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#DC2626' }}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={[styles.actionBtn, { backgroundColor: '#D1FAE5', marginRight: 8 }]}
+                          onPress={() => handleUpdateStatus(item._id, 'confirmed')}
+                        >
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#065F46' }}>Accept</Text>
+                        </TouchableOpacity>
+                      </>
+                    )}
                     <TouchableOpacity 
                       style={[styles.actionBtn, { backgroundColor: COLORS.primaryLight }]}
                       onPress={() => {
@@ -621,7 +637,7 @@ const AdminAppointmentsScreen = () => {
                       <Text style={{ fontSize: 11, fontWeight: '700', color: COLORS.primary }}>View Receipt</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
-                      style={[styles.actionBtn, { backgroundColor: '#EFF6FF' }]}
+                      style={[styles.actionBtn, { backgroundColor: '#EFF6FF', marginLeft: 8 }]}
                       onPress={() => handleDownloadDoctorReceipt(item)}
                     >
                       <Text style={{ fontSize: 11, fontWeight: '700', color: '#2563EB' }}>Download PDF</Text>
@@ -739,6 +755,29 @@ const AdminAppointmentsScreen = () => {
                   <Text style={styles.infoText}><Text style={{ fontWeight: '600' }}>Time Slot:</Text> {selectedAppt.time}</Text>
                   <Text style={styles.infoText}><Text style={{ fontWeight: '600' }}>Status:</Text> {selectedAppt.status}</Text>
                 </View>
+
+                {selectedAppt.status === 'pending' && (
+                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 20, paddingHorizontal: 16, marginBottom: 10 }}>
+                    <TouchableOpacity 
+                      style={{ backgroundColor: '#EF4444', flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
+                      onPress={() => {
+                        handleUpdateStatus(selectedAppt._id, 'cancelled');
+                        setModalVisible(false);
+                      }}
+                    >
+                      <Text style={{ color: '#FFF', fontWeight: '700' }}>Cancel Appointment</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={{ backgroundColor: '#10B981', flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
+                      onPress={() => {
+                        handleUpdateStatus(selectedAppt._id, 'confirmed');
+                        setModalVisible(false);
+                      }}
+                    >
+                      <Text style={{ color: '#FFF', fontWeight: '700' }}>Accept Appointment</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </ScrollView>
             )}
           </View>

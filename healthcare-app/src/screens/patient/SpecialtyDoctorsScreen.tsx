@@ -8,7 +8,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.158.225.227:4000';
 
 type SpecialtyDoctorsRouteProp = RouteProp<RootStackParamList, 'SpecialtyDoctors'>;
 type SpecialtyDoctorsNavigationProp = StackNavigationProp<RootStackParamList, 'SpecialtyDoctors'>;
@@ -90,7 +90,14 @@ const SpecialtyDoctorsScreen = () => {
               style={styles.doctorCard}
               onPress={() => navigation.navigate('DoctorAvailability', { specialty: specialty })}
             >
-              <Image source={{ uri: doctor.profileImage || 'https://img.freepik.com/free-photo/doctor-offering-medical-teleconsultation_23-2149329007.jpg' }} style={styles.doctorImage} />
+              <Image 
+                source={{ 
+                  uri: doctor.photo 
+                    ? (doctor.photo.startsWith('http') ? doctor.photo : `${API_BASE_URL}${doctor.photo}`)
+                    : 'https://img.freepik.com/free-photo/doctor-offering-medical-teleconsultation_23-2149329007.jpg' 
+                }} 
+                style={styles.doctorImage} 
+              />
               <View style={styles.doctorDetails}>
                 <View style={styles.nameRow}>
                   <Text style={styles.doctorName}>{doctor.name}</Text>

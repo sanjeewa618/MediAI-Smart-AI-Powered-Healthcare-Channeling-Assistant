@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Platform, Dimensions, TextInput, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Platform, Dimensions, TextInput, ActivityIndicator, ScrollView, Image } from 'react-native';
 import { ChevronLeft, Search, ArrowRight } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -9,7 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import BottomNavBar from '../../components/BottomNavBar';
 import { useAuth } from '../../context/AuthContext';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.32.136.102:4000';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.158.225.227:4000';
 
 type NavProp = StackNavigationProp<RootStackParamList, 'DoctorAvailability'>;
 
@@ -18,6 +18,7 @@ interface Doctor {
   name: string;
   specialization: string;
   hospital?: string;
+  photo?: string;
 }
 
   const DoctorAvailability = () => {
@@ -87,9 +88,16 @@ interface Doctor {
     <View style={[styles.card, SHADOWS.medium]}>
       <View style={styles.cardHeader}>
         <View style={styles.docMainInfo}>
-          <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarInitials}>{item.name.charAt(0)}</Text>
-          </View>
+          {item.photo ? (
+            <Image 
+              source={{ uri: item.photo.startsWith('http') ? item.photo : `${API_BASE_URL}${item.photo}` }} 
+              style={{ width: 60, height: 60, borderRadius: 20, marginRight: 16 }} 
+            />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Text style={styles.avatarInitials}>{item.name.charAt(0)}</Text>
+            </View>
+          )}
           <View style={styles.textGroup}>
             <Text style={styles.docName}>{item.name}</Text>
             <Text style={styles.docSpecialty}>{item.specialization || 'General Physician'}</Text>
