@@ -24,6 +24,7 @@ export type RootStackParamList = {
   // Patient sub-screens
   BookAppointment: { doctorId?: string; doctorName?: string; specialty?: string; date?: string; time?: string; queueNumber?: number | null };
   AIHealthAssistant: undefined;
+  PatientAIChat: undefined;
   FindDoctors: undefined;
   PatientAppointments: undefined;
   PatientProfile: undefined;

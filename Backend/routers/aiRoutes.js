@@ -1,5 +1,5 @@
 import express from 'express';
-import { analyzeSymptoms, getAIHistory } from '../controllers/aiController.js';
+import { analyzeSymptoms, getAIHistory, analyzeReports } from '../controllers/aiController.js';
 import { protect } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
@@ -8,6 +8,7 @@ const router = express.Router();
 router.use(protect);
 
 router.post('/analyze', analyzeSymptoms);
+router.post('/chat', analyzeReports);
 router.get('/history', getAIHistory);
 
 export default router;
